@@ -1,4 +1,5 @@
 import { app, ipcMain as electronIpcMain } from 'electron';
+import { z } from 'zod';
 
 import type {
   EnterpriseLoginPollResult,
@@ -8,6 +9,7 @@ import type {
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
 import { ENTERPRISE_IPC_CHANNELS } from '@/common/enterprise/constants';
+import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import {
   EnterpriseApiClient,
   EnterpriseApiError,
@@ -73,6 +75,28 @@ const BRIDGE_ERROR_MESSAGES: Record<Exclude<EnterpriseBridgeErrorCode, Enterpris
   SESSION_RESTORE_FAILED: 'Enterprise session restoration failed.',
   SESSION_CLEAR_FAILED: 'Enterprise session clearing failed.',
   REQUEST_FAILED: 'Enterprise request failed.',
+};
+
+const loginKeySchema = z.string().regex(/^enterprise_desktop_[A-Za-z0-9]{18}$/);
+const registrationOpenIdSchema = z
+  .string()
+  .transform((value) => value.trim())
+  .pipe(
+    z
+      .string()
+      .min(1)
+      .max(256)
+      .refine((value) => !/\p{C}/u.test(value))
+  );
+
+const hasRequiredEnterpriseRequestFields = (
+  value: z.output<typeof enterpriseRequestSchema>
+): value is EnterpriseRequest => value.operation !== undefined && value.payload !== undefined;
+
+const parseStrictEnterpriseRequest = (value: unknown): EnterpriseRequest | undefined => {
+  const parsed = enterpriseRequestSchema.safeParse(value);
+  if (!parsed.success || !hasRequiredEnterpriseRequestFields(parsed.data)) return undefined;
+  return parsed.data;
 };
 
 /** A stable, non-sensitive failure crossing the enterprise IPC boundary. */
@@ -174,6 +198,21 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     return context;
   };
 
+  const commitAuthenticatedContext = async (
+    openId: string,
+    context: EnterpriseUserContext,
+    generationAtStart: number
+  ): Promise<void> => {
+    if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
+    sessionGeneration += 1;
+    const commitGeneration = sessionGeneration;
+    activeContext = null;
+
+    await sessionStore.saveOpenId(openId);
+    if (sessionGeneration !== commitGeneration) throw bridgeError('MISSING_CONTEXT');
+    activeContext = context;
+  };
+
   const handlers: ReadonlyArray<readonly [string, EnterpriseIpcHandler]> = [
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_CREATE,
@@ -189,16 +228,14 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
       ENTERPRISE_IPC_CHANNELS.AUTH_POLL,
       async (_event, loginKey) => {
         try {
-          if (typeof loginKey !== 'string') throw bridgeError('INVALID_REQUEST');
+          const parsedLoginKey = loginKeySchema.safeParse(loginKey);
+          if (!parsedLoginKey.success) throw bridgeError('INVALID_REQUEST');
           const generationAtStart = sessionGeneration;
-          const result = await apiClient.pollLoginSession(loginKey);
+          const result = await apiClient.pollLoginSession(parsedLoginKey.data);
           if (result.status !== 'AUTHENTICATED') return result;
           if (!isRegisteredContext(result.userContext, result.openId)) throw bridgeError('INVALID_AUTH_RESULT');
-          if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
 
-          await sessionStore.saveOpenId(result.openId);
-          if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
-          activeContext = result.userContext;
+          await commitAuthenticatedContext(result.openId, result.userContext, generationAtStart);
           return result;
         } catch (error) {
           throw sanitizeFailure(error, 'AUTH_POLL_FAILED');
@@ -209,16 +246,14 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
       ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION,
       async (_event, untrustedOpenId) => {
         try {
-          const openId = normalizeUntrustedText(untrustedOpenId);
-          if (!openId) throw bridgeError('INVALID_REQUEST');
+          const parsedOpenId = registrationOpenIdSchema.safeParse(untrustedOpenId);
+          if (!parsedOpenId.success) throw bridgeError('INVALID_REQUEST');
+          const openId = parsedOpenId.data;
           const generationAtStart = sessionGeneration;
           const context = await apiClient.getUserContext(openId);
           if (!isRegisteredContext(context, openId)) throw bridgeError('REGISTRATION_INCOMPLETE');
-          if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
 
-          await sessionStore.saveOpenId(openId);
-          if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
-          activeContext = context;
+          await commitAuthenticatedContext(openId, context, generationAtStart);
           return context;
         } catch (error) {
           throw sanitizeFailure(error, 'REGISTRATION_FAILED');
@@ -249,8 +284,10 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
       ENTERPRISE_IPC_CHANNELS.REQUEST,
       async (_event, request) => {
         try {
+          const parsedRequest = parseStrictEnterpriseRequest(request);
+          if (!parsedRequest) throw bridgeError('INVALID_REQUEST');
           const context = await requireActiveContext();
-          return await apiClient.request(request as EnterpriseRequest, context);
+          return await apiClient.request(parsedRequest, context);
         } catch (error) {
           throw sanitizeFailure(error, 'REQUEST_FAILED');
         }

@@ -9,16 +9,30 @@ const MAX_SESSION_FILE_BYTES = 4096;
 const MAX_OPEN_ID_LENGTH = 256;
 
 type SessionFileStat = {
-  size: number;
+  dev: bigint;
+  ino: bigint;
+  size: bigint;
   isFile: () => boolean;
   isSymbolicLink: () => boolean;
 };
 
+export type EnterpriseSessionFileHandle = {
+  stat: (options: { bigint: true }) => Promise<SessionFileStat>;
+  read: (
+    buffer: Uint8Array,
+    offset: number,
+    length: number,
+    position: number
+  ) => Promise<{ bytesRead: number; buffer: Uint8Array }>;
+  writeFile: (data: string) => Promise<void>;
+  sync: () => Promise<void>;
+  close: () => Promise<void>;
+};
+
 export type EnterpriseSessionFileSystem = {
   mkdir: (directoryPath: string, options: { recursive: true }) => Promise<string | undefined>;
-  lstat: (filePath: string) => Promise<SessionFileStat>;
-  readFile: (filePath: string, options: { encoding: 'utf8' }) => Promise<string>;
-  writeFile: (filePath: string, data: string, options: { encoding: 'utf8'; flag: 'wx'; mode: number }) => Promise<void>;
+  lstat: (filePath: string, options: { bigint: true }) => Promise<SessionFileStat>;
+  open: (filePath: string, flags: string, mode?: number) => Promise<EnterpriseSessionFileHandle>;
   rename: (oldPath: string, newPath: string) => Promise<void>;
   unlink: (filePath: string) => Promise<void>;
 };
@@ -30,9 +44,17 @@ export type EnterpriseSessionStoreOptions = {
 
 const defaultFileSystem: EnterpriseSessionFileSystem = {
   mkdir: (directoryPath, options) => fs.mkdir(directoryPath, options),
-  lstat: (filePath) => fs.lstat(filePath),
-  readFile: (filePath, options) => fs.readFile(filePath, options),
-  writeFile: (filePath, data, options) => fs.writeFile(filePath, data, options),
+  lstat: (filePath, options) => fs.lstat(filePath, options),
+  open: async (filePath, flags, mode) => {
+    const handle = await fs.open(filePath, flags, mode);
+    return {
+      stat: (options) => handle.stat(options),
+      read: (buffer, offset, length, position) => handle.read(buffer, offset, length, position),
+      writeFile: (data) => handle.writeFile(data, { encoding: 'utf8' }),
+      sync: () => handle.sync(),
+      close: () => handle.close(),
+    };
+  },
   rename: (oldPath, newPath) => fs.rename(oldPath, newPath),
   unlink: (filePath) => fs.unlink(filePath),
 };
@@ -65,6 +87,19 @@ const getErrorCode = (error: unknown): string | undefined => {
   }
 };
 
+const isValidIdentityPart = (value: bigint): boolean => value >= BigInt(0);
+
+const isUsableSessionStat = (stat: SessionFileStat): boolean =>
+  isValidIdentityPart(stat.dev) &&
+  isValidIdentityPart(stat.ino) &&
+  stat.size > BigInt(0) &&
+  stat.size <= BigInt(MAX_SESSION_FILE_BYTES) &&
+  stat.isFile() &&
+  !stat.isSymbolicLink();
+
+const hasSameFileIdentity = (left: SessionFileStat, right: SessionFileStat): boolean =>
+  left.dev === right.dev && left.ino === right.ino;
+
 /** A fixed, non-sensitive failure from the enterprise session persistence boundary. */
 export class EnterpriseSessionStoreError extends Error {
   constructor() {
@@ -89,33 +124,36 @@ export class EnterpriseSessionStore {
   /** Loads a valid openId, returning null for absent or isolated corrupt session data. */
   loadOpenId(): Promise<string | null> {
     return this.runSerialized(async () => {
-      let stat: SessionFileStat;
+      let handle: EnterpriseSessionFileHandle | undefined;
       try {
-        stat = await this.fileSystem.lstat(this.sessionPath);
+        const pathStatBeforeOpen = await this.fileSystem.lstat(this.sessionPath, { bigint: true });
+        if (!isUsableSessionStat(pathStatBeforeOpen)) return null;
+
+        handle = await this.fileSystem.open(this.sessionPath, 'r');
+        const handleStat = await handle.stat({ bigint: true });
+        const pathStatAfterOpen = await this.fileSystem.lstat(this.sessionPath, { bigint: true });
+        const isStableRegularFile =
+          isUsableSessionStat(handleStat) &&
+          isUsableSessionStat(pathStatAfterOpen) &&
+          hasSameFileIdentity(pathStatBeforeOpen, handleStat) &&
+          hasSameFileIdentity(handleStat, pathStatAfterOpen);
+        if (!isStableRegularFile) return null;
+
+        const contents = await this.readBounded(handle);
+        if (contents === null) return null;
+
+        try {
+          const parsedJson: unknown = JSON.parse(contents);
+          const parsedSession = sessionSchema.safeParse(parsedJson);
+          return parsedSession.success ? parsedSession.data.openId : null;
+        } catch {
+          return null;
+        }
       } catch (error) {
         if (getErrorCode(error) === 'ENOENT') return null;
         throw new EnterpriseSessionStoreError();
-      }
-
-      if (!stat.isFile() || stat.isSymbolicLink() || stat.size <= 0 || stat.size > MAX_SESSION_FILE_BYTES) {
-        return null;
-      }
-
-      let contents: string;
-      try {
-        contents = await this.fileSystem.readFile(this.sessionPath, { encoding: 'utf8' });
-      } catch (error) {
-        if (getErrorCode(error) === 'ENOENT') return null;
-        throw new EnterpriseSessionStoreError();
-      }
-      if (Buffer.byteLength(contents, 'utf8') > MAX_SESSION_FILE_BYTES) return null;
-
-      try {
-        const parsedJson: unknown = JSON.parse(contents);
-        const parsedSession = sessionSchema.safeParse(parsedJson);
-        return parsedSession.success ? parsedSession.data.openId : null;
-      } catch {
-        return null;
+      } finally {
+        if (handle) await this.closeReadHandle(handle);
       }
     });
   }
@@ -127,21 +165,23 @@ export class EnterpriseSessionStore {
 
     return this.runSerialized(async () => {
       let temporaryPath: string | undefined;
-      let temporaryFileCreated = false;
+      let handle: EnterpriseSessionFileHandle | undefined;
+      let ownsTemporaryFile = false;
       try {
         temporaryPath = `${this.sessionPath}.${this.randomUUID()}.tmp`;
         const contents = JSON.stringify({ version: 1, openId: parsedOpenId.data });
         await this.fileSystem.mkdir(path.dirname(this.sessionPath), { recursive: true });
-        await this.fileSystem.writeFile(temporaryPath, contents, {
-          encoding: 'utf8',
-          flag: 'wx',
-          mode: 0o600,
-        });
-        temporaryFileCreated = true;
+        handle = await this.fileSystem.open(temporaryPath, 'wx', 0o600);
+        ownsTemporaryFile = true;
+        await handle.writeFile(contents);
+        await handle.sync();
+        await handle.close();
+        handle = undefined;
         await this.fileSystem.rename(temporaryPath, this.sessionPath);
-        temporaryFileCreated = false;
+        ownsTemporaryFile = false;
       } catch {
-        if (temporaryFileCreated && temporaryPath) await this.removeTemporaryFile(temporaryPath);
+        if (handle) await this.closeWriteHandleBestEffort(handle);
+        if (ownsTemporaryFile && temporaryPath) await this.removeTemporaryFile(temporaryPath);
         throw new EnterpriseSessionStoreError();
       }
     });
@@ -173,6 +213,39 @@ export class EnterpriseSessionStore {
       await this.fileSystem.unlink(temporaryPath);
     } catch {
       // Cleanup is best-effort and must never replace the original sanitized failure.
+    }
+  }
+
+  private async readBounded(handle: EnterpriseSessionFileHandle): Promise<string | null> {
+    const buffer = Buffer.alloc(MAX_SESSION_FILE_BYTES + 1);
+    let totalBytes = 0;
+    while (totalBytes < buffer.byteLength) {
+      const remainingBytes = buffer.byteLength - totalBytes;
+      // eslint-disable-next-line no-await-in-loop -- Reads are sequential and capped at MAX+1 bytes.
+      const result = await handle.read(buffer, totalBytes, remainingBytes, totalBytes);
+      if (!Number.isSafeInteger(result.bytesRead) || result.bytesRead < 0 || result.bytesRead > remainingBytes) {
+        throw new EnterpriseSessionStoreError();
+      }
+      if (result.bytesRead === 0) break;
+      totalBytes += result.bytesRead;
+    }
+    if (totalBytes > MAX_SESSION_FILE_BYTES) return null;
+    return buffer.subarray(0, totalBytes).toString('utf8');
+  }
+
+  private async closeReadHandle(handle: EnterpriseSessionFileHandle): Promise<void> {
+    try {
+      await handle.close();
+    } catch {
+      throw new EnterpriseSessionStoreError();
+    }
+  }
+
+  private async closeWriteHandleBestEffort(handle: EnterpriseSessionFileHandle): Promise<void> {
+    try {
+      await handle.close();
+    } catch {
+      // The owned temporary path is still unlinked after a close failure.
     }
   }
 }

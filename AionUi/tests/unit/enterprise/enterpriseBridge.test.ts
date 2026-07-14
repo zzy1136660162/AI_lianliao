@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   EnterpriseLoginPollResult,
   EnterpriseRequest,
-  EnterpriseResponse,
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
 import { ENTERPRISE_IPC_CHANNELS } from '@/common/enterprise/constants';
@@ -52,6 +51,8 @@ type SessionStoreDouble = {
 };
 
 const OPEN_ID = 'wx-open-id-sensitive-value';
+const OLD_OPEN_ID = 'old-open-id';
+const LOGIN_KEY = 'enterprise_desktop_123456789012345678';
 const USER_CONTEXT: EnterpriseUserContext = {
   registered: true,
   openId: OPEN_ID,
@@ -59,6 +60,12 @@ const USER_CONTEXT: EnterpriseUserContext = {
   companyId: '202',
   userName: 'User',
   companyName: 'Company',
+};
+const OLD_USER_CONTEXT: EnterpriseUserContext = {
+  registered: true,
+  openId: OLD_OPEN_ID,
+  userId: '301',
+  companyId: '302',
 };
 
 const makeApiClient = (): ApiClientDouble => ({
@@ -96,6 +103,20 @@ const invokeHandler = async (handlers: Map<string, Handler>, channel: string, ..
   const handler = handlers.get(channel);
   if (!handler) throw new Error(`Missing test handler: ${channel}`);
   return handler({}, ...args);
+};
+
+const createDeferred = <T>() => {
+  let resolve: ((value: T) => void) | undefined;
+  let reject: ((reason?: unknown) => void) | undefined;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return {
+    promise,
+    resolve: (value: T) => resolve?.(value),
+    reject: (reason?: unknown) => reject?.(reason),
+  };
 };
 
 describe('enterprise bridge', () => {
@@ -152,9 +173,7 @@ describe('enterprise bridge', () => {
     const sessionStore = makeSessionStore();
     const { handlers } = await initializeBridge(apiClient, sessionStore);
 
-    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, 'valid-login-key')).resolves.toEqual(
-      result
-    );
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY)).resolves.toEqual(result);
     expect(sessionStore.saveOpenId).not.toHaveBeenCalled();
   });
 
@@ -169,13 +188,28 @@ describe('enterprise bridge', () => {
     const sessionStore = makeSessionStore();
     const { handlers } = await initializeBridge(apiClient, sessionStore);
 
-    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, 'valid-login-key')).resolves.toEqual(
-      result
-    );
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY)).resolves.toEqual(result);
     expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OPEN_ID);
   });
 
-  it('rejects untrusted poll arguments and malformed authenticated identities without persistence', async () => {
+  it.each([123, 'valid-login-key', ` ${LOGIN_KEY}`, `${LOGIN_KEY} `])(
+    'rejects an inexact poll argument before session or API access: %j',
+    async (loginKey) => {
+      const apiClient = makeApiClient();
+      const sessionStore = makeSessionStore();
+      const { handlers } = await initializeBridge(apiClient, sessionStore);
+
+      await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, loginKey)).rejects.toMatchObject({
+        code: 'INVALID_REQUEST',
+      });
+      expect(apiClient.pollLoginSession).not.toHaveBeenCalled();
+      expect(sessionStore.loadOpenId).not.toHaveBeenCalled();
+      expect(sessionStore.saveOpenId).not.toHaveBeenCalled();
+      expect(sessionStore.clear).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects malformed authenticated identities without persistence', async () => {
     const apiClient = makeApiClient();
     apiClient.pollLoginSession.mockResolvedValue({
       status: 'AUTHENTICATED',
@@ -185,10 +219,7 @@ describe('enterprise bridge', () => {
     const sessionStore = makeSessionStore();
     const { handlers } = await initializeBridge(apiClient, sessionStore);
 
-    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, 123)).rejects.toMatchObject({
-      code: 'INVALID_REQUEST',
-    });
-    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, 'valid-login-key')).rejects.toMatchObject({
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY)).rejects.toMatchObject({
       code: 'INVALID_AUTH_RESULT',
     });
     expect(sessionStore.saveOpenId).not.toHaveBeenCalled();
@@ -222,6 +253,22 @@ describe('enterprise bridge', () => {
     ).rejects.toMatchObject({ code: 'REGISTRATION_INCOMPLETE' });
     expect(sessionStore.saveOpenId).not.toHaveBeenCalled();
   });
+
+  it.each([123, '', '   ', `${OPEN_ID}\u0000`])(
+    'rejects an invalid registration openId before session or API access: %j',
+    async (openId) => {
+      const apiClient = makeApiClient();
+      const sessionStore = makeSessionStore();
+      const { handlers } = await initializeBridge(apiClient, sessionStore);
+
+      await expect(
+        invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, openId)
+      ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+      expect(apiClient.getUserContext).not.toHaveBeenCalled();
+      expect(sessionStore.loadOpenId).not.toHaveBeenCalled();
+      expect(sessionStore.saveOpenId).not.toHaveBeenCalled();
+    }
+  );
 
   it('restores by loading only openId and refreshing the user context', async () => {
     const apiClient = makeApiClient();
@@ -313,20 +360,13 @@ describe('enterprise bridge', () => {
     expect(apiClient.request).not.toHaveBeenCalled();
   });
 
-  it('hydrates a persisted identity once and never accepts renderer-injected context', async () => {
+  it('rejects renderer-injected context before hydration or business transport', async () => {
     const request: EnterpriseRequest = {
       operation: 'company.detail',
       payload: { companyId: '303' },
     };
-    const response: EnterpriseResponse = {
-      operation: 'company.detail',
-      data: { companyId: '303', name: 'Target' },
-    };
     const apiClient = makeApiClient();
-    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
-    apiClient.request.mockResolvedValue(response);
     const sessionStore = makeSessionStore();
-    sessionStore.loadOpenId.mockResolvedValue(OPEN_ID);
     const { handlers } = await initializeBridge(apiClient, sessionStore);
 
     await expect(
@@ -334,12 +374,48 @@ describe('enterprise bridge', () => {
         ...request,
         context: { openId: 'renderer-injected' },
       })
-    ).resolves.toEqual(response);
-    expect(apiClient.request).toHaveBeenCalledWith(
-      { ...request, context: { openId: 'renderer-injected' } },
-      USER_CONTEXT
+    ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+    expect(sessionStore.loadOpenId).not.toHaveBeenCalled();
+    expect(apiClient.getUserContext).not.toHaveBeenCalled();
+    expect(apiClient.request).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed, prototype-bearing, and accessor requests before touching session state', async () => {
+    let accessorRead = false;
+    const accessorPayload = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(accessorPayload, 'runId', {
+      enumerable: true,
+      get: () => {
+        accessorRead = true;
+        return 'run';
+      },
+    });
+    const inheritedRequest = Object.assign(Object.create({ injected: true }) as Record<string, unknown>, {
+      operation: 'project.dashboard',
+      payload: {},
+    });
+    const invalidRequests: unknown[] = [
+      null,
+      {},
+      { operation: 'unknown', payload: {} },
+      { operation: 'project.dashboard', payload: accessorPayload },
+      inheritedRequest,
+    ];
+    const apiClient = makeApiClient();
+    const sessionStore = makeSessionStore();
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+
+    await Promise.all(
+      invalidRequests.map((request) =>
+        expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).rejects.toMatchObject({
+          code: 'INVALID_REQUEST',
+        })
+      )
     );
-    expect(apiClient.getUserContext).toHaveBeenCalledOnce();
+    expect(accessorRead).toBe(false);
+    expect(sessionStore.loadOpenId).not.toHaveBeenCalled();
+    expect(apiClient.getUserContext).not.toHaveBeenCalled();
+    expect(apiClient.request).not.toHaveBeenCalled();
   });
 
   it('deduplicates concurrent persisted-session hydration', async () => {
@@ -359,6 +435,111 @@ describe('enterprise bridge', () => {
     expect(sessionStore.loadOpenId).toHaveBeenCalledOnce();
     expect(apiClient.getUserContext).toHaveBeenCalledOnce();
     expect(apiClient.request).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['registered', OLD_USER_CONTEXT],
+    ['unregistered', { registered: false, openId: OLD_OPEN_ID }],
+  ] as const)('prevents an old %s restore from overriding or clearing a polled identity', async (_label, oldResult) => {
+    const oldContext = createDeferred<EnterpriseUserContext>();
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockReturnValue(oldContext.promise);
+    apiClient.pollLoginSession.mockResolvedValue({
+      status: 'AUTHENTICATED',
+      openId: OPEN_ID,
+      userContext: USER_CONTEXT,
+    });
+    apiClient.request.mockResolvedValue({ operation: 'project.dashboard', data: {} });
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockResolvedValue(OLD_OPEN_ID);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    const restoring = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    await vi.waitFor(() => expect(apiClient.getUserContext).toHaveBeenCalledWith(OLD_OPEN_ID));
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY)).resolves.toMatchObject({
+      status: 'AUTHENTICATED',
+    });
+    oldContext.resolve(oldResult);
+
+    await expect(restoring).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await expect(
+      invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, { operation: 'project.dashboard', payload: {} })
+    ).resolves.toMatchObject({ operation: 'project.dashboard' });
+    expect(apiClient.request).toHaveBeenCalledWith({ operation: 'project.dashboard', payload: {} }, USER_CONTEXT);
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+  });
+
+  it('prevents an old restore from overriding an identity committed by registration completion', async () => {
+    const oldContext = createDeferred<EnterpriseUserContext>();
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockReturnValueOnce(oldContext.promise).mockResolvedValueOnce(USER_CONTEXT);
+    apiClient.request.mockResolvedValue({ operation: 'project.dashboard', data: {} });
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockResolvedValue(OLD_OPEN_ID);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    const restoring = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    await vi.waitFor(() => expect(apiClient.getUserContext).toHaveBeenCalledWith(OLD_OPEN_ID));
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID)).resolves.toEqual(
+      USER_CONTEXT
+    );
+    oldContext.resolve(OLD_USER_CONTEXT);
+
+    await expect(restoring).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, {
+      operation: 'project.dashboard',
+      payload: {},
+    });
+    expect(apiClient.request).toHaveBeenCalledWith({ operation: 'project.dashboard', payload: {} }, USER_CONTEXT);
+  });
+
+  it('fails a polled auth commit closed when clear wins while its save is in flight', async () => {
+    const save = createDeferred<void>();
+    const apiClient = makeApiClient();
+    apiClient.pollLoginSession.mockResolvedValue({
+      status: 'AUTHENTICATED',
+      openId: OPEN_ID,
+      userContext: USER_CONTEXT,
+    });
+    const sessionStore = makeSessionStore();
+    sessionStore.saveOpenId.mockReturnValue(save.promise);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    const polling = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY);
+    await vi.waitFor(() => expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OPEN_ID));
+
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    save.resolve();
+
+    await expect(polling).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await expect(
+      invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, { operation: 'project.dashboard', payload: {} })
+    ).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    expect(apiClient.request).not.toHaveBeenCalled();
+  });
+
+  it('does not revive an old hydration after an authenticated session save fails', async () => {
+    const oldContext = createDeferred<EnterpriseUserContext>();
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockReturnValue(oldContext.promise);
+    apiClient.pollLoginSession.mockResolvedValue({
+      status: 'AUTHENTICATED',
+      openId: OPEN_ID,
+      userContext: USER_CONTEXT,
+    });
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockResolvedValue(OLD_OPEN_ID);
+    sessionStore.saveOpenId.mockRejectedValue(new Error(`${OPEN_ID} save failed`));
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    const restoring = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    await vi.waitFor(() => expect(apiClient.getUserContext).toHaveBeenCalledWith(OLD_OPEN_ID));
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY)).rejects.toMatchObject({
+      code: 'AUTH_POLL_FAILED',
+    });
+    oldContext.resolve(OLD_USER_CONTEXT);
+
+    await expect(restoring).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    expect(sessionStore.clear).not.toHaveBeenCalled();
   });
 
   it('preserves stable API error codes but masks arbitrary dependency failures', async () => {
