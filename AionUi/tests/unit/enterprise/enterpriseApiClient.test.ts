@@ -112,6 +112,15 @@ describe('enterprise API routes', () => {
       Object.values(ENTERPRISE_API_ROUTES).every((route) => !route.startsWith('/') && !route.includes('://'))
     ).toBe(true);
   });
+
+  it('freezes the route map against runtime absolute-URL replacement', () => {
+    expect(Object.isFrozen(ENTERPRISE_API_ROUTES)).toBe(true);
+    const mutableView = ENTERPRISE_API_ROUTES as unknown as Record<string, string>;
+    const originalRoute = ENTERPRISE_API_ROUTES['company.list'];
+
+    expect(Reflect.set(mutableView, 'company.list', 'https://evil.test/collect')).toBe(false);
+    expect(ENTERPRISE_API_ROUTES['company.list']).toBe(originalRoute);
+  });
 });
 
 describe('EnterpriseApiClient base URL policy', () => {
@@ -176,15 +185,39 @@ describe('EnterpriseApiClient base URL policy', () => {
   });
 });
 
+describe('EnterpriseApiClient timeout policy', () => {
+  it.each([0, -1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, 2_147_483_648])(
+    'rejects invalid timeoutMs=%s before transport',
+    (timeoutMs) => {
+      let calls = 0;
+      const transport: EnterpriseApiTransport = async () => {
+        calls += 1;
+        return successResponse('product.list');
+      };
+
+      expect(() => new EnterpriseApiClient({ timeoutMs, transport })).toThrowError(
+        expect.objectContaining({ code: 'INVALID_REQUEST' })
+      );
+      expect(calls).toBe(0);
+    }
+  );
+
+  it.each([1, 2_147_483_647])('accepts bounded integer timeoutMs=%s', (timeoutMs) => {
+    expect(() => new EnterpriseApiClient({ timeoutMs })).not.toThrow();
+  });
+});
+
 describe('EnterpriseApiClient request boundary', () => {
   it.each([
     { operation: 'unknown.operation', payload: {} },
     { operation: 'company.detail', payload: { companyId: 'target', url: 'https://evil.test' } },
     { operation: 'company.detail', payload: { companyId: 'target', method: 'GET' } },
     { operation: 'company.detail', payload: { companyId: 'target', headers: { Authorization: 'secret' } } },
+    { operation: 'company.detail', payload: { companyId: 'target', redirect: 'follow' } },
     { operation: 'company.detail', payload: { companyId: 'target' }, url: 'https://evil.test' },
     { operation: 'company.detail', payload: { companyId: 'target' }, method: 'GET' },
     { operation: 'company.detail', payload: { companyId: 'target' }, headers: { Authorization: 'secret' } },
+    { operation: 'company.detail', payload: { companyId: 'target' }, redirect: 'follow' },
   ])('rejects an unknown operation or caller-controlled transport field before IO', async (unsafeRequest) => {
     let calls = 0;
     const transport: EnterpriseApiTransport = async () => {
@@ -213,6 +246,7 @@ describe('EnterpriseApiClient request boundary', () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe('https://cloud.lslnii.com/cloud-api/CompanyController/getDetailcompany');
     expect(calls[0]?.init.method).toBe('POST');
+    expect(calls[0]?.init.redirect).toBe('error');
     expect(calls[0]?.init.headers).toEqual({
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -706,10 +740,12 @@ describe('EnterpriseApiClient transport and response errors', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('maps transport rejection to NETWORK without exposing dependency errors', async () => {
+  it('maps a blocked redirect transport rejection to NETWORK without exposing dependency errors', async () => {
     const phone = '13800000000';
+    let redirect: RequestRedirect | undefined;
     const client = new EnterpriseApiClient({
-      transport: async () => {
+      transport: async (_url, init) => {
+        redirect = init.redirect;
         throw new Error(`failed for ${REGISTERED_CONTEXT.openId} at ${phone}`);
       },
     });
@@ -719,6 +755,7 @@ describe('EnterpriseApiClient transport and response errors', () => {
       'NETWORK'
     );
 
+    expect(redirect).toBe('error');
     expect(error.message).not.toContain(REGISTERED_CONTEXT.openId);
     expect(error.message).not.toContain(phone);
   });

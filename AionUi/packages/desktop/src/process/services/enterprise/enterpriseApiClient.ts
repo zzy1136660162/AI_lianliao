@@ -12,6 +12,7 @@ import { ENTERPRISE_API_ROUTES, type EnterpriseApiRouteKey } from './enterpriseA
 
 const DEFAULT_BASE_URL = 'https://cloud.lslnii.com/';
 const DEFAULT_TIMEOUT_MS = 15_000;
+const MAX_TIMEOUT_MS = 2_147_483_647;
 const FORBIDDEN_ENVELOPE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
 const commonFailureResultSchema = z
@@ -332,7 +333,9 @@ export class EnterpriseApiClient {
     if (environment !== 'production' && environment !== 'development') throw apiError('INVALID_BASE_URL');
     this.baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL, environment);
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) throw apiError('INVALID_REQUEST');
+    if (!Number.isInteger(this.timeoutMs) || this.timeoutMs <= 0 || this.timeoutMs > MAX_TIMEOUT_MS) {
+      throw apiError('INVALID_REQUEST');
+    }
     this.transport = options.transport ?? defaultTransport;
   }
 
@@ -376,6 +379,7 @@ export class EnterpriseApiClient {
     const requestPromise = Promise.resolve().then(async () => {
       const response = await this.transport(url, {
         method: 'POST',
+        redirect: 'error',
         headers: {
           Accept: 'application/json',
           'Content-Type': 'application/json',

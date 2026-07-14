@@ -1,5 +1,5 @@
 /** Fixed relative paths for the allowlisted enterprise cloud API operations. */
-export const ENTERPRISE_API_ROUTES = {
+export const ENTERPRISE_API_ROUTES = Object.freeze({
   'company.list': 'cloud-api/CompanyController/getQiYeMaCompanyList',
   'company.detail': 'cloud-api/CompanyController/getDetailcompany',
   'product.list': 'cloud-api/CompanyController/getFindProducts',
@@ -11,6 +11,6 @@ export const ENTERPRISE_API_ROUTES = {
   'auth.create': 'cloud-api/CommonWxGZHQrCodeLogIn/desktop/create',
   'auth.poll': 'cloud-api/CommonWxGZHQrCodeLogIn/desktop/poll',
   'auth.userContext': 'cloud-api/DesktopEnterpriseController/userContext',
-} as const;
+} as const);
 
 export type EnterpriseApiRouteKey = keyof typeof ENTERPRISE_API_ROUTES;
