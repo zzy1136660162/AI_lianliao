@@ -182,6 +182,7 @@ const serializeCompanyList = (
   };
   setDefined(body, 'name', payload.keyword);
   setDefined(body, 'industry', payload.industry);
+  setDefined(body, 'province', payload.province);
   setDefined(body, 'city', payload.city);
   setDefined(body, 'district', payload.district);
   setDefined(body, 'comLevel', payload.companyLevel ?? (payload.vip === true ? -2 : undefined));

@@ -1,7 +1,7 @@
 import React from 'react';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Outlet } from 'react-router-dom';
 
 import type { EnterpriseAuthContextValue } from '@/renderer/hooks/context/EnterpriseAuthContext';
@@ -13,6 +13,19 @@ const routerMocks = vi.hoisted(() => ({
   enterpriseStatus: 'authenticated' as EnterpriseAuthContextValue['status'],
   logout: vi.fn<EnterpriseAuthContextValue['logout']>(async () => true),
 }));
+
+beforeAll(() => {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as typeof window.matchMedia;
+});
 
 vi.mock('@/renderer/hooks/context/AuthContext', () => ({
   useAuth: () => ({ status: routerMocks.appStatus }),
@@ -54,7 +67,9 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@/renderer/pages/login', () => ({ default: () => <div>original-login-page</div> }));
 vi.mock('@/renderer/pages/guid', () => ({ default: () => <div>original-guid-page</div> }));
-vi.mock('@/renderer/pages/conversation', () => ({ default: () => <div>original-conversation-page</div> }));
+vi.mock('@/renderer/pages/conversation', () => ({
+  default: () => <div>original-conversation-page</div>,
+}));
 vi.mock('@/renderer/pages/enterprise/login/EnterpriseLoginPage', () => ({
   default: () => <div>enterprise-login-page</div>,
 }));
@@ -164,8 +179,12 @@ describe('enterprise desktop routing', () => {
   it('lets keyboard and pointer users collapse and restore the assistant slot', async () => {
     renderAt('/enterprise/dashboard');
 
-    const hideButton = await screen.findByRole('button', { name: 'enterprise.assistant.actions.hide' });
-    const assistant = screen.getByRole('complementary', { name: 'enterprise.accessibility.assistant' });
+    const hideButton = await screen.findByRole('button', {
+      name: 'enterprise.assistant.actions.hide',
+    });
+    const assistant = screen.getByRole('complementary', {
+      name: 'enterprise.accessibility.assistant',
+    });
     expect(hideButton).toHaveAttribute('aria-expanded', 'true');
 
     await userEvent.click(hideButton);

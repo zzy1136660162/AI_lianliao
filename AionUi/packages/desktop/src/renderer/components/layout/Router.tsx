@@ -26,6 +26,8 @@ const TaskDetailPage = React.lazy(() => import('@renderer/pages/cron/ScheduledTa
 const TeamIndex = React.lazy(() => import('@renderer/pages/team'));
 const EnterpriseLoginPage = React.lazy(() => import('@renderer/pages/enterprise/login/EnterpriseLoginPage'));
 const EnterpriseShell = React.lazy(() => import('@renderer/pages/enterprise/layout/EnterpriseShell'));
+const CompanyListPage = React.lazy(() => import('@renderer/pages/enterprise/companies/CompanyListPage'));
+const CompanyDetailPage = React.lazy(() => import('@renderer/pages/enterprise/companies/CompanyDetailPage'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -87,8 +89,6 @@ type EnterprisePlaceholderPageProps = {
 
 const ENTERPRISE_PLACEHOLDER_ROUTES = [
   ['dashboard', 'enterprise.routes.dashboard.title', 'enterprise.routes.dashboard.description'],
-  ['companies', 'enterprise.routes.companies.title', 'enterprise.routes.companies.description'],
-  ['companies/:companyId', 'enterprise.routes.companyDetail.title', 'enterprise.routes.companyDetail.description'],
   ['products', 'enterprise.routes.products.title', 'enterprise.routes.products.description'],
   ['products/:productId', 'enterprise.routes.productDetail.title', 'enterprise.routes.productDetail.description'],
   ['projects', 'enterprise.routes.projects.title', 'enterprise.routes.projects.description'],
@@ -130,6 +130,8 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
         <Route path='/enterprise/login' element={<EnterpriseLoginRoute />} />
         <Route path='/enterprise' element={<EnterpriseProtectedLayout />}>
           <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
+          <Route path='companies' element={withRouteFallback(CompanyListPage)} />
+          <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
           {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
             <Route
               key={path}

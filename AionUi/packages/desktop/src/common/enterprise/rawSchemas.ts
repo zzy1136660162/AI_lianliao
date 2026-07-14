@@ -57,7 +57,10 @@ const guardedObject = <Schema extends z.ZodTypeAny>(schema: Schema, requiredOwnK
     .transform((output, context): z.output<Schema> => {
       const sanitized = sanitizePlainJsonObject(output, []);
       if (!sanitized) {
-        context.addIssue({ code: 'custom', message: 'Expected a plain JSON object with own data fields' });
+        context.addIssue({
+          code: 'custom',
+          message: 'Expected a plain JSON object with own data fields',
+        });
         return z.NEVER;
       }
       return sanitized as z.output<Schema>;
@@ -130,6 +133,8 @@ export const enterpriseCompanyRawSchema = passthroughRawSchema({
     'SHORT_NAME',
     'industry',
     'INDUSTRY',
+    'province',
+    'PROVINCE',
     'city',
     'CITY',
     'district',
@@ -158,6 +163,8 @@ export const enterpriseCompanyRawSchema = passthroughRawSchema({
     'COM_INTRO',
     'description',
     'DESCRIPTION',
+    'inputTime',
+    'INPUT_TIME',
     'societyCode',
     'SOCIETY_CODE',
     'unifiedSocialCreditCode',
@@ -484,6 +491,7 @@ const companyListQuerySchema = guardedObject(
     .object({
       keyword: z.string().optional(),
       industry: z.string().optional(),
+      province: z.string().optional(),
       city: z.string().optional(),
       district: z.string().optional(),
       companyLevel: z.number().finite().nonnegative().optional(),

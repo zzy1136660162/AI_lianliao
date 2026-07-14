@@ -235,6 +235,7 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
   };
   setText(result, 'shortName', raw.shortName, raw.SHORT_NAME);
   setText(result, 'industry', raw.industry, raw.INDUSTRY);
+  setText(result, 'province', raw.province, raw.PROVINCE);
   setText(result, 'city', raw.city, raw.CITY);
   setText(result, 'district', raw.district, raw.DISTRICT);
   setText(result, 'address', raw.address, raw.ADDRESS);
@@ -250,6 +251,8 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
   setNumber(result, 'companyLevel', raw.companyLevel, raw.COMPANY_LEVEL, raw.comLevel, raw.COM_LEVEL);
   setBoolean(result, 'vip', raw.vip, raw.VIP, raw.payVip, raw.PAY_VIP);
   setText(result, 'establishedAt', raw.establishedAt, raw.ESTABLISHED_AT, raw.foundTime, raw.FOUND_TIME);
+  setText(result, 'businessSummary', raw.comAbs, raw.COM_ABS);
+  setText(result, 'updatedAt', raw.inputTime, raw.INPUT_TIME);
   setBoolean(result, 'collected', raw.collected, raw.COLLECTED, raw.isCollect, raw.IS_COLLECT);
   if (operation === 'company.detail') {
     setText(result, 'logoUrl', raw.logoUrl, raw.LOGO_URL, raw.tempPic, raw.TEMP_PIC);

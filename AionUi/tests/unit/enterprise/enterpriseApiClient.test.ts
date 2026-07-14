@@ -223,11 +223,18 @@ describe('EnterpriseApiClient request boundary', () => {
     { operation: 'unknown.operation', payload: {} },
     { operation: 'company.detail', payload: { companyId: 'target', url: 'https://evil.test' } },
     { operation: 'company.detail', payload: { companyId: 'target', method: 'GET' } },
-    { operation: 'company.detail', payload: { companyId: 'target', headers: { Authorization: 'secret' } } },
+    {
+      operation: 'company.detail',
+      payload: { companyId: 'target', headers: { Authorization: 'secret' } },
+    },
     { operation: 'company.detail', payload: { companyId: 'target', redirect: 'follow' } },
     { operation: 'company.detail', payload: { companyId: 'target' }, url: 'https://evil.test' },
     { operation: 'company.detail', payload: { companyId: 'target' }, method: 'GET' },
-    { operation: 'company.detail', payload: { companyId: 'target' }, headers: { Authorization: 'secret' } },
+    {
+      operation: 'company.detail',
+      payload: { companyId: 'target' },
+      headers: { Authorization: 'secret' },
+    },
     { operation: 'company.detail', payload: { companyId: 'target' }, redirect: 'follow' },
   ])('rejects an unknown operation or caller-controlled transport field before IO', async (unsafeRequest) => {
     let calls = 0;
@@ -270,7 +277,9 @@ describe('EnterpriseApiClient request boundary', () => {
       operation: 'company.detail',
       payload: { companyId: 'company-target-1', phone },
     } as unknown as EnterpriseRequest;
-    const client = new EnterpriseApiClient({ transport: async () => successResponse('company.detail') });
+    const client = new EnterpriseApiClient({
+      transport: async () => successResponse('company.detail'),
+    });
 
     const error = await expectApiError(client.request(unsafeRequest, REGISTERED_CONTEXT), 'INVALID_REQUEST');
 
@@ -293,6 +302,7 @@ describe('EnterpriseApiClient serialization and context injection', () => {
         payload: {
           keyword: 'steel',
           industry: 'Manufacturing',
+          province: 'Liaoning',
           city: 'Shenyang',
           district: 'Hunnan',
           companyLevel: 2,
@@ -304,6 +314,7 @@ describe('EnterpriseApiClient serialization and context injection', () => {
       expectedBody: {
         name: 'steel',
         industry: 'Manufacturing',
+        province: 'Liaoning',
         city: 'Shenyang',
         district: 'Hunnan',
         comLevel: 2,
@@ -705,7 +716,9 @@ describe('EnterpriseApiClient transport and response errors', () => {
     Object.defineProperty(response, 'json', {
       value: () =>
         new Promise<unknown>((_resolve, reject) => {
-          signal?.addEventListener('abort', () => reject(new Error(`body failed for ${phone}`)), { once: true });
+          signal?.addEventListener('abort', () => reject(new Error(`body failed for ${phone}`)), {
+            once: true,
+          });
         }),
     });
     const client = new EnterpriseApiClient({
@@ -815,7 +828,9 @@ describe('EnterpriseApiClient transport and response errors', () => {
     ['non-string message', { success: false, data: null, message: 42 }],
     ['invalid code', { success: false, data: null, message: 'denied', code: { nested: true } }],
   ])('maps a malformed failed CommonResult with %s to INVALID_RESPONSE', async (_label, envelope) => {
-    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue(envelope),
+    });
 
     await expectApiError(
       client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
@@ -830,7 +845,9 @@ describe('EnterpriseApiClient transport and response errors', () => {
       const envelope = JSON.parse(
         `{"success":false,"data":null,"message":"denied","${key}":"${sensitiveValue}"}`
       ) as unknown;
-      const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+      const client = new EnterpriseApiClient({
+        transport: async () => responseWithJsonValue(envelope),
+      });
 
       const error = await expectApiError(
         client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
@@ -847,7 +864,9 @@ describe('EnterpriseApiClient transport and response errors', () => {
       data: null,
       message: 'denied',
     }) as unknown;
-    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue(envelope),
+    });
 
     await expectApiError(
       client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
@@ -869,7 +888,9 @@ describe('EnterpriseApiClient transport and response errors', () => {
       data: { enumerable: true, value: null },
       message: { enumerable: true, value: 'denied' },
     });
-    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue(envelope),
+    });
 
     const outcome = await client
       .request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT)
@@ -881,7 +902,9 @@ describe('EnterpriseApiClient transport and response errors', () => {
   });
 
   it('maps an invalid CommonResult envelope to INVALID_RESPONSE', async () => {
-    const client = new EnterpriseApiClient({ transport: async () => jsonResponse({ success: true }) });
+    const client = new EnterpriseApiClient({
+      transport: async () => jsonResponse({ success: true }),
+    });
 
     await expectApiError(
       client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
@@ -1022,7 +1045,10 @@ describe('EnterpriseApiClient QR authentication', () => {
       transport: async (url, init) => {
         calls.push({ url, init });
         if (calls.length === 1) {
-          return jsonResponse({ success: true, data: { loginKey, qrPath, expiresAt, pollIntervalMs: 3000 } });
+          return jsonResponse({
+            success: true,
+            data: { loginKey, qrPath, expiresAt, pollIntervalMs: 3000 },
+          });
         }
         return responseWithFinalUrl(pngBytes, qrUrl, {
           status: 200,
@@ -1178,7 +1204,9 @@ describe('EnterpriseApiClient QR authentication', () => {
   });
 
   it('rejects a QR response whose final URL indicates an ignored redirect', async () => {
-    const qrResponse = responseWithFinalUrl(pngBytes, 'https://evil.test/redirected.png', { status: 200 });
+    const qrResponse = responseWithFinalUrl(pngBytes, 'https://evil.test/redirected.png', {
+      status: 200,
+    });
     let calls = 0;
     const client = new EnterpriseApiClient({
       transport: async () => {
@@ -1592,7 +1620,10 @@ describe('EnterpriseApiClient QR authentication', () => {
     });
     const client = new EnterpriseApiClient({
       transport: async () =>
-        responseWithJsonValue({ success: true, data: { status: 'WAITING', userContext: unsafeContext } }),
+        responseWithJsonValue({
+          success: true,
+          data: { status: 'WAITING', userContext: unsafeContext },
+        }),
     });
 
     await expectApiError(client.pollLoginSession(loginKey), 'INVALID_RESPONSE');
@@ -1601,7 +1632,9 @@ describe('EnterpriseApiClient QR authentication', () => {
   });
 
   it('rejects an unsafe object nested in a field that would otherwise be stripped', async () => {
-    const unsafeExtra = Object.assign(Object.create({ inherited: 'sensitive' }), { value: 'ignored' }) as unknown;
+    const unsafeExtra = Object.assign(Object.create({ inherited: 'sensitive' }), {
+      value: 'ignored',
+    }) as unknown;
     const client = new EnterpriseApiClient({
       transport: async () => responseWithJsonValue({ success: true, data: { status: 'WAITING', extra: unsafeExtra } }),
     });
@@ -1630,7 +1663,10 @@ describe('EnterpriseApiClient QR authentication', () => {
   it('returns EXPIRED without copying unexpected response fields', async () => {
     const client = new EnterpriseApiClient({
       transport: async () =>
-        jsonResponse({ success: true, data: { status: 'EXPIRED', openId: 'must-not-leak', phone: '13800000000' } }),
+        jsonResponse({
+          success: true,
+          data: { status: 'EXPIRED', openId: 'must-not-leak', phone: '13800000000' },
+        }),
     });
 
     await expect(client.pollLoginSession(loginKey)).resolves.toEqual({ status: 'EXPIRED' });
@@ -1642,7 +1678,12 @@ describe('EnterpriseApiClient QR authentication', () => {
       transport: async () =>
         jsonResponse({
           success: true,
-          data: { status: 'REGISTER_REQUIRED', openId, phone: '13800000000', unionId: 'must-not-leak' },
+          data: {
+            status: 'REGISTER_REQUIRED',
+            openId,
+            phone: '13800000000',
+            unionId: 'must-not-leak',
+          },
         }),
     });
 
@@ -1834,7 +1875,9 @@ describe('EnterpriseApiClient QR authentication', () => {
     ['create', 'INVALID_RESPONSE', { success: false, message: 'denied' }],
     ['poll', 'INVALID_RESPONSE', { success: false, message: 'denied' }],
   ] as const)('maps a %s CommonResult failure to %s', async (method, code, envelope) => {
-    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue(envelope),
+    });
 
     const promise = method === 'create' ? client.createLoginSession() : client.pollLoginSession(loginKey);
     const error = await expectApiError(promise, code);

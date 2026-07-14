@@ -65,9 +65,12 @@ export type EnterpriseCompanySummary = {
   name: string;
   shortName?: string;
   industry?: string;
+  province?: string;
   city?: string;
   district?: string;
   address?: string;
+  businessSummary?: string;
+  updatedAt?: string;
   legalRepresentative?: string;
   companyType?: string;
   companyLevel?: number;
@@ -179,6 +182,7 @@ export type EnterpriseProjectDetail = EnterpriseProjectSummary & {
 export type CompanyListQuery = {
   keyword?: string;
   industry?: string;
+  province?: string;
   city?: string;
   district?: string;
   companyLevel?: number;

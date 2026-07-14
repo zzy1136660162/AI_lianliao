@@ -149,7 +149,11 @@ describe('enterprise schemas', () => {
       legacyRank: { enumerable: true, value: 'A' },
     });
 
-    expect(enterpriseCompanyRawSchema.parse(input)).toMatchObject({ id: 12, name: 'Acme', legacyRank: 'A' });
+    expect(enterpriseCompanyRawSchema.parse(input)).toMatchObject({
+      id: 12,
+      name: 'Acme',
+      legacyRank: 'A',
+    });
   });
 
   it('does not read a non-enumerable company identifier polluted onto Object.prototype', () => {
@@ -242,7 +246,9 @@ describe('enterprise schemas', () => {
   });
 
   it('rejects an inherited project drill envelope list', () => {
-    const input = Object.create({ list: [{ name: 'Cement', level: 'materialName', projectCount: 1 }] });
+    const input = Object.create({
+      list: [{ name: 'Cement', level: 'materialName', projectCount: 1 }],
+    });
 
     expect(() => parseEnterpriseResponse('project.drill', input)).toThrow(/project\.drill/i);
   });
@@ -402,6 +408,9 @@ describe('enterprise schemas', () => {
           NAME: 'Acme',
           SHORT_NAME: 'AC',
           INDUSTRY: 'Manufacturing',
+          PROVINCE: 'Liaoning',
+          COM_ABS: 'Industrial controls and equipment',
+          INPUT_TIME: '2026-07-14 10:30:00',
           IS_COLLECT: 1,
         },
       ],
@@ -419,6 +428,9 @@ describe('enterprise schemas', () => {
             name: 'Acme',
             shortName: 'AC',
             industry: 'Manufacturing',
+            province: 'Liaoning',
+            businessSummary: 'Industrial controls and equipment',
+            updatedAt: '2026-07-14 10:30:00',
             collected: true,
           },
         ],

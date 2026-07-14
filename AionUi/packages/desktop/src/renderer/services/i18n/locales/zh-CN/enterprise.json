@@ -125,11 +125,11 @@
     },
     "companies": {
       "title": "企业库",
-      "description": "真实企业数据将在下一项开发任务中接入。"
+      "description": "按行业、地区与会员等级检索经过校验的企业记录。"
     },
     "companyDetail": {
       "title": "企业详情",
-      "description": "经过接口校验的企业档案字段将在下一项开发任务中接入。"
+      "description": "查看企业档案、联系方式权限状态与关联产品。"
     },
     "products": {
       "title": "产品库",
@@ -162,5 +162,98 @@
     "emptyDescription": "请调整当前筛选条件后重试。",
     "errorTitle": "暂时无法加载企业数据",
     "errorDescription": "企业服务暂时不可用，请重试。"
+  },
+  "companies": {
+    "eyebrow": "辽宁产业企业索引",
+    "description": "筛选真实企业数据，在当前工作区快速预览，并进入经过校验的完整档案。",
+    "loading": "正在加载企业库",
+    "missing": "暂未提供",
+    "resultCount": "共 {{count}} 家企业",
+    "filters": {
+      "keywordLabel": "企业名称",
+      "keywordPlaceholder": "请输入企业名称",
+      "industryLabel": "所属行业",
+      "industryPlaceholder": "请输入行业",
+      "provinceLabel": "省份",
+      "provincePlaceholder": "请输入省份",
+      "cityLabel": "城市",
+      "cityPlaceholder": "请输入城市",
+      "districtLabel": "区县",
+      "districtPlaceholder": "请输入区县",
+      "memberLevelLabel": "会员等级",
+      "memberLevelPlaceholder": "请选择会员等级"
+    },
+    "actions": {
+      "search": "查询企业",
+      "reset": "重置筛选",
+      "viewDetails": "查看详情",
+      "closeQuickView": "关闭企业预览"
+    },
+    "columns": {
+      "name": "企业名称",
+      "industry": "行业",
+      "region": "所在地区",
+      "memberLevel": "会员等级",
+      "businessSummary": "主营摘要",
+      "updatedAt": "更新时间",
+      "actions": "操作"
+    },
+    "memberLevel": {
+      "value": "{{level}} 级会员",
+      "unknown": "暂未分级"
+    },
+    "quickView": {
+      "label": "企业快速预览",
+      "index": "企业 / {{index}}",
+      "title": "当前选中企业",
+      "hint": "进入完整档案可查看接口返回的联系方式权限状态与关联产品。"
+    },
+    "empty": {
+      "title": "未找到符合条件的企业",
+      "description": "请减少筛选条件或重置后重新查询。"
+    },
+    "error": {
+      "title": "暂时无法加载企业库",
+      "description": "企业服务未返回有效的企业列表，请重试。"
+    }
+  },
+  "companyDetail": {
+    "eyebrow": "已校验企业档案",
+    "profileEyebrow": "企业档案",
+    "backToList": "返回企业库",
+    "loading": "正在加载企业详情",
+    "logoAlt": "{{name}} 企业标识",
+    "logoUnavailable": "企业标识暂不可用",
+    "contactPermissionNote": "联系方式严格按接口返回内容展示；本页面不会绕过权限解锁受限信息。",
+    "sections": {
+      "basic": "基本信息",
+      "contact": "联系方式与地址",
+      "businessSummary": "主营摘要",
+      "description": "企业简介",
+      "products": "企业产品"
+    },
+    "fields": {
+      "legalRepresentative": "法定代表人",
+      "companyType": "企业类型",
+      "establishedAt": "成立时间",
+      "unifiedSocialCreditCode": "统一社会信用代码",
+      "industry": "所属行业",
+      "memberLevel": "会员等级",
+      "contactName": "联系人",
+      "contactTitle": "职务",
+      "phone": "联系电话",
+      "address": "联系地址"
+    },
+    "productImageAlt": "{{name}} 产品图片",
+    "productImageUnavailable": "暂无图片",
+    "productsEmpty": "该企业暂未返回产品数据。",
+    "invalid": {
+      "title": "企业链接无效",
+      "description": "请返回企业库并选择有效的企业记录。"
+    },
+    "error": {
+      "title": "暂时无法加载企业详情",
+      "description": "企业服务未返回有效的企业档案，请重试。"
+    }
   }
 }

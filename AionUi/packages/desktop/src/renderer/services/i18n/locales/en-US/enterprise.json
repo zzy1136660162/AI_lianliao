@@ -125,11 +125,11 @@
     },
     "companies": {
       "title": "Company directory",
-      "description": "The live company directory will be connected in the next development task."
+      "description": "Search verified company records with industry, region and membership filters."
     },
     "companyDetail": {
       "title": "Company profile",
-      "description": "Verified company profile fields will be connected in the next development task."
+      "description": "Review verified company information, contact visibility and related products."
     },
     "products": {
       "title": "Product directory",
@@ -162,5 +162,98 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "companies": {
+    "eyebrow": "Industrial company index / Liaoning",
+    "description": "Filter the live company directory, preview a record in context, then open its verified profile.",
+    "loading": "Loading the company directory",
+    "missing": "Not provided",
+    "resultCount": "{{count}} company records",
+    "filters": {
+      "keywordLabel": "Company name",
+      "keywordPlaceholder": "Enter a company name",
+      "industryLabel": "Industry",
+      "industryPlaceholder": "Enter an industry",
+      "provinceLabel": "Province",
+      "provincePlaceholder": "Enter a province",
+      "cityLabel": "City",
+      "cityPlaceholder": "Enter a city",
+      "districtLabel": "District",
+      "districtPlaceholder": "Enter a district",
+      "memberLevelLabel": "Member level",
+      "memberLevelPlaceholder": "Select a member level"
+    },
+    "actions": {
+      "search": "Search companies",
+      "reset": "Reset filters",
+      "viewDetails": "View details",
+      "closeQuickView": "Close company preview"
+    },
+    "columns": {
+      "name": "Company",
+      "industry": "Industry",
+      "region": "Region",
+      "memberLevel": "Member level",
+      "businessSummary": "Primary business",
+      "updatedAt": "Updated",
+      "actions": "Actions"
+    },
+    "memberLevel": {
+      "value": "Level {{level}}",
+      "unknown": "Not classified"
+    },
+    "quickView": {
+      "label": "Company quick view",
+      "index": "Company / {{index}}",
+      "title": "Selected company",
+      "hint": "Open the complete profile for contact visibility and related products returned by the service."
+    },
+    "empty": {
+      "title": "No companies match these filters",
+      "description": "Reset one or more filters and search again."
+    },
+    "error": {
+      "title": "The company directory could not be loaded",
+      "description": "The enterprise service did not return a valid company page. Try again."
+    }
+  },
+  "companyDetail": {
+    "eyebrow": "Verified company record",
+    "profileEyebrow": "Company profile",
+    "backToList": "Back to company directory",
+    "loading": "Loading the company profile",
+    "logoAlt": "{{name}} logo",
+    "logoUnavailable": "Company logo unavailable",
+    "contactPermissionNote": "Contact details are shown exactly as returned by the service. Restricted values are not unlocked on this page.",
+    "sections": {
+      "basic": "Basic information",
+      "contact": "Contact and address",
+      "businessSummary": "Primary business",
+      "description": "Company introduction",
+      "products": "Company products"
+    },
+    "fields": {
+      "legalRepresentative": "Legal representative",
+      "companyType": "Company type",
+      "establishedAt": "Established",
+      "unifiedSocialCreditCode": "Unified social credit code",
+      "industry": "Industry",
+      "memberLevel": "Member level",
+      "contactName": "Contact",
+      "contactTitle": "Title",
+      "phone": "Phone",
+      "address": "Address"
+    },
+    "productImageAlt": "{{name}} product image",
+    "productImageUnavailable": "No image",
+    "productsEmpty": "No products were returned for this company.",
+    "invalid": {
+      "title": "This company link is invalid",
+      "description": "Return to the company directory and choose a valid record."
+    },
+    "error": {
+      "title": "The company profile could not be loaded",
+      "description": "The enterprise service did not return a valid profile. Try again."
+    }
   }
 }
