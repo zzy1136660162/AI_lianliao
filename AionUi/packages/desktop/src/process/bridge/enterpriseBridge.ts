@@ -73,13 +73,32 @@ const parseStrictEnterpriseRequest = (value: unknown): EnterpriseRequest | undef
   return parsed.data;
 };
 
-/** Defense in depth for injected API clients: raw company phones must not cross Electron IPC. */
-const protectCompanyDetailPhone = (response: EnterpriseResponse): EnterpriseResponse => {
-  if (response.operation !== 'company.detail' || response.data.phone === undefined) return response;
-  return {
-    operation: 'company.detail',
-    data: { ...response.data, phone: maskEnterprisePhone(response.data.phone) },
-  };
+/** Defense in depth for injected API clients: raw contact phones must not cross Electron IPC. */
+const protectEnterprisePhones = (response: EnterpriseResponse): EnterpriseResponse => {
+  if (response.operation === 'company.detail' && response.data.phone !== undefined) {
+    return {
+      operation: 'company.detail',
+      data: { ...response.data, phone: maskEnterprisePhone(response.data.phone) },
+    };
+  }
+  if (response.operation === 'product.detail' && response.data.phone !== undefined) {
+    return {
+      operation: 'product.detail',
+      data: { ...response.data, phone: maskEnterprisePhone(response.data.phone) },
+    };
+  }
+  if (response.operation === 'product.list') {
+    return {
+      operation: 'product.list',
+      data: {
+        ...response.data,
+        list: response.data.list.map((product) =>
+          product.phone === undefined ? product : { ...product, phone: maskEnterprisePhone(product.phone) }
+        ),
+      },
+    };
+  }
+  return response;
 };
 
 /** Internal typed failure; handlers always convert it to a plain IPC result. */
@@ -451,7 +470,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
         const response = await apiClient.request(parsedRequest, context);
         assertCurrentLifecycle();
         if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
-        return protectCompanyDetailPhone(response);
+        return protectEnterprisePhones(response);
       }),
     ],
   ];

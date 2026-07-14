@@ -28,6 +28,8 @@ const EnterpriseLoginPage = React.lazy(() => import('@renderer/pages/enterprise/
 const EnterpriseShell = React.lazy(() => import('@renderer/pages/enterprise/layout/EnterpriseShell'));
 const CompanyListPage = React.lazy(() => import('@renderer/pages/enterprise/companies/CompanyListPage'));
 const CompanyDetailPage = React.lazy(() => import('@renderer/pages/enterprise/companies/CompanyDetailPage'));
+const ProductListPage = React.lazy(() => import('@renderer/pages/enterprise/products/ProductListPage'));
+const ProductDetailPage = React.lazy(() => import('@renderer/pages/enterprise/products/ProductDetailPage'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -89,8 +91,6 @@ type EnterprisePlaceholderPageProps = {
 
 const ENTERPRISE_PLACEHOLDER_ROUTES = [
   ['dashboard', 'enterprise.routes.dashboard.title', 'enterprise.routes.dashboard.description'],
-  ['products', 'enterprise.routes.products.title', 'enterprise.routes.products.description'],
-  ['products/:productId', 'enterprise.routes.productDetail.title', 'enterprise.routes.productDetail.description'],
   ['projects', 'enterprise.routes.projects.title', 'enterprise.routes.projects.description'],
   ['projects/:hpInfoId', 'enterprise.routes.projectDetail.title', 'enterprise.routes.projectDetail.description'],
   ['favorites', 'enterprise.routes.favorites.title', 'enterprise.routes.favorites.description'],
@@ -132,6 +132,8 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
           <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
           <Route path='companies' element={withRouteFallback(CompanyListPage)} />
           <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
+          <Route path='products' element={withRouteFallback(ProductListPage)} />
+          <Route path='products/:productId' element={withRouteFallback(ProductDetailPage)} />
           {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
             <Route
               key={path}

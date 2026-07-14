@@ -220,6 +220,9 @@ const serializeProductList = (
   };
   setDefined(body, 'name', payload.keyword);
   setDefined(body, 'industry', payload.industry);
+  setDefined(body, 'province', payload.province);
+  setDefined(body, 'city', payload.city);
+  setDefined(body, 'district', payload.district);
   setDefined(body, 'companyId', payload.companyId);
   setDefined(body, 'parkId', payload.parkId);
   setDefined(body, 'sorted', payload.sort);

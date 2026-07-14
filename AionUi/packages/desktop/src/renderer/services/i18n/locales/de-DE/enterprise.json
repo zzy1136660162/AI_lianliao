@@ -256,5 +256,77 @@
       "title": "The company profile could not be loaded",
       "description": "The enterprise service did not return a valid profile. Try again."
     }
+  },
+  "products": {
+    "eyebrow": "Industrial product index / Liaoning",
+    "description": "Search live enterprise products, preview industrial capability in context, then open the verified record.",
+    "loading": "Loading the product directory",
+    "missing": "Not provided",
+    "resultCount": "{{count}} product records",
+    "cardLabel": "Product {{name}}",
+    "imageAlt": "{{name}} product image",
+    "imageUnavailable": "Product image unavailable",
+    "filters": {
+      "keywordLabel": "Product name",
+      "keywordPlaceholder": "Enter a product keyword",
+      "industryLabel": "Industry",
+      "industryPlaceholder": "Enter an industry",
+      "provinceLabel": "Province",
+      "provincePlaceholder": "Enter a province",
+      "cityLabel": "City",
+      "cityPlaceholder": "Enter a city",
+      "districtLabel": "District",
+      "districtPlaceholder": "Enter a district"
+    },
+    "actions": {
+      "search": "Search products",
+      "reset": "Reset filters",
+      "viewDetails": "View product details",
+      "viewCompany": "View related company",
+      "closeQuickView": "Close product preview"
+    },
+    "fields": {
+      "company": "Company",
+      "industry": "Industry",
+      "region": "Region",
+      "summary": "Product summary",
+      "address": "Address",
+      "contactName": "Contact",
+      "phone": "Phone"
+    },
+    "quickView": {
+      "label": "Product quick view",
+      "index": "Product / {{index}}",
+      "title": "Selected product",
+      "hint": "Open the complete record for verified product information and a masked contact number."
+    },
+    "empty": {
+      "title": "No products match these filters",
+      "description": "Reset one or more filters and search again."
+    },
+    "error": {
+      "title": "The product directory could not be loaded",
+      "description": "The enterprise service did not return a valid product page. Try again."
+    }
+  },
+  "productDetail": {
+    "eyebrow": "Verified product record",
+    "profileEyebrow": "Product profile",
+    "backToList": "Back to product directory",
+    "loading": "Loading the product profile",
+    "contactPermissionNote": "The phone is masked at the trusted desktop boundary using the H5 policy. Dialing and access unlocking are not available.",
+    "sections": {
+      "profile": "Product and company",
+      "contact": "Contact",
+      "summary": "Product summary"
+    },
+    "invalid": {
+      "title": "This product link is invalid",
+      "description": "Return to the product directory and choose a valid record."
+    },
+    "error": {
+      "title": "The product profile could not be loaded",
+      "description": "The enterprise service did not return a valid product record. Try again."
+    }
   }
 }

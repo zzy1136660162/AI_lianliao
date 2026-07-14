@@ -818,6 +818,44 @@ describe('enterprise bridge', () => {
     expect(JSON.stringify(response)).not.toContain(rawPhone);
   });
 
+  it.each(['product.list', 'product.detail'] as const)(
+    'masks a product phone again at the final main-process IPC boundary for %s',
+    async (operation) => {
+      const rawPhone = '13800000000';
+      const request: EnterpriseRequest =
+        operation === 'product.list'
+          ? { operation, payload: { pageNum: 1, pageSize: 20 } }
+          : { operation, payload: { productId: '9' } };
+      const apiClient = makeApiClient();
+      apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+      apiClient.request.mockResolvedValue(
+        operation === 'product.list'
+          ? {
+              operation,
+              data: {
+                list: [{ productId: '9', companyId: '42', name: 'Pump', phone: rawPhone }],
+                pageNum: 1,
+                pageSize: 20,
+                pages: 1,
+                total: 1,
+              },
+            }
+          : { operation, data: { productId: '9', companyId: '42', name: 'Pump', phone: rawPhone } }
+      );
+      const { handlers } = await initializeBridge(apiClient);
+      await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+      const response = await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
+
+      expect(response).toMatchObject(
+        operation === 'product.list'
+          ? { data: { list: [{ phone: '1380000****' }] } }
+          : { data: { phone: '1380000****' } }
+      );
+      expect(JSON.stringify(response)).not.toContain(rawPhone);
+    }
+  );
+
   it('discards a pending business response after a successful clear changes the session generation', async () => {
     const pendingResponse = createDeferred<{ operation: 'project.dashboard'; data: { secret: string } }>();
     const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };

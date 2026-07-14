@@ -292,6 +292,8 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
 
 const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.detail'): EnterpriseProductDetail => {
   const raw = enterpriseProductRawSchema.parse(input);
+  const hasDedicatedProductName =
+    optionalText(raw.productName, raw.PRODUCT_NAME, raw.productsName, raw.PRODUCTS_NAME) !== undefined;
   const result: EnterpriseProductDetail = {
     productId: requiredIdentifier(operation, 'productId', raw.productId, raw.PRODUCT_ID, raw.id, raw.ID),
     name: requiredText(
@@ -308,14 +310,44 @@ const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.d
   };
   setText(result, 'imageUrl', raw.imageUrl, raw.IMAGE_URL, raw.tempPic, raw.TEMP_PIC);
   setText(result, 'summary', raw.summary, raw.SUMMARY, raw.productAbs, raw.PRODUCT_ABS);
-  setText(result, 'industry', raw.industry, raw.INDUSTRY);
+  setText(
+    result,
+    'industry',
+    raw.compIndustry,
+    raw.COMP_INDUSTRY,
+    raw.industry1,
+    raw.INDUSTRY1,
+    raw.industry,
+    raw.INDUSTRY
+  );
   setText(result, 'companyName', raw.companyName, raw.COMPANY_NAME);
-  setText(result, 'companyIndustry', raw.compIndustry, raw.COMP_INDUSTRY);
-  setText(result, 'city', raw.city, raw.CITY, raw.compCity, raw.COMP_CITY);
-  setText(result, 'district', raw.district, raw.DISTRICT, raw.compDistrict, raw.COMP_DISTRICT);
-  setText(result, 'address', raw.address, raw.ADDRESS, raw.compAddress, raw.COMP_ADDRESS);
-  setText(result, 'contactName', raw.contactName, raw.CONTACT_NAME, raw.compContactPerson, raw.COMP_CONTACT_PERSON);
-  setText(result, 'phone', raw.phone, raw.PHONE, raw.compPhone, raw.COMP_PHONE);
+  if (result.companyName === undefined && hasDedicatedProductName) setText(result, 'companyName', raw.name, raw.NAME);
+  setText(result, 'companyIndustry', raw.compIndustry, raw.COMP_INDUSTRY, raw.industry1, raw.INDUSTRY1);
+  setText(
+    result,
+    'province',
+    raw.province1,
+    raw.PROVINCE1,
+    raw.compProvince,
+    raw.COMP_PROVINCE,
+    raw.province,
+    raw.PROVINCE
+  );
+  setText(result, 'city', raw.city1, raw.CITY1, raw.compCity, raw.COMP_CITY, raw.city, raw.CITY);
+  setText(
+    result,
+    'district',
+    raw.district1,
+    raw.DISTRICT1,
+    raw.compDistrict,
+    raw.COMP_DISTRICT,
+    raw.district,
+    raw.DISTRICT
+  );
+  setText(result, 'address', raw.compAddress, raw.COMP_ADDRESS, raw.address, raw.ADDRESS);
+  setText(result, 'contactName', raw.compContactPerson, raw.COMP_CONTACT_PERSON, raw.contactName, raw.CONTACT_NAME);
+  const phone = optionalText(raw.compPhone, raw.COMP_PHONE, raw.phone, raw.PHONE);
+  if (phone !== undefined) result.phone = maskEnterprisePhone(phone);
   setBoolean(result, 'collected', raw.collected, raw.COLLECTED, raw.isCollect, raw.IS_COLLECT);
   return result;
 };

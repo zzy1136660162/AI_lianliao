@@ -137,7 +137,7 @@ describe('enterprise desktop routing', () => {
     ['/enterprise/companies', 'enterprise.routes.companies.title'],
     ['/enterprise/companies/company-1', 'enterprise.routes.companyDetail.title'],
     ['/enterprise/products', 'enterprise.routes.products.title'],
-    ['/enterprise/products/product-1', 'enterprise.routes.productDetail.title'],
+    ['/enterprise/products/1', 'enterprise.routes.productDetail.title'],
     ['/enterprise/projects', 'enterprise.routes.projects.title'],
     ['/enterprise/projects/project-1', 'enterprise.routes.projectDetail.title'],
     ['/enterprise/favorites', 'enterprise.routes.favorites.title'],

@@ -97,6 +97,7 @@ export type EnterpriseProductSummary = {
   industry?: string;
   companyName?: string;
   companyIndustry?: string;
+  province?: string;
   city?: string;
   district?: string;
   address?: string;
@@ -194,6 +195,9 @@ export type CompanyListQuery = {
 export type ProductListQuery = {
   keyword?: string;
   industry?: string;
+  province?: string;
+  city?: string;
+  district?: string;
   companyId?: string;
   parkId?: string;
   sort?: string;

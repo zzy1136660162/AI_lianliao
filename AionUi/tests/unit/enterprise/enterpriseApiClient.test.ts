@@ -163,6 +163,31 @@ describe('EnterpriseApiClient base URL policy', () => {
     expect(calls[0]?.url).toBe('https://cloud.lslnii.com/cloud-api/CompanyController/getFindProducts');
   });
 
+  it('serializes product region filters for the existing product-list endpoint', async () => {
+    const { calls, transport } = captureTransport('product.list');
+    const client = new EnterpriseApiClient({ transport });
+
+    await client.request(
+      {
+        operation: 'product.list',
+        payload: {
+          province: '辽宁省',
+          city: '沈阳市',
+          district: '浑南区',
+          pageNum: 1,
+          pageSize: 20,
+        },
+      },
+      REGISTERED_CONTEXT
+    );
+
+    expect(JSON.parse(String(calls[0]?.init.body))).toMatchObject({
+      province: '辽宁省',
+      city: '沈阳市',
+      district: '浑南区',
+    });
+  });
+
   it.each([
     'https://cloud.lslnii.com',
     'http://localhost:4173',

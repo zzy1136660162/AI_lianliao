@@ -370,6 +370,21 @@ describe('enterprise schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts the product region filters supported by the enterprise product catalog', () => {
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'product.list',
+        payload: {
+          province: '辽宁省',
+          city: '沈阳市',
+          district: '浑南区',
+          pageNum: 1,
+          pageSize: 20,
+        },
+      }).success
+    ).toBe(true);
+  });
+
   it.each([
     {
       operation: 'company.list',
@@ -586,9 +601,66 @@ describe('enterprise schemas', () => {
         companyId: '12',
         companyName: 'Acme',
         summary: 'High-efficiency pump',
-        phone: '13800000000',
+        phone: '1380000****',
       },
     });
+  });
+
+  it('normalizes product-list company aliases and masks product phones for list and detail', () => {
+    const list = parseEnterpriseResponse('product.list', {
+      list: [
+        {
+          id: 51,
+          productsName: '工业泵',
+          companyId: 12,
+          name: '辽宁装备企业',
+          industry: '产品自填行业',
+          industry1: '装备制造',
+          province: '产品自填省份',
+          province1: '辽宁省',
+          city: '产品自填城市',
+          city1: '沈阳市',
+          district: '产品自填区县',
+          district1: '浑南区',
+          address: '产品自填地址',
+          compAddress: '沈阳市浑南区产业路 8 号',
+          contactName: '产品自填联系人',
+          compContactPerson: '企业联系人',
+          phone: '13900000000',
+          compPhone: '13800000000',
+        },
+      ],
+      pageNum: 1,
+      pageSize: 20,
+      pages: 1,
+      total: 1,
+    });
+    const detail = parseEnterpriseResponse('product.detail', {
+      id: 51,
+      productsName: '工业泵',
+      companyId: 12,
+      compPhone: '13900000000',
+    });
+
+    expect(list).toMatchObject({
+      data: {
+        list: [
+          {
+            companyName: '辽宁装备企业',
+            industry: '装备制造',
+            companyIndustry: '装备制造',
+            province: '辽宁省',
+            city: '沈阳市',
+            district: '浑南区',
+            address: '沈阳市浑南区产业路 8 号',
+            contactName: '企业联系人',
+            phone: '1380000****',
+          },
+        ],
+      },
+    });
+    expect(detail).toMatchObject({ data: { phone: '1390000****' } });
+    expect(JSON.stringify({ list, detail })).not.toMatch(/13800000000|13900000000/);
   });
 
   it('normalizes nested project dashboard metrics and distributions', () => {
