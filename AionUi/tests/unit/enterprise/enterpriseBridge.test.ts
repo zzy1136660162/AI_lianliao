@@ -901,29 +901,47 @@ describe('enterprise bridge', () => {
   );
 
   it.each([
-    ['13800000000转8012', '138********转8012'],
-    ['138 0000 0000转8012', '138********转8012'],
-    ['138.0000.0000转8012', '138********转8012'],
-    ['(138) 0000-0000', '(138********'],
-    ['13800000000****', '138************'],
-    ['13800000000 / 02412345678', '138******** / 024********'],
-  ])('masks every phone-like digit run at the final IPC boundary: %s', async (rawPhone, expectedPhone) => {
+    ['slash grouping', '138/0000/0000 WeChat', '138/****/**** WeChat', false],
+    ['full-width digits', '１３８００００００００****', '１３８************', undefined],
+    ['slash-connected phones', '13800000000/02412345678', '138********/***********', false],
+    ['existing stars', '13800000000****', '138************', undefined],
+  ] as const)(
+    'applies whole-field Unicode decimal masking at the final IPC boundary for %s',
+    async (_label, rawPhone, expectedPhone, purchased) => {
+      const request: EnterpriseRequest = { operation: 'project.detail', payload: { hpInfoId: '901' } };
+      const apiClient = makeApiClient();
+      apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+      apiClient.request.mockResolvedValue({
+        operation: 'project.detail',
+        data: { hpInfoId: '901', projectName: 'Factory', phone: rawPhone, purchased },
+      });
+      const { handlers } = await initializeBridge(apiClient);
+      await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+      const response = (await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)) as {
+        data: { phone: string };
+      };
+
+      expect(response.data.phone).toBe(expectedPhone);
+      expect((response.data.phone.match(/\p{Nd}/gu) ?? []).length).toBeLessThan(7);
+    }
+  );
+
+  it('keeps a slash-formatted Unicode phone unchanged at IPC when purchase access is explicit', async () => {
+    const rawPhone = '１３８/0000/0000 WeChat';
     const request: EnterpriseRequest = { operation: 'project.detail', payload: { hpInfoId: '901' } };
     const apiClient = makeApiClient();
     apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
     apiClient.request.mockResolvedValue({
       operation: 'project.detail',
-      data: { hpInfoId: '901', projectName: 'Factory', phone: rawPhone, purchased: false },
+      data: { hpInfoId: '901', projectName: 'Factory', phone: rawPhone, purchased: true },
     });
     const { handlers } = await initializeBridge(apiClient);
     await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
 
-    const response = (await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)) as {
-      data: { phone: string };
-    };
-
-    expect(response.data.phone).toBe(expectedPhone);
-    expect(response.data.phone).not.toMatch(/\d{7,}/u);
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toMatchObject({
+      data: { phone: rawPhone, purchased: true },
+    });
   });
 
   it.each(['operation', 'data', 'phone', 'purchased'] as const)(

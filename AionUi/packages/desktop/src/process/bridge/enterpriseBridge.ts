@@ -16,7 +16,7 @@ import type {
   EnterpriseResponse,
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
-import { maskEnterprisePhone } from '@/common/enterprise/normalizers';
+import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';

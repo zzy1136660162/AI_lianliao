@@ -617,23 +617,27 @@ describe('enterprise schemas', () => {
   });
 
   it.each([
-    ['13800000000转8012', '138********转8012'],
-    ['138 0000 0000转8012', '138********转8012'],
-    ['138.0000.0000转8012', '138********转8012'],
-    ['(138) 0000-0000', '(138********'],
-    ['13800000000****', '138************'],
-    ['13800000000 / 02412345678', '138******** / 024********'],
-    ['1380000****', '138********'],
-  ])('masks every complete phone-like digit run in shared responses: %s', (phone, expectedPhone) => {
+    ['extension text', '13800000000转8012', '138********转****', false],
+    ['space grouping', '138 0000 0000转8012', '138 **** ****转****', false],
+    ['dot grouping', '138.0000.0000转8012', '138.****.****转****', false],
+    ['parentheses', '(138) 0000-0000', '(138) ****-****', false],
+    ['existing stars', '13800000000****', '138************', undefined],
+    ['slash-separated phones', '13800000000 / 02412345678', '138******** / ***********', false],
+    ['partially masked digits', '1380000****', '138********', undefined],
+    ['slash grouping', '138/0000/0000 WeChat', '138/****/**** WeChat', false],
+    ['full-width digits', '１３８００００００００****', '１３８************', undefined],
+    ['slash-connected phones', '13800000000/02412345678', '138********/***********', false],
+  ] as const)('masks all but the first three decimal digits for %s', (_label, phone, expectedPhone, purchased) => {
     const response = parseEnterpriseResponse('project.detail', {
       HP_INFO_ID: 901,
       PROJECT_NAME: 'Factory Project',
       PHONE: phone,
-      IS_PURCHASED: false,
+      IS_PURCHASED: purchased,
     });
 
-    expect(response).toMatchObject({ data: { phone: expectedPhone, purchased: false } });
-    expect((response.data as { phone: string }).phone).not.toMatch(/\d{7,}/u);
+    expect(response).toMatchObject({ data: { phone: expectedPhone } });
+    if (purchased === false) expect(response).toMatchObject({ data: { purchased: false } });
+    expect(((response.data as { phone: string }).phone.match(/\p{Nd}/gu) ?? []).length).toBeLessThan(7);
   });
 
   it('uses COM_INTRO for the profile description while keeping COM_ABS as the business summary', () => {
@@ -1126,6 +1130,17 @@ describe('enterprise schemas', () => {
         IS_PURCHASED: true,
       })
     ).toMatchObject({ data: { phone: '13800000000', purchased: true } });
+  });
+
+  it('keeps Unicode and slash-formatted phones unchanged when purchase access is explicit', () => {
+    expect(
+      parseEnterpriseResponse('project.detail', {
+        HP_INFO_ID: 901,
+        PROJECT_NAME: 'Factory Project',
+        PHONE: '１３８/0000/0000 WeChat',
+        IS_PURCHASED: true,
+      })
+    ).toMatchObject({ data: { phone: '１３８/0000/0000 WeChat', purchased: true } });
   });
 
   it('accepts a precise ordinary decimal project investment string', () => {

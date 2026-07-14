@@ -267,6 +267,9 @@ describe('project detail boundary', () => {
     ['extension text', '13800000000转8012', false],
     ['grouped complete number', '138 0000 0000转8012', false],
     ['dot-grouped complete number', '138.0000.0000转8012', false],
+    ['slash-grouped complete number', '138/0000/0000 WeChat', false],
+    ['full-width complete number', '１３８００００００００****', undefined],
+    ['slash-connected complete numbers', '13800000000/02412345678', false],
     ['parenthesized complete number', '(138) 0000-0000', false],
     ['raw digits followed by stars', '13800000000****', false],
     ['multiple raw phones', '13800000000 / 02412345678', false],
@@ -281,7 +284,18 @@ describe('project detail boundary', () => {
   });
 
   it('accepts a strongly masked extension phone for an unpurchased project', async () => {
-    const detail = { ...project, phone: '138********转8012', purchased: false };
+    const detail = { ...project, phone: '138********转****', purchased: false };
+    const request = vi
+      .fn<EnterpriseClient['request']>()
+      .mockResolvedValue({ operation: 'project.detail', data: detail });
+
+    await expect(loadProjectDetail(createClient(request), '901', new AbortController().signal)).resolves.toEqual(
+      detail
+    );
+  });
+
+  it('accepts an unchanged Unicode slash phone only when purchase access is explicit', async () => {
+    const detail = { ...project, phone: '１３８/0000/0000 WeChat', purchased: true };
     const request = vi
       .fn<EnterpriseClient['request']>()
       .mockResolvedValue({ operation: 'project.detail', data: detail });

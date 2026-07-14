@@ -9,6 +9,7 @@ import type {
   ProjectListQuery,
 } from '@/common/enterprise/contracts';
 import { ENTERPRISE_IPC_ERROR_MESSAGES } from '@/common/enterprise/constants';
+import { countEnterprisePhoneDecimalDigits } from '@/common/enterprise/phonePrivacy';
 import {
   createPlainEnterpriseRecordParser,
   getPlainEnterpriseDataFields,
@@ -309,13 +310,12 @@ const parseProjectSummary = (value: unknown): EnterpriseProjectSummary | null =>
 };
 
 const MASKED_PHONE_CHARACTERS = /^[\p{L}\p{N}\s+()\-\u2013\u2014/,.\uff0c\u3001\uff1b;:*#]+$/u;
-const COMPLETE_PHONE_CANDIDATE = /\d(?:[\s().\-\u2013\u2014]*\d){6,19}/u;
 
 const isMaskedPhone = (value: string): boolean =>
   value.length <= 256 &&
   value.includes('*') &&
   !/\p{C}/u.test(value) &&
-  !COMPLETE_PHONE_CANDIDATE.test(value) &&
+  countEnterprisePhoneDecimalDigits(value) < 7 &&
   MASKED_PHONE_CHARACTERS.test(value);
 
 const parseProjectDetailRecord = (value: unknown): EnterpriseProjectDetail | null => {
