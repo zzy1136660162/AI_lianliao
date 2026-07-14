@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import type { EnterpriseRequest, EnterpriseResponse, EnterpriseUserContext } from '@/common/enterprise/contracts';
 import {
   commonResultSchema,
@@ -10,6 +12,16 @@ import { ENTERPRISE_API_ROUTES, type EnterpriseApiRouteKey } from './enterpriseA
 
 const DEFAULT_BASE_URL = 'https://cloud.lslnii.com/';
 const DEFAULT_TIMEOUT_MS = 15_000;
+const FORBIDDEN_ENVELOPE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+const commonFailureResultSchema = z
+  .object({
+    success: z.literal(false),
+    data: z.unknown(),
+    message: z.string(),
+    code: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough();
 
 export type EnterpriseApiEnvironment = 'production' | 'development';
 
@@ -148,7 +160,6 @@ const serializeCompanyDetail = (
 ): EnterpriseRequestBody => {
   requireCompanyIdentity(context);
   return {
-    companyId: request.payload.companyId,
     id: request.payload.companyId,
     openId: context.openId,
     userId: context.userId as string,
@@ -159,12 +170,17 @@ const serializeCompanyDetail = (
 };
 
 const serializeProductList = (
-  request: Extract<EnterpriseRequest, { operation: 'product.list' }>
+  request: Extract<EnterpriseRequest, { operation: 'product.list' }>,
+  context: EnterpriseUserContext
 ): EnterpriseRequestBody => {
+  requireCompanyIdentity(context);
   const { payload } = request;
   const body: EnterpriseRequestBody = {
     pageNum: payload.pageNum,
     pageSize: payload.pageSize,
+    openId: context.openId,
+    fromCompanyId: context.companyId as string,
+    fromUserId: context.userId as string,
   };
   setDefined(body, 'name', payload.keyword);
   setDefined(body, 'industry', payload.industry);
@@ -241,7 +257,7 @@ const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserCon
     case 'company.detail':
       return serializeCompanyDetail(request, context);
     case 'product.list':
-      return serializeProductList(request);
+      return serializeProductList(request, context);
     case 'product.detail':
       return serializeProductDetail(request, context);
     case 'project.dashboard':
@@ -252,17 +268,55 @@ const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserCon
   }
 };
 
+const sanitizeEnvelope = (input: unknown): Record<string, unknown> | undefined => {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
+
+  try {
+    const prototype = Object.getPrototypeOf(input);
+    if (prototype !== Object.prototype && prototype !== null) return undefined;
+
+    const sanitized = Object.create(null) as Record<string, unknown>;
+    for (const key of Reflect.ownKeys(input)) {
+      if (typeof key !== 'string' || FORBIDDEN_ENVELOPE_KEYS.has(key)) return undefined;
+
+      const descriptor = Object.getOwnPropertyDescriptor(input, key);
+      if (!descriptor || 'get' in descriptor || 'set' in descriptor) return undefined;
+      if (!descriptor.enumerable) continue;
+      Object.defineProperty(sanitized, key, {
+        value: descriptor.value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    }
+
+    for (const key in input) {
+      if (!Object.hasOwn(input, key)) return undefined;
+    }
+    return sanitized;
+  } catch {
+    return undefined;
+  }
+};
+
 const unwrapCommonResult = (input: unknown): unknown => {
-  if (
-    typeof input === 'object' &&
-    input !== null &&
-    Object.hasOwn(input, 'success') &&
-    (input as { success?: unknown }).success === false
-  ) {
+  const sanitized = sanitizeEnvelope(input);
+  if (!sanitized) throw apiError('INVALID_RESPONSE');
+
+  if (sanitized.success === false) {
+    if (
+      !Object.hasOwn(sanitized, 'success') ||
+      !Object.hasOwn(sanitized, 'data') ||
+      !Object.hasOwn(sanitized, 'message')
+    ) {
+      throw apiError('INVALID_RESPONSE');
+    }
+    const failureResult = commonFailureResultSchema.safeParse(sanitized);
+    if (!failureResult.success) throw apiError('INVALID_RESPONSE');
     throw apiError('API_FAILURE');
   }
 
-  const result = commonResultSchema.safeParse(input);
+  const result = commonResultSchema.safeParse(sanitized);
   if (!result.success) throw apiError('INVALID_RESPONSE');
   return result.data.data;
 };
@@ -319,8 +373,8 @@ export class EnterpriseApiClient {
     });
 
     const url = new URL(ENTERPRISE_API_ROUTES[routeKey], this.baseUrl).toString();
-    const transportPromise = Promise.resolve().then(() =>
-      this.transport(url, {
+    const requestPromise = Promise.resolve().then(async () => {
+      const response = await this.transport(url, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -328,23 +382,24 @@ export class EnterpriseApiClient {
         },
         body: JSON.stringify(body),
         signal: controller.signal,
-      })
-    );
-
-    try {
-      const response = await Promise.race([transportPromise, timeoutPromise]);
+      });
       if (!response.ok) throw apiError('HTTP');
 
       let json: unknown;
       try {
         json = await response.json();
       } catch {
+        if (controller.signal.aborted) throw apiError('TIMEOUT');
         throw apiError('INVALID_JSON');
       }
       return unwrapCommonResult(json);
+    });
+
+    try {
+      return await Promise.race([requestPromise, timeoutPromise]);
     } catch (error) {
-      if (error instanceof EnterpriseApiError) throw error;
       if (controller.signal.aborted) throw apiError('TIMEOUT');
+      if (error instanceof EnterpriseApiError) throw error;
       throw apiError('NETWORK');
     } finally {
       if (timeoutId !== undefined) clearTimeout(timeoutId);

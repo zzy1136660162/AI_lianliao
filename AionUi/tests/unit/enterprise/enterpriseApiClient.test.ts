@@ -22,6 +22,12 @@ const jsonResponse = (value: unknown, status = 200): Response =>
     headers: { 'Content-Type': 'application/json' },
   });
 
+const responseWithJsonValue = (value: unknown): Response => {
+  const response = jsonResponse(null);
+  Object.defineProperty(response, 'json', { value: async () => value });
+  return response;
+};
+
 const successfulData: Record<EnterpriseOperation, unknown> = {
   'company.list': {
     list: [{ id: 'company-target-1', name: 'Acme' }],
@@ -132,10 +138,7 @@ describe('EnterpriseApiClient base URL policy', () => {
       transport,
     });
 
-    await client.request(
-      { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
-      { registered: false, openId: '' }
-    );
+    await client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT);
 
     expect(calls[0]?.url).toBe('https://cloud.lslnii.com/cloud-api/CompanyController/getFindProducts');
   });
@@ -271,7 +274,6 @@ describe('EnterpriseApiClient serialization and context injection', () => {
       operation: 'company.detail',
       request: { operation: 'company.detail', payload: { companyId: 'company-target-9' } },
       expectedBody: {
-        companyId: 'company-target-9',
         id: 'company-target-9',
         openId: REGISTERED_CONTEXT.openId,
         userId: REGISTERED_CONTEXT.userId,
@@ -302,6 +304,9 @@ describe('EnterpriseApiClient serialization and context injection', () => {
         sorted: 'NEW_SORT',
         pageNum: 3,
         pageSize: 12,
+        openId: REGISTERED_CONTEXT.openId,
+        fromCompanyId: REGISTERED_CONTEXT.companyId,
+        fromUserId: REGISTERED_CONTEXT.userId,
       },
     },
     {
@@ -454,7 +459,38 @@ describe('EnterpriseApiClient serialization and context injection', () => {
 
     await client.request(request, context);
 
-    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ pageNum: 1, pageSize: 20 });
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      pageNum: 1,
+      pageSize: 20,
+      openId: REGISTERED_CONTEXT.openId,
+      fromCompanyId: REGISTERED_CONTEXT.companyId,
+      fromUserId: REGISTERED_CONTEXT.userId,
+    });
+    expect(request).toEqual(requestSnapshot);
+    expect(context).toEqual(contextSnapshot);
+  });
+
+  it('keeps the company-detail target separate from the immutable identity context', async () => {
+    const request = Object.freeze({
+      operation: 'company.detail' as const,
+      payload: Object.freeze({ companyId: 'company-target-99' }),
+    });
+    const context = Object.freeze({ ...REGISTERED_CONTEXT, companyId: 'company-current-88' });
+    const requestSnapshot = structuredClone(request);
+    const contextSnapshot = structuredClone(context);
+    const { calls, transport } = captureTransport('company.detail');
+    const client = new EnterpriseApiClient({ transport });
+
+    await client.request(request, context);
+
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      id: 'company-target-99',
+      openId: REGISTERED_CONTEXT.openId,
+      userId: REGISTERED_CONTEXT.userId,
+      fromCompanyId: 'company-current-88',
+      pageNum: 1,
+      pageSize: 10,
+    });
     expect(request).toEqual(requestSnapshot);
     expect(context).toEqual(contextSnapshot);
   });
@@ -478,6 +514,26 @@ describe('EnterpriseApiClient serialization and context injection', () => {
     {
       label: 'missing company companyId',
       request: { operation: 'company.list', payload: { pageNum: 1, pageSize: 20 } },
+      context: { registered: true, openId: 'open', userId: 'user' },
+    },
+    {
+      label: 'unregistered product-list user',
+      request: { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
+      context: { ...REGISTERED_CONTEXT, registered: false },
+    },
+    {
+      label: 'blank product-list openId',
+      request: { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
+      context: { ...REGISTERED_CONTEXT, openId: ' ' },
+    },
+    {
+      label: 'missing product-list userId',
+      request: { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
+      context: { registered: true, openId: 'open', companyId: 'current' },
+    },
+    {
+      label: 'missing product-list companyId',
+      request: { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
       context: { registered: true, openId: 'open', userId: 'user' },
     },
     {
@@ -506,6 +562,29 @@ describe('EnterpriseApiClient serialization and context injection', () => {
 
     expect(calls).toBe(0);
   });
+
+  it.each([
+    { operation: 'company.list', payload: { pageNum: 1, pageSize: 20 } },
+    { operation: 'company.detail', payload: { companyId: 'company-target' } },
+    { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
+    { operation: 'product.detail', payload: { productId: 'product-target' } },
+    { operation: 'project.dashboard', payload: {} },
+    { operation: 'project.drill', payload: { level: 'l1' } },
+    { operation: 'project.list', payload: { pageNum: 1, pageSize: 20 } },
+    { operation: 'project.detail', payload: { hpInfoId: 'project-target' } },
+  ] satisfies EnterpriseRequest[])('rejects missing identity for $operation before transport', async (request) => {
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return successResponse(request.operation);
+      },
+    });
+
+    await expectApiError(client.request(request, { registered: false, openId: ' ' }), 'MISSING_CONTEXT');
+
+    expect(calls).toBe(0);
+  });
 });
 
 describe('EnterpriseApiClient transport and response errors', () => {
@@ -525,7 +604,7 @@ describe('EnterpriseApiClient transport and response errors', () => {
 
     const pending = client.request(
       { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
-      { registered: false, openId: '' }
+      REGISTERED_CONTEXT
     );
     const timeoutError = expectApiError(pending, 'TIMEOUT');
     await vi.advanceTimersByTimeAsync(25);
@@ -536,6 +615,85 @@ describe('EnterpriseApiClient transport and response errors', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('settles as TIMEOUT when response body parsing ignores abort', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | null = null;
+    const response = successResponse('product.list');
+    Object.defineProperty(response, 'json', {
+      value: () => new Promise<unknown>(() => undefined),
+    });
+    const client = new EnterpriseApiClient({
+      timeoutMs: 25,
+      transport: async (_url, init) => {
+        signal = init.signal ?? null;
+        return response;
+      },
+    });
+    const unsettled = Symbol('unsettled');
+    let outcome: unknown = unsettled;
+
+    const pending = client.request(
+      { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
+      REGISTERED_CONTEXT
+    );
+    void pending.then(
+      (value) => {
+        outcome = value;
+      },
+      (error: unknown) => {
+        outcome = error;
+      }
+    );
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(outcome).toBeInstanceOf(EnterpriseApiError);
+    expect((outcome as EnterpriseApiError).code).toBe('TIMEOUT');
+    expect(signal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('maps an abort-rejected response body to TIMEOUT without exposing its error', async () => {
+    vi.useFakeTimers();
+    const phone = '13800000000';
+    let signal: AbortSignal | null = null;
+    const response = successResponse('product.list');
+    Object.defineProperty(response, 'json', {
+      value: () =>
+        new Promise<unknown>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error(`body failed for ${phone}`)), { once: true });
+        }),
+    });
+    const client = new EnterpriseApiClient({
+      timeoutMs: 25,
+      transport: async (_url, init) => {
+        signal = init.signal ?? null;
+        return response;
+      },
+    });
+
+    const pending = client.request(
+      { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
+      REGISTERED_CONTEXT
+    );
+    const unsettled = Symbol('unsettled');
+    let outcome: unknown = unsettled;
+    void pending.then(
+      (value) => {
+        outcome = value;
+      },
+      (error: unknown) => {
+        outcome = error;
+      }
+    );
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(outcome).toBeInstanceOf(EnterpriseApiError);
+    expect((outcome as EnterpriseApiError).code).toBe('TIMEOUT');
+    expect((outcome as EnterpriseApiError).message).not.toContain(phone);
+    expect(signal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('clears the timeout after a completed request', async () => {
     vi.useFakeTimers();
     const client = new EnterpriseApiClient({
@@ -543,10 +701,7 @@ describe('EnterpriseApiClient transport and response errors', () => {
       transport: async () => successResponse('product.list'),
     });
 
-    await client.request(
-      { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
-      { registered: false, openId: '' }
-    );
+    await client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT);
 
     expect(vi.getTimerCount()).toBe(0);
   });
@@ -574,10 +729,7 @@ describe('EnterpriseApiClient transport and response errors', () => {
     });
 
     const error = await expectApiError(
-      client.request(
-        { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
-        { registered: false, openId: '' }
-      ),
+      client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
       'HTTP'
     );
 
@@ -588,10 +740,7 @@ describe('EnterpriseApiClient transport and response errors', () => {
     const client = new EnterpriseApiClient({ transport: async () => new Response('{broken') });
 
     await expectApiError(
-      client.request(
-        { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
-        { registered: false, openId: '' }
-      ),
+      client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
       'INVALID_JSON'
     );
   });
@@ -603,24 +752,91 @@ describe('EnterpriseApiClient transport and response errors', () => {
     });
 
     const error = await expectApiError(
-      client.request(
-        { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
-        { registered: false, openId: '' }
-      ),
+      client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
       'API_FAILURE'
     );
 
     expect(error.message).not.toContain(phone);
   });
 
+  it.each([
+    ['missing success', { data: null, message: 'denied' }],
+    ['missing data', { success: false, message: 'denied' }],
+    ['missing message', { success: false, data: null }],
+    ['non-boolean success', { success: 'false', data: null, message: 'denied' }],
+    ['non-string message', { success: false, data: null, message: 42 }],
+    ['invalid code', { success: false, data: null, message: 'denied', code: { nested: true } }],
+  ])('maps a malformed failed CommonResult with %s to INVALID_RESPONSE', async (_label, envelope) => {
+    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+
+    await expectApiError(
+      client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
+      'INVALID_RESPONSE'
+    );
+  });
+
+  it.each(['__proto__', 'prototype', 'constructor'])(
+    'rejects the dangerous failed-envelope key %s without exposing its value',
+    async (key) => {
+      const sensitiveValue = `sensitive-${key}-13800000000`;
+      const envelope = JSON.parse(
+        `{"success":false,"data":null,"message":"denied","${key}":"${sensitiveValue}"}`
+      ) as unknown;
+      const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+
+      const error = await expectApiError(
+        client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
+        'INVALID_RESPONSE'
+      );
+
+      expect(error.message).not.toContain(sensitiveValue);
+    }
+  );
+
+  it('rejects a failed CommonResult with a custom prototype', async () => {
+    const envelope = Object.assign(Object.create({ inherited: 'sensitive-value' }), {
+      success: false,
+      data: null,
+      message: 'denied',
+    }) as unknown;
+    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+
+    await expectApiError(
+      client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
+      'INVALID_RESPONSE'
+    );
+  });
+
+  it('rejects a failed CommonResult accessor without evaluating it', async () => {
+    let accessorReads = 0;
+    const envelope = Object.create(null) as Record<string, unknown>;
+    Object.defineProperties(envelope, {
+      success: {
+        enumerable: true,
+        get: () => {
+          accessorReads += 1;
+          return false;
+        },
+      },
+      data: { enumerable: true, value: null },
+      message: { enumerable: true, value: 'denied' },
+    });
+    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+
+    const outcome = await client
+      .request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT)
+      .catch((error: unknown) => error);
+
+    expect(accessorReads).toBe(0);
+    expect(outcome).toBeInstanceOf(EnterpriseApiError);
+    expect((outcome as EnterpriseApiError).code).toBe('INVALID_RESPONSE');
+  });
+
   it('maps an invalid CommonResult envelope to INVALID_RESPONSE', async () => {
     const client = new EnterpriseApiClient({ transport: async () => jsonResponse({ success: true }) });
 
     await expectApiError(
-      client.request(
-        { operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } },
-        { registered: false, openId: '' }
-      ),
+      client.request({ operation: 'product.list', payload: { pageNum: 1, pageSize: 20 } }, REGISTERED_CONTEXT),
       'INVALID_RESPONSE'
     );
   });
