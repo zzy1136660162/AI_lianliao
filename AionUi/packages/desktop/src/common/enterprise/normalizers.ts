@@ -32,14 +32,33 @@ const firstScalar = (...values: unknown[]): string | number | boolean | undefine
 
 const optionalText = (...values: unknown[]): string | undefined => {
   const value = firstScalar(...values);
-  return value === undefined || typeof value === 'boolean' ? undefined : String(value).trim();
+  return typeof value === 'string' ? value.trim() : undefined;
 };
+
+const optionalIdentifier = (...values: unknown[]): string | undefined => {
+  const value = firstScalar(...values);
+  if (typeof value === 'string') return value.trim() || undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isSafeInteger(value)) return undefined;
+  return String(value);
+};
+
+const ORDINARY_DECIMAL_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
 
 const optionalNumber = (...values: unknown[]): number | undefined => {
   const value = firstScalar(...values);
   if (value === undefined || typeof value === 'boolean') return undefined;
-  const parsed = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return undefined;
+    return Number.isInteger(value) && !Number.isSafeInteger(value) ? undefined : value;
+  }
+
+  const normalized = value.trim();
+  if (!ORDINARY_DECIMAL_PATTERN.test(normalized)) return undefined;
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return undefined;
+  return Number.isInteger(parsed) && !Number.isSafeInteger(parsed) ? undefined : parsed;
 };
 
 const optionalBoolean = (...values: unknown[]): boolean | undefined => {
@@ -62,6 +81,12 @@ const operationError = (operation: string, detail: string): Error =>
 
 const requiredText = (operation: string, field: string, ...values: unknown[]): string => {
   const value = optionalText(...values);
+  if (!value) throw operationError(operation, `missing required ${field}`);
+  return value;
+};
+
+const requiredIdentifier = (operation: string, field: string, ...values: unknown[]): string => {
+  const value = optionalIdentifier(...values);
   if (!value) throw operationError(operation, `missing required ${field}`);
   return value;
 };
@@ -100,6 +125,19 @@ const setText = <T extends object, K extends keyof T>(target: T, key: K, ...valu
   if (value !== undefined) target[key] = value as T[K];
 };
 
+const setIdentifier = <T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  operation: string,
+  ...values: unknown[]
+) => {
+  const rawValue = firstScalar(...values);
+  if (rawValue === undefined) return;
+  const value = optionalIdentifier(rawValue);
+  if (value === undefined) throw operationError(operation, `invalid ${String(key)}`);
+  target[key] = value as T[K];
+};
+
 const setNumber = <T extends object, K extends keyof T>(target: T, key: K, ...values: unknown[]) => {
   const value = optionalNumber(...values);
   if (value !== undefined) target[key] = value as T[K];
@@ -127,21 +165,21 @@ const normalizeUserContextRaw = (raw: z.infer<typeof userContextRawSchema>): Ent
 
   const result: EnterpriseUserContext = {
     registered,
-    openId: requiredText(operation, 'openId', raw.openId, raw.openid, raw.OPEN_ID, raw.OPENID),
+    openId: requiredIdentifier(operation, 'openId', raw.openId, raw.openid, raw.OPEN_ID, raw.OPENID),
   };
-  setText(result, 'userId', raw.userId, raw.USER_ID, raw.id, raw.ID);
+  setIdentifier(result, 'userId', operation, raw.userId, raw.USER_ID, raw.id, raw.ID);
   setText(result, 'userName', raw.userName, raw.USER_NAME);
-  setText(result, 'companyId', raw.companyId, raw.COMPANY_ID);
+  setIdentifier(result, 'companyId', operation, raw.companyId, raw.COMPANY_ID);
   setText(result, 'companyName', raw.companyName, raw.COMPANY_NAME);
   setNumber(result, 'companyLevel', raw.companyLevel, raw.COMPANY_LEVEL, raw.comLevel, raw.COM_LEVEL);
-  setText(result, 'roleId', raw.roleId, raw.ROLE_ID);
+  setIdentifier(result, 'roleId', operation, raw.roleId, raw.ROLE_ID);
   return result;
 };
 
 const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.detail'): EnterpriseCompanyDetail => {
   const raw = enterpriseCompanyRawSchema.parse(input);
   const result: EnterpriseCompanyDetail = {
-    companyId: requiredText(operation, 'companyId', raw.companyId, raw.COMPANY_ID, raw.id, raw.ID),
+    companyId: requiredIdentifier(operation, 'companyId', raw.companyId, raw.COMPANY_ID, raw.id, raw.ID),
     name: requiredText(operation, 'name', raw.name, raw.NAME, raw.companyName, raw.COMPANY_NAME),
   };
   setText(result, 'shortName', raw.shortName, raw.SHORT_NAME);
@@ -192,7 +230,7 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
 const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.detail'): EnterpriseProductDetail => {
   const raw = enterpriseProductRawSchema.parse(input);
   const result: EnterpriseProductDetail = {
-    productId: requiredText(operation, 'productId', raw.productId, raw.PRODUCT_ID, raw.id, raw.ID),
+    productId: requiredIdentifier(operation, 'productId', raw.productId, raw.PRODUCT_ID, raw.id, raw.ID),
     name: requiredText(
       operation,
       'name',
@@ -203,7 +241,7 @@ const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.d
       raw.name,
       raw.NAME
     ),
-    companyId: requiredText(operation, 'companyId', raw.companyId, raw.COMPANY_ID),
+    companyId: requiredIdentifier(operation, 'companyId', raw.companyId, raw.COMPANY_ID),
   };
   setText(result, 'imageUrl', raw.imageUrl, raw.IMAGE_URL, raw.tempPic, raw.TEMP_PIC);
   setText(result, 'summary', raw.summary, raw.SUMMARY, raw.productAbs, raw.PRODUCT_ABS);
@@ -225,7 +263,16 @@ const normalizeProjectSummary = (
 ): EnterpriseProjectSummary => {
   const raw = enterpriseProjectRawSchema.parse(input);
   const result: EnterpriseProjectSummary = {
-    hpInfoId: requiredText(operation, 'hpInfoId', raw.hpInfoId, raw.HP_INFO_ID, raw.dbId, raw.DB_ID, raw.id, raw.ID),
+    hpInfoId: requiredIdentifier(
+      operation,
+      'hpInfoId',
+      raw.hpInfoId,
+      raw.HP_INFO_ID,
+      raw.dbId,
+      raw.DB_ID,
+      raw.id,
+      raw.ID
+    ),
     projectName: requiredText(
       operation,
       'projectName',
@@ -437,7 +484,7 @@ const inferDrillLevel = (
   const explicit = optionalText(raw.level, raw.LEVEL, raw.resultLevel, raw.RESULT_LEVEL);
   if (explicit) {
     const parsed = z.enum(ENTERPRISE_PROJECT_DRILL_LEVELS).safeParse(explicit);
-    if (!parsed.success) throw operationError(operation, `invalid dimension ${explicit}`);
+    if (!parsed.success) throw operationError(operation, 'invalid dimension');
     return parsed.data;
   }
   if (optionalText(raw.materialName, raw.MATERIAL_NAME)) return 'materialName';
@@ -508,7 +555,10 @@ const describeParseError = (error: unknown): string => {
   return 'unknown validation error';
 };
 
-/** Internal pure functions used by the enterprise schema facade. */
+/**
+ * @internal
+ * Pure fail-closed normalizers used only by the enterprise schema facade.
+ */
 export const enterpriseNormalizers = {
   describeParseError,
   normalizeCompany,

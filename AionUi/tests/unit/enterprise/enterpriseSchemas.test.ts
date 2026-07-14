@@ -44,6 +44,39 @@ describe('enterprise schemas', () => {
     expect(parseCommonResult({ success: true, data: null }, 'company.detail')).toBeNull();
   });
 
+  it('rejects inherited CommonResult success and data properties', () => {
+    const inheritedSuccess = Object.assign(Object.create({ success: true }), { data: null });
+    const inheritedData = Object.assign(Object.create({ data: { secret: 1 } }), { success: true });
+
+    expect(() => parseCommonResult(inheritedSuccess, 'probe.success')).toThrow(/probe\.success/i);
+    expect(() => parseCommonResult(inheritedData, 'probe.data')).toThrow(/probe\.data/i);
+  });
+
+  it.each(['__proto__', 'constructor'])(
+    'rejects the dangerous own CommonResult key %s without leaking its value',
+    (key) => {
+      const input = JSON.parse(`{"success":true,"data":null,"${key}":"sensitive-value"}`) as unknown;
+
+      expect(() => parseCommonResult(input, 'probe.dangerous')).toThrow(/probe\.dangerous/i);
+      try {
+        parseCommonResult(input, 'probe.dangerous');
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).not.toContain('sensitive-value');
+      }
+    }
+  );
+
+  it('accepts a null-prototype CommonResult when required fields are own properties', () => {
+    const input = Object.create(null) as { success: boolean; data: null };
+    Object.defineProperties(input, {
+      success: { enumerable: true, value: true },
+      data: { enumerable: true, value: null },
+    });
+
+    expect(parseCommonResult(input, 'probe.nullPrototype')).toBeNull();
+  });
+
   it.each(['WAITING', 'AUTHENTICATED', 'REGISTER_REQUIRED', 'EXPIRED'])(
     'accepts the supported login status %s',
     (status) => {
@@ -79,6 +112,25 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it('rejects an unsafe numeric value in an optional identifier field', () => {
+    expect(() =>
+      enterpriseUserContextSchema.parse({
+        registered: true,
+        openId: 'openid-1',
+        userId: Number.MAX_SAFE_INTEGER + 1,
+      })
+    ).toThrow(/auth\.userContext.*userId/i);
+  });
+
+  it('preserves leading zeroes in opaque string identifiers', () => {
+    expect(
+      enterpriseUserContextSchema.parse({
+        registered: true,
+        openId: '0000123',
+      })
+    ).toMatchObject({ openId: '0000123' });
+  });
+
   it('preserves extra backend fields only in passthrough raw schema results', () => {
     const raw = enterpriseCompanyRawSchema.parse({
       id: 12,
@@ -100,6 +152,33 @@ describe('enterprise schemas', () => {
       operation: 'company.detail',
       data: { companyId: '12', name: 'Acme' },
     });
+  });
+
+  it('rejects a company detail envelope with a custom polluted prototype', () => {
+    const input = {
+      company: { id: 12, name: 'Acme' },
+    };
+    Object.setPrototypeOf(input, { polluted: true });
+
+    expect(() => parseEnterpriseResponse('company.detail', input)).toThrow(/company\.detail/i);
+  });
+
+  it('rejects an inherited project drill envelope list', () => {
+    const input = Object.create({ list: [{ name: 'Cement', level: 'materialName', projectCount: 1 }] });
+
+    expect(() => parseEnterpriseResponse('project.drill', input)).toThrow(/project\.drill/i);
+  });
+
+  it('rejects dangerous own keys on response envelopes', () => {
+    const input = JSON.parse('{"company":{"id":12,"name":"Acme"},"constructor":"sensitive-envelope-value"}') as unknown;
+
+    try {
+      parseEnterpriseResponse('company.detail', input);
+      expect.unreachable('expected a dangerous envelope key error');
+    } catch (error) {
+      expect((error as Error).message).toMatch(/company\.detail/i);
+      expect((error as Error).message).not.toContain('sensitive-envelope-value');
+    }
   });
 
   it('rejects renderer request fields outside the operation whitelist', () => {
@@ -146,6 +225,53 @@ describe('enterprise schemas', () => {
     ).toBe(false);
   });
 
+  it('rejects inherited enterprise operation and payload properties', () => {
+    const inheritedRequest = Object.create({
+      operation: 'company.detail',
+      payload: { companyId: '12' },
+    });
+    const inheritedPayload = {
+      operation: 'company.detail',
+      payload: Object.create({ companyId: '12' }),
+    };
+
+    expect(enterpriseRequestSchema.safeParse(inheritedRequest).success).toBe(false);
+    expect(enterpriseRequestSchema.safeParse(inheritedPayload).success).toBe(false);
+  });
+
+  it('rejects a request with a custom polluted prototype', () => {
+    const request = {
+      operation: 'company.detail',
+      payload: { companyId: '12' },
+    };
+    Object.setPrototypeOf(request, { polluted: true });
+
+    expect(enterpriseRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  it.each(['__proto__', 'constructor'])('rejects dangerous own request and payload keys named %s', (key) => {
+    const topLevel = JSON.parse(`{"operation":"company.detail","payload":{"companyId":"12"},"${key}":true}`) as unknown;
+    const payload = JSON.parse(`{"operation":"company.detail","payload":{"companyId":"12","${key}":true}}`) as unknown;
+
+    expect(enterpriseRequestSchema.safeParse(topLevel).success).toBe(false);
+    expect(enterpriseRequestSchema.safeParse(payload).success).toBe(false);
+  });
+
+  it('accepts a null-prototype request with own operation and payload properties', () => {
+    const payload = Object.create(null) as { companyId: string };
+    Object.defineProperty(payload, 'companyId', { enumerable: true, value: '12' });
+    const request = Object.create(null) as {
+      operation: 'company.detail';
+      payload: { companyId: string };
+    };
+    Object.defineProperties(request, {
+      operation: { enumerable: true, value: 'company.detail' },
+      payload: { enumerable: true, value: payload },
+    });
+
+    expect(enterpriseRequestSchema.safeParse(request).success).toBe(true);
+  });
+
   it('accepts company level and VIP filters in company list requests', () => {
     const result = enterpriseRequestSchema.safeParse({
       operation: 'company.list',
@@ -158,6 +284,23 @@ describe('enterprise schemas', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it.each([
+    {
+      operation: 'company.list',
+      payload: { pageNum: Number.MAX_SAFE_INTEGER + 1, pageSize: 20 },
+    },
+    {
+      operation: 'product.list',
+      payload: { pageNum: 1, pageSize: Number.MAX_SAFE_INTEGER + 1 },
+    },
+    {
+      operation: 'project.drill',
+      payload: { level: 'l1', minProjectCount: Number.MAX_SAFE_INTEGER + 1 },
+    },
+  ] as const)('rejects unsafe integer values in renderer request payloads', (request) => {
+    expect(enterpriseRequestSchema.safeParse(request).success).toBe(false);
   });
 
   it('rejects the unconfirmed contact-state company filter', () => {
@@ -221,6 +364,18 @@ describe('enterprise schemas', () => {
     ).toMatchObject({ data: { pages: 0, total: 0 } });
   });
 
+  it('accepts canonical decimal integer strings for pagination', () => {
+    expect(
+      parseEnterpriseResponse('company.list', {
+        list: [],
+        pageNum: '2',
+        pageSize: '20',
+        pages: '0',
+        total: '0',
+      })
+    ).toMatchObject({ data: { pageNum: 2, pageSize: 20, pages: 0, total: 0 } });
+  });
+
   it.each([
     ['pageNum', 0],
     ['pageSize', 0],
@@ -232,6 +387,11 @@ describe('enterprise schemas', () => {
     ['total', 1.5],
     ['pageSize', Number.POSITIVE_INFINITY],
     ['total', Number.NaN],
+    ['pageNum', '9007199254740993'],
+    ['pageNum', Number.MAX_SAFE_INTEGER + 1],
+    ['pageNum', '0x10'],
+    ['pageNum', '0b10'],
+    ['pageNum', '1e3'],
   ])('rejects invalid pagination value %s=%s', (field, value) => {
     expect(() =>
       parseEnterpriseResponse('company.list', {
@@ -251,6 +411,38 @@ describe('enterprise schemas', () => {
 
   it('rejects a boolean value for a required display name', () => {
     expect(() => parseEnterpriseResponse('company.detail', { id: 12, name: true })).toThrow(/company\.detail.*name/i);
+  });
+
+  it.each([
+    ['company.detail', { id: 12, name: 0 }, /company\.detail.*name/i],
+    ['product.detail', { id: 51, name: 12345, companyId: 12 }, /product\.detail.*name/i],
+    ['project.detail', { hpInfoId: 901, projectName: 2026 }, /project\.detail.*projectName/i],
+  ] as const)('rejects a numeric value for required business text in %s', (operation, data, expectedError) => {
+    expect(() => parseEnterpriseResponse(operation, data)).toThrow(expectedError);
+  });
+
+  it('rejects numeric values for optional business text instead of stringifying them', () => {
+    expect(() => parseEnterpriseResponse('company.detail', { id: 12, name: 'Acme', address: 123 })).toThrow(
+      /company\.detail/i
+    );
+  });
+
+  it('rejects unsafe numeric identifiers without changing their value into a rounded string', () => {
+    expect(() =>
+      parseEnterpriseResponse('company.detail', {
+        id: Number.MAX_SAFE_INTEGER + 1,
+        name: 'Acme',
+      })
+    ).toThrow(/company\.detail.*companyId/i);
+  });
+
+  it('preserves opaque string identifiers exactly', () => {
+    expect(
+      parseEnterpriseResponse('company.detail', {
+        id: '9007199254740993',
+        name: 'Acme',
+      })
+    ).toMatchObject({ data: { companyId: '9007199254740993' } });
   });
 
   it('normalizes product detail aliases into the stable model', () => {
@@ -334,6 +526,18 @@ describe('enterprise schemas', () => {
   });
 
   it.each([
+    ['0', 0],
+    ['12.50', 12.5],
+  ])('accepts the decimal dashboard investment amount %s', (investmentTotalYi, expected) => {
+    expect(
+      parseEnterpriseResponse('project.dashboard', {
+        ...validDashboardPayload,
+        kpi: { ...validDashboardPayload.kpi, investmentTotalYi },
+      })
+    ).toMatchObject({ data: { investmentTotalYi: expected } });
+  });
+
+  it.each([
     ['projectCount', -1],
     ['categoryL1Count', 1.5],
     ['categoryL2Count', -1],
@@ -341,6 +545,11 @@ describe('enterprise schemas', () => {
     ['materialNameCount', -1],
     ['projectCount', Number.POSITIVE_INFINITY],
     ['materialNameCount', Number.NaN],
+    ['projectCount', '9007199254740993'],
+    ['projectCount', Number.MAX_SAFE_INTEGER + 1],
+    ['projectCount', '0x10'],
+    ['projectCount', '0b10'],
+    ['projectCount', '1e3'],
   ])('rejects invalid dashboard count %s=%s', (field, value) => {
     expect(() =>
       parseEnterpriseResponse('project.dashboard', {
@@ -352,6 +561,18 @@ describe('enterprise schemas', () => {
 
   it.each([-1, Number.POSITIVE_INFINITY, Number.NaN])(
     'rejects invalid dashboard investment amount %s',
+    (investmentTotalYi) => {
+      expect(() =>
+        parseEnterpriseResponse('project.dashboard', {
+          ...validDashboardPayload,
+          kpi: { ...validDashboardPayload.kpi, investmentTotalYi },
+        })
+      ).toThrow(/project\.dashboard.*investmentTotalYi/i);
+    }
+  );
+
+  it.each(['0x10', '0b10', '1e3', '9007199254740993'])(
+    'rejects the non-decimal or unsafe dashboard investment amount %s',
     (investmentTotalYi) => {
       expect(() =>
         parseEnterpriseResponse('project.dashboard', {
@@ -429,6 +650,17 @@ describe('enterprise schemas', () => {
     expect(() => parseEnterpriseResponse('project.drill', [{ name: 'Unknown', projectCount: 1 }])).toThrow(
       /project\.drill.*dimension/i
     );
+  });
+
+  it('does not echo an invalid project drill dimension in the error message', () => {
+    const sensitiveDimension = `sensitive-dimension-${'x'.repeat(200)}`;
+    try {
+      parseEnterpriseResponse('project.drill', [{ name: 'Unknown', level: sensitiveDimension, projectCount: 1 }]);
+      expect.unreachable('expected an invalid drill dimension error');
+    } catch (error) {
+      expect((error as Error).message).toMatch(/project\.drill.*dimension/i);
+      expect((error as Error).message).not.toContain(sensitiveDimension);
+    }
   });
 
   it('accepts a list envelope from the project drill endpoint', () => {

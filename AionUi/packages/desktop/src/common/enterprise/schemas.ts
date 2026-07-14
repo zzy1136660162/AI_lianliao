@@ -11,7 +11,9 @@ import type {
 import { enterpriseNormalizers } from './normalizers';
 import {
   commonResultSchema,
+  enterpriseCompanyDetailEnvelopeRawSchema,
   enterpriseCompanyRawSchema,
+  enterpriseDrillEnvelopeRawSchema,
   enterpriseLoginStatusSchema,
   enterpriseRequestSchema,
   userContextRawSchema,
@@ -41,7 +43,7 @@ export {
 export const enterpriseUserContextSchema = userContextRawSchema.transform(normalizeUserContextRaw);
 
 const projectDrillResponseSchema = z
-  .union([z.array(z.unknown()), z.object({ list: z.array(z.unknown()) }).passthrough()])
+  .union([z.array(z.unknown()), enterpriseDrillEnvelopeRawSchema])
   .transform((input) => (Array.isArray(input) ? input : input.list));
 
 /**
@@ -73,7 +75,7 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
           data: normalizePage<EnterpriseCompanySummary>(input, operation, (item) => normalizeCompany(item, operation)),
         };
       case 'company.detail': {
-        const envelope = z.object({ company: enterpriseCompanyRawSchema.optional() }).passthrough().parse(input);
+        const envelope = enterpriseCompanyDetailEnvelopeRawSchema.parse(input);
         return { operation, data: normalizeCompany(envelope.company ?? envelope, operation) };
       }
       case 'product.list':

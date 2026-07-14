@@ -2,378 +2,358 @@ import { z } from 'zod';
 
 import { ENTERPRISE_LOGIN_STATUSES, ENTERPRISE_PROJECT_DRILL_LEVELS } from './constants';
 
-const scalarSchema = z.union([z.string(), z.number(), z.boolean()]).nullish();
-const positiveIntegerSchema = z.number().int().positive();
-const nonNegativeIntegerSchema = z.number().int().nonnegative();
+const rawTextSchema = z.string().nullish();
+const rawIdentifierSchema = z.union([z.string(), z.number()]).nullish();
+const rawNumberSchema = z.union([z.string(), z.number()]).nullish();
+const rawBooleanSchema = z.union([z.string(), z.number(), z.boolean()]).nullish();
+const positiveIntegerSchema = z.number().int().positive().refine(Number.isSafeInteger, 'Expected a safe integer');
+const nonNegativeIntegerSchema = z.number().int().nonnegative().refine(Number.isSafeInteger, 'Expected a safe integer');
 const requestIdentifierSchema = z.string().trim().min(1);
+const FORBIDDEN_OBJECT_KEYS = ['__proto__', 'prototype', 'constructor'] as const;
 
-const scalarShape = <const Keys extends readonly string[]>(keys: Keys) =>
-  Object.fromEntries(keys.map((key) => [key, scalarSchema])) as {
-    [Key in Keys[number]]: typeof scalarSchema;
+const hasOwn = (input: object, key: string): boolean => Object.prototype.hasOwnProperty.call(input, key);
+
+const isPlainJsonObject = (input: unknown): input is object => {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return false;
+  try {
+    const prototype = Object.getPrototypeOf(input);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    if (FORBIDDEN_OBJECT_KEYS.some((key) => hasOwn(input, key))) return false;
+    for (const key in input) {
+      if (!hasOwn(input, key)) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const jsonObjectGuard = (requiredOwnKeys: readonly string[] = []) =>
+  z.custom<object>(
+    (input) => isPlainJsonObject(input) && requiredOwnKeys.every((key) => hasOwn(input, key)),
+    'Expected a plain JSON object with own required fields'
+  );
+
+const guardedObject = <Schema extends z.ZodTypeAny>(schema: Schema, requiredOwnKeys: readonly string[] = []) =>
+  jsonObjectGuard(requiredOwnKeys).pipe(schema);
+
+const fieldShape = <const Keys extends readonly string[], Schema extends z.ZodTypeAny>(keys: Keys, schema: Schema) =>
+  Object.fromEntries(keys.map((key) => [key, schema])) as {
+    [Key in Keys[number]]: Schema;
   };
 
-const passthroughScalarSchema = <const Keys extends readonly string[]>(keys: Keys) =>
-  z.object(scalarShape(keys)).passthrough();
+interface RawFieldGroups<
+  TextKeys extends readonly string[],
+  IdentifierKeys extends readonly string[],
+  NumberKeys extends readonly string[],
+  BooleanKeys extends readonly string[],
+> {
+  text: TextKeys;
+  identifiers: IdentifierKeys;
+  numbers: NumberKeys;
+  booleans: BooleanKeys;
+}
 
-export const commonResultSchema = z
-  .object({
-    success: z.literal(true),
-    data: z.unknown(),
-    message: z.string().optional(),
-    code: z.union([z.string(), z.number()]).optional(),
-  })
-  .passthrough()
-  .refine((result) => Object.prototype.hasOwnProperty.call(result, 'data'), {
-    message: 'Required',
-    path: ['data'],
-  });
+const passthroughRawObjectSchema = <
+  const TextKeys extends readonly string[],
+  const IdentifierKeys extends readonly string[],
+  const NumberKeys extends readonly string[],
+  const BooleanKeys extends readonly string[],
+>(
+  fields: RawFieldGroups<TextKeys, IdentifierKeys, NumberKeys, BooleanKeys>
+) =>
+  z
+    .object({
+      ...fieldShape(fields.text, rawTextSchema),
+      ...fieldShape(fields.identifiers, rawIdentifierSchema),
+      ...fieldShape(fields.numbers, rawNumberSchema),
+      ...fieldShape(fields.booleans, rawBooleanSchema),
+    })
+    .passthrough();
+
+const passthroughRawSchema = <
+  const TextKeys extends readonly string[],
+  const IdentifierKeys extends readonly string[],
+  const NumberKeys extends readonly string[],
+  const BooleanKeys extends readonly string[],
+>(
+  fields: RawFieldGroups<TextKeys, IdentifierKeys, NumberKeys, BooleanKeys>
+) => guardedObject(passthroughRawObjectSchema(fields));
+
+export const commonResultSchema = guardedObject(
+  z
+    .object({
+      success: z.literal(true),
+      data: z.unknown(),
+      message: z.string().optional(),
+      code: z.union([z.string(), z.number()]).optional(),
+    })
+    .passthrough(),
+  ['success', 'data']
+);
 
 export const enterpriseLoginStatusSchema = z.enum(ENTERPRISE_LOGIN_STATUSES);
 
-export const enterpriseCompanyRawSchema = passthroughScalarSchema([
-  'id',
-  'ID',
-  'companyId',
-  'COMPANY_ID',
-  'name',
-  'NAME',
-  'companyName',
-  'COMPANY_NAME',
-  'shortName',
-  'SHORT_NAME',
-  'industry',
-  'INDUSTRY',
-  'city',
-  'CITY',
-  'district',
-  'DISTRICT',
-  'address',
-  'ADDRESS',
-  'corporation',
-  'CORPORATION',
-  'legalRepresentative',
-  'LEGAL_REPRESENTATIVE',
-  'comType',
-  'COM_TYPE',
-  'companyType',
-  'COMPANY_TYPE',
-  'comLevel',
-  'COM_LEVEL',
-  'companyLevel',
-  'COMPANY_LEVEL',
-  'vip',
-  'VIP',
-  'payVip',
-  'PAY_VIP',
-  'foundTime',
-  'FOUND_TIME',
-  'establishedAt',
-  'ESTABLISHED_AT',
-  'isCollect',
-  'IS_COLLECT',
-  'collected',
-  'COLLECTED',
-  'tempPic',
-  'TEMP_PIC',
-  'logoUrl',
-  'LOGO_URL',
-  'comAbs',
-  'COM_ABS',
-  'comIntro',
-  'COM_INTRO',
-  'description',
-  'DESCRIPTION',
-  'societyCode',
-  'SOCIETY_CODE',
-  'unifiedSocialCreditCode',
-  'UNIFIED_SOCIAL_CREDIT_CODE',
-  'contactPerson',
-  'CONTACT_PERSON',
-  'contactName',
-  'CONTACT_NAME',
-  'contactDuty',
-  'CONTACT_DUTY',
-  'contactTitle',
-  'CONTACT_TITLE',
-  'phone',
-  'PHONE',
-] as const);
-
-export const enterpriseProductRawSchema = passthroughScalarSchema([
-  'id',
-  'ID',
-  'productId',
-  'PRODUCT_ID',
-  'productsName',
-  'PRODUCTS_NAME',
-  'productName',
-  'PRODUCT_NAME',
-  'name',
-  'NAME',
-  'companyId',
-  'COMPANY_ID',
-  'companyName',
-  'COMPANY_NAME',
-  'tempPic',
-  'TEMP_PIC',
-  'imageUrl',
-  'IMAGE_URL',
-  'productAbs',
-  'PRODUCT_ABS',
-  'summary',
-  'SUMMARY',
-  'industry',
-  'INDUSTRY',
-  'compIndustry',
-  'COMP_INDUSTRY',
-  'city',
-  'CITY',
-  'compCity',
-  'COMP_CITY',
-  'district',
-  'DISTRICT',
-  'compDistrict',
-  'COMP_DISTRICT',
-  'address',
-  'ADDRESS',
-  'compAddress',
-  'COMP_ADDRESS',
-  'compContactPerson',
-  'COMP_CONTACT_PERSON',
-  'contactName',
-  'CONTACT_NAME',
-  'compPhone',
-  'COMP_PHONE',
-  'phone',
-  'PHONE',
-  'isCollect',
-  'IS_COLLECT',
-  'collected',
-  'COLLECTED',
-] as const);
-
-export const enterpriseProjectRawSchema = passthroughScalarSchema([
-  'id',
-  'ID',
-  'hpInfoId',
-  'HP_INFO_ID',
-  'dbId',
-  'DB_ID',
-  'projectName',
-  'PROJECT_NAME',
-  'name',
-  'NAME',
-  'title',
-  'TITLE',
-  'constructionUnit',
-  'CONSTRUCTION_UNIT',
-  'ownerName',
-  'OWNER_NAME',
-  'danwei',
-  'DANWEI',
-  'province',
-  'PROVINCE',
-  'sheng',
-  'SHENG',
-  'city',
-  'CITY',
-  'region',
-  'REGION',
-  'totalInvestment',
-  'TOTAL_INVESTMENT',
-  'zongtouzi',
-  'ZONGTOUZI',
-  'constructionNature',
-  'CONSTRUCTION_NATURE',
-  'xingzhi',
-  'XINGZHI',
-  'investmentType',
-  'INVESTMENT_TYPE',
-  'projectNature',
-  'PROJECT_NATURE',
-  'xiangmuxingzhi',
-  'XIANGMUXINGZHI',
-  'publishDate',
-  'PUBLISH_DATE',
-  'inputTime',
-  'INPUT_TIME',
-  'constructionPeriod',
-  'CONSTRUCTION_PERIOD',
-  'buildCycleText',
-  'BUILD_CYCLE_TEXT',
-  'jianshezhouqi',
-  'JIANSHEZHOUQI',
-  'startDate',
-  'START_DATE',
-  'endDate',
-  'END_DATE',
-  'materialName',
-  'MATERIAL_NAME',
-  'materialShortName',
-  'MATERIAL_SHORT_NAME',
-  'procurementSummary',
-  'PROCUREMENT_SUMMARY',
-  'lianxiren',
-  'LIANXIREN',
-  'contactName',
-  'CONTACT_NAME',
-  'phone',
-  'PHONE',
-  'email',
-  'EMAIL',
-  'address',
-  'ADDRESS',
-  'didian',
-  'DIDIAN',
-  'buildLocation',
-  'BUILD_LOCATION',
-  'industry',
-  'INDUSTRY',
-  'hangye',
-  'HANGYE',
-  'landArea',
-  'LAND_AREA',
-  'zhandimianji',
-  'ZHANDIMIANJI',
-  'buildingArea',
-  'BUILDING_AREA',
-  'jianzhumianji',
-  'JIANZHUMIANJI',
-  'greenArea',
-  'GREEN_AREA',
-  'lvhualv',
-  'LVHUALV',
-  'constructionScale',
-  'CONSTRUCTION_SCALE',
-  'guimo',
-  'GUIMO',
-  'equipment',
-  'EQUIPMENT',
-  'shebeigouzhi',
-  'SHEBEIGOUZHI',
-  'materials',
-  'MATERIALS',
-  'yuancailiao',
-  'YUANCAILIAO',
-  'projectComposition',
-  'PROJECT_COMPOSITION',
-  'jianshezucheng',
-  'JIANSHEZUCHENG',
-  'sourceUrl',
-  'SOURCE_URL',
-  'reqUrl',
-  'REQ_URL',
-  'isCollect',
-  'IS_COLLECT',
-  'collected',
-  'COLLECTED',
-  'followStatus',
-  'FOLLOW_STATUS',
-  'isPurchased',
-  'IS_PURCHASED',
-  'purchased',
-  'PURCHASED',
-] as const);
-
-export const enterprisePageRawSchema = z
-  .object({
-    list: z.array(z.unknown()).optional(),
-    LIST: z.array(z.unknown()).optional(),
-    rows: z.array(z.unknown()).optional(),
-    ROWS: z.array(z.unknown()).optional(),
-    pageNum: scalarSchema,
-    PAGE_NUM: scalarSchema,
-    pageSize: scalarSchema,
-    PAGE_SIZE: scalarSchema,
-    pages: scalarSchema,
-    PAGES: scalarSchema,
-    total: scalarSchema,
-    TOTAL: scalarSchema,
-  })
-  .passthrough();
-
-export const enterpriseDistributionRawSchema = passthroughScalarSchema([
-  'name',
-  'NAME',
-  'label',
-  'LABEL',
-  'value',
-  'VALUE',
-  'dimension',
-  'DIMENSION',
-  'budgetRange',
-  'BUDGET_RANGE',
-  'projectCount',
-  'PROJECT_COUNT',
-] as const);
-
-const enterpriseDashboardKpiRawSchema = passthroughScalarSchema([
-  'projectCount',
-  'PROJECT_COUNT',
-  'categoryL1Count',
-  'CATEGORY_L1_COUNT',
-  'categoryL2Count',
-  'CATEGORY_L2_COUNT',
-  'shortNameCount',
-  'SHORT_NAME_COUNT',
-  'materialShortNameCount',
-  'MATERIAL_SHORT_NAME_COUNT',
-  'materialNameCount',
-  'MATERIAL_NAME_COUNT',
-  'investmentTotalYi',
-  'INVESTMENT_TOTAL_YI',
-] as const);
-
-export const enterpriseDashboardRawSchema = passthroughScalarSchema([
-  'runId',
-  'RUN_ID',
-  'updatedAt',
-  'UPDATED_AT',
-  'projectCount',
-  'PROJECT_COUNT',
-  'categoryL1Count',
-  'CATEGORY_L1_COUNT',
-  'categoryL2Count',
-  'CATEGORY_L2_COUNT',
-  'shortNameCount',
-  'SHORT_NAME_COUNT',
-  'materialShortNameCount',
-  'MATERIAL_SHORT_NAME_COUNT',
-  'materialNameCount',
-  'MATERIAL_NAME_COUNT',
-  'investmentTotalYi',
-  'INVESTMENT_TOTAL_YI',
-] as const).extend({
-  kpi: enterpriseDashboardKpiRawSchema.optional(),
-  regionDistribution: z.array(enterpriseDistributionRawSchema).optional(),
-  REGION_DISTRIBUTION: z.array(enterpriseDistributionRawSchema).optional(),
-  budgetDistribution: z.array(enterpriseDistributionRawSchema).optional(),
-  BUDGET_DISTRIBUTION: z.array(enterpriseDistributionRawSchema).optional(),
-  categoryDistribution: z.array(enterpriseDistributionRawSchema).optional(),
-  CATEGORY_DISTRIBUTION: z.array(enterpriseDistributionRawSchema).optional(),
-  shortNameTop: z.array(enterpriseDistributionRawSchema).optional(),
-  SHORT_NAME_TOP: z.array(enterpriseDistributionRawSchema).optional(),
-  materialTop: z.array(enterpriseDistributionRawSchema).optional(),
-  MATERIAL_TOP: z.array(enterpriseDistributionRawSchema).optional(),
+export const enterpriseCompanyRawSchema = passthroughRawSchema({
+  text: [
+    'name',
+    'NAME',
+    'companyName',
+    'COMPANY_NAME',
+    'shortName',
+    'SHORT_NAME',
+    'industry',
+    'INDUSTRY',
+    'city',
+    'CITY',
+    'district',
+    'DISTRICT',
+    'address',
+    'ADDRESS',
+    'corporation',
+    'CORPORATION',
+    'legalRepresentative',
+    'LEGAL_REPRESENTATIVE',
+    'comType',
+    'COM_TYPE',
+    'companyType',
+    'COMPANY_TYPE',
+    'foundTime',
+    'FOUND_TIME',
+    'establishedAt',
+    'ESTABLISHED_AT',
+    'tempPic',
+    'TEMP_PIC',
+    'logoUrl',
+    'LOGO_URL',
+    'comAbs',
+    'COM_ABS',
+    'comIntro',
+    'COM_INTRO',
+    'description',
+    'DESCRIPTION',
+    'societyCode',
+    'SOCIETY_CODE',
+    'unifiedSocialCreditCode',
+    'UNIFIED_SOCIAL_CREDIT_CODE',
+    'contactPerson',
+    'CONTACT_PERSON',
+    'contactName',
+    'CONTACT_NAME',
+    'contactDuty',
+    'CONTACT_DUTY',
+    'contactTitle',
+    'CONTACT_TITLE',
+    'phone',
+    'PHONE',
+  ] as const,
+  identifiers: ['id', 'ID', 'companyId', 'COMPANY_ID'] as const,
+  numbers: ['comLevel', 'COM_LEVEL', 'companyLevel', 'COMPANY_LEVEL'] as const,
+  booleans: ['vip', 'VIP', 'payVip', 'PAY_VIP', 'isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
 });
 
-export const enterpriseDrillRawSchema = passthroughScalarSchema([
-  'name',
-  'NAME',
-  'label',
-  'LABEL',
-  'level',
-  'LEVEL',
-  'resultLevel',
-  'RESULT_LEVEL',
-  'categoryL1',
-  'CATEGORY_L1',
-  'categoryL2',
-  'CATEGORY_L2',
-  'materialShortName',
-  'MATERIAL_SHORT_NAME',
-  'materialName',
-  'MATERIAL_NAME',
+export const enterpriseCompanyDetailEnvelopeRawSchema = guardedObject(
+  z.object({ company: enterpriseCompanyRawSchema.optional() }).passthrough()
+);
+
+export const enterpriseProductRawSchema = passthroughRawSchema({
+  text: [
+    'productsName',
+    'PRODUCTS_NAME',
+    'productName',
+    'PRODUCT_NAME',
+    'name',
+    'NAME',
+    'companyName',
+    'COMPANY_NAME',
+    'tempPic',
+    'TEMP_PIC',
+    'imageUrl',
+    'IMAGE_URL',
+    'productAbs',
+    'PRODUCT_ABS',
+    'summary',
+    'SUMMARY',
+    'industry',
+    'INDUSTRY',
+    'compIndustry',
+    'COMP_INDUSTRY',
+    'city',
+    'CITY',
+    'compCity',
+    'COMP_CITY',
+    'district',
+    'DISTRICT',
+    'compDistrict',
+    'COMP_DISTRICT',
+    'address',
+    'ADDRESS',
+    'compAddress',
+    'COMP_ADDRESS',
+    'compContactPerson',
+    'COMP_CONTACT_PERSON',
+    'contactName',
+    'CONTACT_NAME',
+    'compPhone',
+    'COMP_PHONE',
+    'phone',
+    'PHONE',
+  ] as const,
+  identifiers: ['id', 'ID', 'productId', 'PRODUCT_ID', 'companyId', 'COMPANY_ID'] as const,
+  numbers: [] as const,
+  booleans: ['isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
+});
+
+export const enterpriseProjectRawSchema = passthroughRawSchema({
+  text: [
+    'projectName',
+    'PROJECT_NAME',
+    'name',
+    'NAME',
+    'title',
+    'TITLE',
+    'constructionUnit',
+    'CONSTRUCTION_UNIT',
+    'ownerName',
+    'OWNER_NAME',
+    'danwei',
+    'DANWEI',
+    'province',
+    'PROVINCE',
+    'sheng',
+    'SHENG',
+    'city',
+    'CITY',
+    'region',
+    'REGION',
+    'constructionNature',
+    'CONSTRUCTION_NATURE',
+    'xingzhi',
+    'XINGZHI',
+    'investmentType',
+    'INVESTMENT_TYPE',
+    'projectNature',
+    'PROJECT_NATURE',
+    'xiangmuxingzhi',
+    'XIANGMUXINGZHI',
+    'publishDate',
+    'PUBLISH_DATE',
+    'inputTime',
+    'INPUT_TIME',
+    'constructionPeriod',
+    'CONSTRUCTION_PERIOD',
+    'buildCycleText',
+    'BUILD_CYCLE_TEXT',
+    'jianshezhouqi',
+    'JIANSHEZHOUQI',
+    'startDate',
+    'START_DATE',
+    'endDate',
+    'END_DATE',
+    'materialName',
+    'MATERIAL_NAME',
+    'materialShortName',
+    'MATERIAL_SHORT_NAME',
+    'procurementSummary',
+    'PROCUREMENT_SUMMARY',
+    'lianxiren',
+    'LIANXIREN',
+    'contactName',
+    'CONTACT_NAME',
+    'phone',
+    'PHONE',
+    'email',
+    'EMAIL',
+    'address',
+    'ADDRESS',
+    'didian',
+    'DIDIAN',
+    'buildLocation',
+    'BUILD_LOCATION',
+    'industry',
+    'INDUSTRY',
+    'hangye',
+    'HANGYE',
+    'landArea',
+    'LAND_AREA',
+    'zhandimianji',
+    'ZHANDIMIANJI',
+    'buildingArea',
+    'BUILDING_AREA',
+    'jianzhumianji',
+    'JIANZHUMIANJI',
+    'greenArea',
+    'GREEN_AREA',
+    'lvhualv',
+    'LVHUALV',
+    'constructionScale',
+    'CONSTRUCTION_SCALE',
+    'guimo',
+    'GUIMO',
+    'equipment',
+    'EQUIPMENT',
+    'shebeigouzhi',
+    'SHEBEIGOUZHI',
+    'materials',
+    'MATERIALS',
+    'yuancailiao',
+    'YUANCAILIAO',
+    'projectComposition',
+    'PROJECT_COMPOSITION',
+    'jianshezucheng',
+    'JIANSHEZUCHENG',
+    'sourceUrl',
+    'SOURCE_URL',
+    'reqUrl',
+    'REQ_URL',
+    'followStatus',
+    'FOLLOW_STATUS',
+  ] as const,
+  identifiers: ['id', 'ID', 'hpInfoId', 'HP_INFO_ID', 'dbId', 'DB_ID'] as const,
+  numbers: ['totalInvestment', 'TOTAL_INVESTMENT', 'zongtouzi', 'ZONGTOUZI'] as const,
+  booleans: [
+    'isCollect',
+    'IS_COLLECT',
+    'collected',
+    'COLLECTED',
+    'isPurchased',
+    'IS_PURCHASED',
+    'purchased',
+    'PURCHASED',
+  ] as const,
+});
+
+export const enterprisePageRawSchema = guardedObject(
+  z
+    .object({
+      list: z.array(z.unknown()).optional(),
+      LIST: z.array(z.unknown()).optional(),
+      rows: z.array(z.unknown()).optional(),
+      ROWS: z.array(z.unknown()).optional(),
+      pageNum: rawNumberSchema,
+      PAGE_NUM: rawNumberSchema,
+      pageSize: rawNumberSchema,
+      PAGE_SIZE: rawNumberSchema,
+      pages: rawNumberSchema,
+      PAGES: rawNumberSchema,
+      total: rawNumberSchema,
+      TOTAL: rawNumberSchema,
+    })
+    .passthrough()
+);
+
+export const enterpriseDistributionRawSchema = passthroughRawSchema({
+  text: ['name', 'NAME', 'label', 'LABEL', 'dimension', 'DIMENSION', 'budgetRange', 'BUDGET_RANGE'] as const,
+  identifiers: [] as const,
+  numbers: ['value', 'VALUE', 'projectCount', 'PROJECT_COUNT'] as const,
+  booleans: [] as const,
+});
+
+const DASHBOARD_NUMBER_FIELDS = [
+  'projectCount',
+  'PROJECT_COUNT',
+  'categoryL1Count',
+  'CATEGORY_L1_COUNT',
   'categoryL2Count',
   'CATEGORY_L2_COUNT',
   'shortNameCount',
@@ -382,114 +362,199 @@ export const enterpriseDrillRawSchema = passthroughScalarSchema([
   'MATERIAL_SHORT_NAME_COUNT',
   'materialNameCount',
   'MATERIAL_NAME_COUNT',
-  'projectCount',
-  'PROJECT_COUNT',
-] as const);
+  'investmentTotalYi',
+  'INVESTMENT_TOTAL_YI',
+] as const;
 
-export const userContextRawSchema = passthroughScalarSchema([
-  'registered',
-  'REGISTERED',
-  'openId',
-  'OPEN_ID',
-  'openid',
-  'OPENID',
-  'userId',
-  'USER_ID',
-  'id',
-  'ID',
-  'userName',
-  'USER_NAME',
+const enterpriseDashboardKpiRawSchema = passthroughRawSchema({
+  text: [] as const,
+  identifiers: [] as const,
+  numbers: DASHBOARD_NUMBER_FIELDS,
+  booleans: [] as const,
+});
+
+export const enterpriseDashboardRawSchema = guardedObject(
+  passthroughRawObjectSchema({
+    text: ['runId', 'RUN_ID', 'updatedAt', 'UPDATED_AT'] as const,
+    identifiers: [] as const,
+    numbers: DASHBOARD_NUMBER_FIELDS,
+    booleans: [] as const,
+  }).extend({
+    kpi: enterpriseDashboardKpiRawSchema.optional(),
+    regionDistribution: z.array(enterpriseDistributionRawSchema).optional(),
+    REGION_DISTRIBUTION: z.array(enterpriseDistributionRawSchema).optional(),
+    budgetDistribution: z.array(enterpriseDistributionRawSchema).optional(),
+    BUDGET_DISTRIBUTION: z.array(enterpriseDistributionRawSchema).optional(),
+    categoryDistribution: z.array(enterpriseDistributionRawSchema).optional(),
+    CATEGORY_DISTRIBUTION: z.array(enterpriseDistributionRawSchema).optional(),
+    shortNameTop: z.array(enterpriseDistributionRawSchema).optional(),
+    SHORT_NAME_TOP: z.array(enterpriseDistributionRawSchema).optional(),
+    materialTop: z.array(enterpriseDistributionRawSchema).optional(),
+    MATERIAL_TOP: z.array(enterpriseDistributionRawSchema).optional(),
+  })
+);
+
+export const enterpriseDrillRawSchema = passthroughRawSchema({
+  text: [
+    'name',
+    'NAME',
+    'label',
+    'LABEL',
+    'level',
+    'LEVEL',
+    'resultLevel',
+    'RESULT_LEVEL',
+    'categoryL1',
+    'CATEGORY_L1',
+    'categoryL2',
+    'CATEGORY_L2',
+    'materialShortName',
+    'MATERIAL_SHORT_NAME',
+    'materialName',
+    'MATERIAL_NAME',
+  ] as const,
+  identifiers: [] as const,
+  numbers: [
+    'categoryL2Count',
+    'CATEGORY_L2_COUNT',
+    'shortNameCount',
+    'SHORT_NAME_COUNT',
+    'materialShortNameCount',
+    'MATERIAL_SHORT_NAME_COUNT',
+    'materialNameCount',
+    'MATERIAL_NAME_COUNT',
+    'projectCount',
+    'PROJECT_COUNT',
+  ] as const,
+  booleans: [] as const,
+});
+
+export const enterpriseDrillEnvelopeRawSchema = guardedObject(z.object({ list: z.array(z.unknown()) }).passthrough(), [
+  'list',
+]);
+
+export const userContextRawSchema = passthroughRawSchema({
+  text: ['userName', 'USER_NAME', 'companyName', 'COMPANY_NAME'] as const,
+  identifiers: [
+    'openId',
+    'OPEN_ID',
+    'openid',
+    'OPENID',
+    'userId',
+    'USER_ID',
+    'id',
+    'ID',
+    'companyId',
+    'COMPANY_ID',
+    'roleId',
+    'ROLE_ID',
+  ] as const,
+  numbers: ['companyLevel', 'COMPANY_LEVEL', 'comLevel', 'COM_LEVEL'] as const,
+  booleans: ['registered', 'REGISTERED'] as const,
+});
+
+const companyListQuerySchema = guardedObject(
+  z
+    .object({
+      keyword: z.string().optional(),
+      industry: z.string().optional(),
+      city: z.string().optional(),
+      district: z.string().optional(),
+      companyLevel: z.number().finite().nonnegative().optional(),
+      vip: z.boolean().optional(),
+      pageNum: positiveIntegerSchema,
+      pageSize: positiveIntegerSchema,
+    })
+    .strict(),
+  ['pageNum', 'pageSize']
+);
+
+const productListQuerySchema = guardedObject(
+  z
+    .object({
+      keyword: z.string().optional(),
+      industry: z.string().optional(),
+      companyId: requestIdentifierSchema.optional(),
+      parkId: z.string().optional(),
+      sort: z.string().optional(),
+      pageNum: positiveIntegerSchema,
+      pageSize: positiveIntegerSchema,
+    })
+    .strict(),
+  ['pageNum', 'pageSize']
+);
+
+const projectDrillQuerySchema = guardedObject(
+  z
+    .object({
+      level: z.enum(ENTERPRISE_PROJECT_DRILL_LEVELS),
+      runId: z.string().optional(),
+      province: z.string().optional(),
+      city: z.string().optional(),
+      budgetRange: z.string().optional(),
+      categoryL1: z.string().optional(),
+      categoryL2: z.string().optional(),
+      materialShortName: z.string().optional(),
+      materialName: z.string().optional(),
+      minProjectCount: nonNegativeIntegerSchema.optional(),
+    })
+    .strict(),
+  ['level']
+);
+
+const projectListQuerySchema = guardedObject(
+  z
+    .object({
+      keyword: z.string().optional(),
+      runId: z.string().optional(),
+      categoryL1: z.string().optional(),
+      categoryL2: z.string().optional(),
+      materialShortName: z.string().optional(),
+      materialName: z.string().optional(),
+      province: z.string().optional(),
+      city: z.string().optional(),
+      budgetRange: z.string().optional(),
+      constructionNature: z.string().optional(),
+      investmentType: z.string().optional(),
+      publishedFrom: z.string().optional(),
+      publishedTo: z.string().optional(),
+      pageNum: positiveIntegerSchema,
+      pageSize: positiveIntegerSchema,
+    })
+    .strict(),
+  ['pageNum', 'pageSize']
+);
+
+const companyDetailPayloadSchema = guardedObject(z.object({ companyId: requestIdentifierSchema }).strict(), [
   'companyId',
-  'COMPANY_ID',
-  'companyName',
-  'COMPANY_NAME',
-  'companyLevel',
-  'COMPANY_LEVEL',
-  'comLevel',
-  'COM_LEVEL',
-  'roleId',
-  'ROLE_ID',
-] as const);
+]);
+const productDetailPayloadSchema = guardedObject(z.object({ productId: requestIdentifierSchema }).strict(), [
+  'productId',
+]);
+const projectDashboardPayloadSchema = guardedObject(z.object({ runId: z.string().optional() }).strict());
+const projectDetailPayloadSchema = guardedObject(z.object({ hpInfoId: requestIdentifierSchema }).strict(), [
+  'hpInfoId',
+]);
 
-const companyListQuerySchema = z
-  .object({
-    keyword: z.string().optional(),
-    industry: z.string().optional(),
-    city: z.string().optional(),
-    district: z.string().optional(),
-    companyLevel: z.number().finite().nonnegative().optional(),
-    vip: z.boolean().optional(),
-    pageNum: positiveIntegerSchema,
-    pageSize: positiveIntegerSchema,
-  })
-  .strict();
-
-const productListQuerySchema = z
-  .object({
-    keyword: z.string().optional(),
-    industry: z.string().optional(),
-    companyId: requestIdentifierSchema.optional(),
-    parkId: z.string().optional(),
-    sort: z.string().optional(),
-    pageNum: positiveIntegerSchema,
-    pageSize: positiveIntegerSchema,
-  })
-  .strict();
-
-const projectDrillQuerySchema = z
-  .object({
-    level: z.enum(ENTERPRISE_PROJECT_DRILL_LEVELS),
-    runId: z.string().optional(),
-    province: z.string().optional(),
-    city: z.string().optional(),
-    budgetRange: z.string().optional(),
-    categoryL1: z.string().optional(),
-    categoryL2: z.string().optional(),
-    materialShortName: z.string().optional(),
-    materialName: z.string().optional(),
-    minProjectCount: nonNegativeIntegerSchema.optional(),
-  })
-  .strict();
-
-const projectListQuerySchema = z
-  .object({
-    keyword: z.string().optional(),
-    runId: z.string().optional(),
-    categoryL1: z.string().optional(),
-    categoryL2: z.string().optional(),
-    materialShortName: z.string().optional(),
-    materialName: z.string().optional(),
-    province: z.string().optional(),
-    city: z.string().optional(),
-    budgetRange: z.string().optional(),
-    constructionNature: z.string().optional(),
-    investmentType: z.string().optional(),
-    publishedFrom: z.string().optional(),
-    publishedTo: z.string().optional(),
-    pageNum: positiveIntegerSchema,
-    pageSize: positiveIntegerSchema,
-  })
-  .strict();
-
-export const enterpriseRequestSchema = z.discriminatedUnion('operation', [
+const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('company.list'), payload: companyListQuerySchema }).strict(),
   z
     .object({
       operation: z.literal('company.detail'),
-      payload: z.object({ companyId: requestIdentifierSchema }).strict(),
+      payload: companyDetailPayloadSchema,
     })
     .strict(),
   z.object({ operation: z.literal('product.list'), payload: productListQuerySchema }).strict(),
   z
     .object({
       operation: z.literal('product.detail'),
-      payload: z.object({ productId: requestIdentifierSchema }).strict(),
+      payload: productDetailPayloadSchema,
     })
     .strict(),
   z
     .object({
       operation: z.literal('project.dashboard'),
-      payload: z.object({ runId: z.string().optional() }).strict(),
+      payload: projectDashboardPayloadSchema,
     })
     .strict(),
   z.object({ operation: z.literal('project.drill'), payload: projectDrillQuerySchema }).strict(),
@@ -497,7 +562,9 @@ export const enterpriseRequestSchema = z.discriminatedUnion('operation', [
   z
     .object({
       operation: z.literal('project.detail'),
-      payload: z.object({ hpInfoId: requestIdentifierSchema }).strict(),
+      payload: projectDetailPayloadSchema,
     })
     .strict(),
 ]);
+
+export const enterpriseRequestSchema = guardedObject(enterpriseRequestUnionSchema, ['operation', 'payload']);
