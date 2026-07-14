@@ -13,29 +13,55 @@ const FORBIDDEN_OBJECT_KEYS = ['__proto__', 'prototype', 'constructor'] as const
 
 const hasOwn = (input: object, key: string): boolean => Object.prototype.hasOwnProperty.call(input, key);
 
-const isPlainJsonObject = (input: unknown): input is object => {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return false;
+const sanitizePlainJsonObject = (input: unknown, requiredOwnKeys: readonly string[]): object | undefined => {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
   try {
     const prototype = Object.getPrototypeOf(input);
-    if (prototype !== Object.prototype && prototype !== null) return false;
-    if (FORBIDDEN_OBJECT_KEYS.some((key) => hasOwn(input, key))) return false;
-    for (const key in input) {
-      if (!hasOwn(input, key)) return false;
+    if (prototype !== Object.prototype && prototype !== null) return undefined;
+
+    const sanitized = Object.create(null) as Record<string, unknown>;
+    for (const key of Reflect.ownKeys(input)) {
+      if (typeof key !== 'string' || FORBIDDEN_OBJECT_KEYS.includes(key as (typeof FORBIDDEN_OBJECT_KEYS)[number])) {
+        return undefined;
+      }
+
+      const descriptor = Object.getOwnPropertyDescriptor(input, key);
+      if (!descriptor || 'get' in descriptor || 'set' in descriptor) return undefined;
+      if (!descriptor.enumerable) continue;
+      Object.defineProperty(sanitized, key, {
+        value: descriptor.value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     }
-    return true;
+
+    for (const key in input) {
+      if (!hasOwn(input, key)) return undefined;
+    }
+    return requiredOwnKeys.every((key) => hasOwn(sanitized, key)) ? sanitized : undefined;
   } catch {
-    return false;
+    return undefined;
   }
 };
 
 const jsonObjectGuard = (requiredOwnKeys: readonly string[] = []) =>
-  z.custom<object>(
-    (input) => isPlainJsonObject(input) && requiredOwnKeys.every((key) => hasOwn(input, key)),
-    'Expected a plain JSON object with own required fields'
+  z.preprocess(
+    (input) => sanitizePlainJsonObject(input, requiredOwnKeys),
+    z.custom<object>((input) => input !== undefined, 'Expected a plain JSON object with own required fields')
   );
 
 const guardedObject = <Schema extends z.ZodTypeAny>(schema: Schema, requiredOwnKeys: readonly string[] = []) =>
-  jsonObjectGuard(requiredOwnKeys).pipe(schema);
+  jsonObjectGuard(requiredOwnKeys)
+    .pipe(schema)
+    .transform((output, context): z.output<Schema> => {
+      const sanitized = sanitizePlainJsonObject(output, []);
+      if (!sanitized) {
+        context.addIssue({ code: 'custom', message: 'Expected a plain JSON object with own data fields' });
+        return z.NEVER;
+      }
+      return sanitized as z.output<Schema>;
+    });
 
 const fieldShape = <const Keys extends readonly string[], Schema extends z.ZodTypeAny>(keys: Keys, schema: Schema) =>
   Object.fromEntries(keys.map((key) => [key, schema])) as {

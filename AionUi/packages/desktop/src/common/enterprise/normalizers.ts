@@ -42,7 +42,63 @@ const optionalIdentifier = (...values: unknown[]): string | undefined => {
   return String(value);
 };
 
-const ORDINARY_DECIMAL_PATTERN = /^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+const ORDINARY_DECIMAL_PATTERN = /^(-?)(\d+)(?:\.(\d+))?$/;
+const DECIMAL_WITH_EXPONENT_PATTERN = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i;
+const MAX_SAFE_SCALED_INTEGER = BigInt(Number.MAX_SAFE_INTEGER);
+
+const canonicalDecimal = (value: string): string | undefined => {
+  const match = DECIMAL_WITH_EXPONENT_PATTERN.exec(value);
+  if (!match) return undefined;
+
+  const sign = match[1] === '-' ? '-' : '';
+  const integerDigits = match[2] as string;
+  const fractionDigits = match[3] ?? '';
+  const exponent = Number(match[4] ?? 0);
+  if (!Number.isSafeInteger(exponent)) return undefined;
+
+  const digits = `${integerDigits}${fractionDigits}`;
+  const decimalPosition = integerDigits.length + exponent;
+  let whole: string;
+  let fraction: string;
+  if (decimalPosition <= 0) {
+    whole = '0';
+    fraction = `${'0'.repeat(-decimalPosition)}${digits}`;
+  } else if (decimalPosition >= digits.length) {
+    whole = `${digits}${'0'.repeat(decimalPosition - digits.length)}`;
+    fraction = '';
+  } else {
+    whole = digits.slice(0, decimalPosition);
+    fraction = digits.slice(decimalPosition);
+  }
+
+  whole = whole.replace(/^0+/, '') || '0';
+  fraction = fraction.replace(/0+$/, '');
+  const isZero = whole === '0' && fraction === '';
+  return `${isZero ? '' : sign}${whole}${fraction ? `.${fraction}` : ''}`;
+};
+
+const parseOrdinaryDecimalString = (value: string): number | undefined => {
+  const normalized = value.trim();
+  const match = ORDINARY_DECIMAL_PATTERN.exec(normalized);
+  if (!match) return undefined;
+
+  const negative = match[1] === '-';
+  const integerDigits = match[2] as string;
+  const effectiveFractionDigits = (match[3] ?? '').replace(/0+$/, '');
+  const combinedDigits = `${integerDigits}${effectiveFractionDigits}`.replace(/^0+/, '') || '0';
+  const scaledMagnitude = BigInt(combinedDigits);
+  if (scaledMagnitude > MAX_SAFE_SCALED_INTEGER) return undefined;
+
+  const scale = 10 ** effectiveFractionDigits.length;
+  if (!Number.isFinite(scale)) return undefined;
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return undefined;
+
+  const signedNormalized = `${negative ? '-' : ''}${integerDigits}${effectiveFractionDigits ? `.${effectiveFractionDigits}` : ''}`;
+  if (canonicalDecimal(signedNormalized) !== canonicalDecimal(parsed.toString())) return undefined;
+  return parsed;
+};
 
 const optionalNumber = (...values: unknown[]): number | undefined => {
   const value = firstScalar(...values);
@@ -53,12 +109,7 @@ const optionalNumber = (...values: unknown[]): number | undefined => {
     return Number.isInteger(value) && !Number.isSafeInteger(value) ? undefined : value;
   }
 
-  const normalized = value.trim();
-  if (!ORDINARY_DECIMAL_PATTERN.test(normalized)) return undefined;
-
-  const parsed = Number(normalized);
-  if (!Number.isFinite(parsed)) return undefined;
-  return Number.isInteger(parsed) && !Number.isSafeInteger(parsed) ? undefined : parsed;
+  return parseOrdinaryDecimalString(value);
 };
 
 const optionalBoolean = (...values: unknown[]): boolean | undefined => {

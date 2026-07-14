@@ -141,6 +141,84 @@ describe('enterprise schemas', () => {
     expect(raw.legacyRank).toBe('A');
   });
 
+  it('accepts safe own passthrough fields from a null-prototype raw record', () => {
+    const input = Object.create(null) as { id: number; name: string; legacyRank: string };
+    Object.defineProperties(input, {
+      id: { enumerable: true, value: 12 },
+      name: { enumerable: true, value: 'Acme' },
+      legacyRank: { enumerable: true, value: 'A' },
+    });
+
+    expect(enterpriseCompanyRawSchema.parse(input)).toMatchObject({ id: 12, name: 'Acme', legacyRank: 'A' });
+  });
+
+  it('does not read a non-enumerable company identifier polluted onto Object.prototype', () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'id');
+    try {
+      // eslint-disable-next-line no-extend-native -- exercise non-enumerable prototype pollution regression
+      Object.defineProperty(Object.prototype, 'id', {
+        value: 77,
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+
+      expect(() => parseEnterpriseResponse('company.detail', { name: 'Acme' })).toThrow(/company\.detail.*companyId/i);
+    } finally {
+      // eslint-disable-next-line no-extend-native -- restore the pre-test native prototype descriptor
+      if (originalDescriptor) Object.defineProperty(Object.prototype, 'id', originalDescriptor);
+      else delete (Object.prototype as { id?: unknown }).id;
+    }
+  });
+
+  it('does not copy a non-enumerable request keyword polluted onto Object.prototype', () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(Object.prototype, 'keyword');
+    try {
+      // eslint-disable-next-line no-extend-native -- exercise non-enumerable prototype pollution regression
+      Object.defineProperty(Object.prototype, 'keyword', {
+        value: 'polluted-keyword',
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+
+      const result = enterpriseRequestSchema.safeParse({
+        operation: 'company.list',
+        payload: { pageNum: 1, pageSize: 20 },
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) expect(Object.hasOwn(result.data.payload, 'keyword')).toBe(false);
+    } finally {
+      // eslint-disable-next-line no-extend-native -- restore the pre-test native prototype descriptor
+      if (originalDescriptor) Object.defineProperty(Object.prototype, 'keyword', originalDescriptor);
+      else delete (Object.prototype as { keyword?: unknown }).keyword;
+    }
+  });
+
+  it('rejects an accessor without executing its getter', () => {
+    let getterCalls = 0;
+    const input = { name: 'Acme' } as { id?: number; name: string };
+    Object.defineProperty(input, 'id', {
+      enumerable: true,
+      configurable: true,
+      get: () => {
+        getterCalls += 1;
+        return 12;
+      },
+    });
+
+    expect(() => parseEnterpriseResponse('company.detail', input)).toThrow(/company\.detail/i);
+    expect(getterCalls).toBe(0);
+  });
+
+  it('rejects symbol keys on raw response objects', () => {
+    const privateKey = Symbol('private');
+    const input = { id: 12, name: 'Acme', [privateKey]: 'sensitive-symbol-value' };
+
+    expect(() => parseEnterpriseResponse('company.detail', input)).toThrow(/company\.detail/i);
+  });
+
   it('does not leak passthrough backend fields into the stable response model', () => {
     expect(
       parseEnterpriseResponse('company.detail', {
@@ -527,7 +605,14 @@ describe('enterprise schemas', () => {
 
   it.each([
     ['0', 0],
+    ['0.1', 0.1],
+    ['0.29', 0.29],
+    ['1.005', 1.005],
+    ['123.45', 123.45],
     ['12.50', 12.5],
+    ['000123.4500', 123.45],
+    ['0.1000', 0.1],
+    [`0.${'0'.repeat(307)}1`, 1e-308],
   ])('accepts the decimal dashboard investment amount %s', (investmentTotalYi, expected) => {
     expect(
       parseEnterpriseResponse('project.dashboard', {
@@ -580,6 +665,22 @@ describe('enterprise schemas', () => {
           kpi: { ...validDashboardPayload.kpi, investmentTotalYi },
         })
       ).toThrow(/project\.dashboard.*investmentTotalYi/i);
+    }
+  );
+
+  it.each(['9007199254740991.1', '9007199254740990.9', '79461974101831.18', `0.${'0'.repeat(400)}1`])(
+    'rejects a decimal dashboard amount that cannot round-trip safely',
+    (investmentTotalYi) => {
+      try {
+        parseEnterpriseResponse('project.dashboard', {
+          ...validDashboardPayload,
+          kpi: { ...validDashboardPayload.kpi, investmentTotalYi },
+        });
+        expect.unreachable('expected an unsafe decimal amount error');
+      } catch (error) {
+        expect((error as Error).message).toMatch(/project\.dashboard.*investmentTotalYi/i);
+        expect((error as Error).message).not.toContain(investmentTotalYi);
+      }
     }
   );
 
@@ -750,6 +851,31 @@ describe('enterprise schemas', () => {
         purchased: true,
       },
     });
+  });
+
+  it('accepts a precise ordinary decimal project investment string', () => {
+    expect(
+      parseEnterpriseResponse('project.detail', {
+        hpInfoId: 901,
+        projectName: 'Factory Project',
+        totalInvestment: '123.45',
+      })
+    ).toMatchObject({ data: { totalInvestment: 123.45 } });
+  });
+
+  it('rejects a project investment string whose fractional tail would be lost', () => {
+    const totalInvestment = '9007199254740991.1';
+    try {
+      parseEnterpriseResponse('project.detail', {
+        hpInfoId: 901,
+        projectName: 'Factory Project',
+        totalInvestment,
+      });
+      expect.unreachable('expected an unsafe decimal amount error');
+    } catch (error) {
+      expect((error as Error).message).toMatch(/project\.detail.*totalInvestment/i);
+      expect((error as Error).message).not.toContain(totalInvestment);
+    }
   });
 
   it.each([-1, Number.POSITIVE_INFINITY, Number.NaN])(
