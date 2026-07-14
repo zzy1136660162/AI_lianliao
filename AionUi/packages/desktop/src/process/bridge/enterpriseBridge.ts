@@ -98,6 +98,16 @@ const protectEnterprisePhones = (response: EnterpriseResponse): EnterpriseRespon
       },
     };
   }
+  if (
+    response.operation === 'project.detail' &&
+    response.data.phone !== undefined &&
+    response.data.purchased !== true
+  ) {
+    return {
+      operation: 'project.detail',
+      data: { ...response.data, phone: maskEnterprisePhone(response.data.phone) },
+    };
+  }
   return response;
 };
 

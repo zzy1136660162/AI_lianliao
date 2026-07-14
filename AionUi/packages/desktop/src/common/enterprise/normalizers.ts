@@ -420,8 +420,10 @@ const normalizeProjectDetail = (input: unknown): EnterpriseProjectDetail => {
   const operation = 'project.detail';
   const raw = enterpriseProjectRawSchema.parse(input);
   const result: EnterpriseProjectDetail = normalizeProjectSummary(raw, operation);
+  const purchased = optionalBoolean(raw.purchased, raw.PURCHASED, raw.isPurchased, raw.IS_PURCHASED);
   setText(result, 'contactName', raw.contactName, raw.CONTACT_NAME, raw.lianxiren, raw.LIANXIREN);
-  setText(result, 'phone', raw.phone, raw.PHONE);
+  const phone = optionalText(raw.phone, raw.PHONE);
+  if (phone !== undefined) result.phone = purchased === true ? phone : maskEnterprisePhone(phone);
   setText(result, 'email', raw.email, raw.EMAIL);
   setText(result, 'address', raw.address, raw.ADDRESS, raw.buildLocation, raw.BUILD_LOCATION, raw.didian, raw.DIDIAN);
   setText(result, 'industry', raw.industry, raw.INDUSTRY, raw.hangye, raw.HANGYE);
@@ -442,7 +444,7 @@ const normalizeProjectDetail = (input: unknown): EnterpriseProjectDetail => {
   setText(result, 'sourceUrl', raw.sourceUrl, raw.SOURCE_URL, raw.reqUrl, raw.REQ_URL);
   setBoolean(result, 'collected', raw.collected, raw.COLLECTED, raw.isCollect, raw.IS_COLLECT);
   setText(result, 'followStatus', raw.followStatus, raw.FOLLOW_STATUS);
-  setBoolean(result, 'purchased', raw.purchased, raw.PURCHASED, raw.isPurchased, raw.IS_PURCHASED);
+  if (purchased !== undefined) result.purchased = purchased;
   return result;
 };
 

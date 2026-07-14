@@ -141,11 +141,11 @@
     },
     "projects": {
       "title": "在建项目",
-      "description": "真实项目看板与项目列表将在项目开发任务中接入。"
+      "description": "查看真实项目需求、采购品类与投资信号。"
     },
     "projectDetail": {
       "title": "项目详情",
-      "description": "经过接口校验的项目详情与权限状态将在项目开发任务中接入。"
+      "description": "查看经过校验的项目内容与当前联系方式权限状态。"
     },
     "favorites": {
       "title": "我的收藏",
@@ -309,6 +309,143 @@
     "error": {
       "title": "暂时无法加载产品库",
       "description": "企业服务未返回有效的产品列表，请重试。"
+    }
+  },
+  "projects": {
+    "eyebrow": "辽宁工业采购雷达",
+    "description": "从地区、投资与采购需求中读取真实项目信号，进入经过校验的项目档案，不使用静默兜底数据。",
+    "loading": "正在加载项目雷达",
+    "missing": "暂未提供",
+    "resultCount": "共 {{count}} 个项目",
+    "rowLabel": "预览项目 {{name}}",
+    "investmentWan": "{{value}} 万元",
+    "filters": {
+      "keywordLabel": "项目关键词",
+      "keywordPlaceholder": "请输入项目或建设单位关键词",
+      "categoryL1Label": "一级品类",
+      "categoryL1Placeholder": "请输入一级品类",
+      "categoryL2Label": "二级品类",
+      "categoryL2Placeholder": "请输入二级品类",
+      "materialShortNameLabel": "材料简称",
+      "materialShortNamePlaceholder": "请输入材料简称",
+      "materialNameLabel": "材料名称",
+      "materialNamePlaceholder": "请输入材料名称",
+      "provinceLabel": "省份",
+      "provincePlaceholder": "请输入省份",
+      "cityLabel": "城市",
+      "cityPlaceholder": "请输入城市",
+      "minInvestmentLabel": "最低投资额",
+      "minInvestmentPlaceholder": "最低万元",
+      "maxInvestmentLabel": "最高投资额",
+      "maxInvestmentPlaceholder": "最高万元"
+    },
+    "actions": {
+      "search": "查询项目",
+      "reset": "重置筛选",
+      "viewDetails": "查看项目详情",
+      "closeQuickView": "关闭项目预览"
+    },
+    "columns": {
+      "name": "项目名称",
+      "region": "所在地区",
+      "investment": "投资额",
+      "nature": "项目性质",
+      "procurement": "采购摘要",
+      "publishedAt": "发布日期",
+      "actions": "操作"
+    },
+    "fields": {
+      "region": "所在地区",
+      "investment": "投资额",
+      "procurement": "采购需求",
+      "publishedAt": "发布日期"
+    },
+    "dashboard": {
+      "eyebrow": "实时项目信号 / 01",
+      "title": "项目机会总览",
+      "updatedAt": "数据更新于 {{date}}",
+      "metrics": {
+        "projects": "在建项目",
+        "categoryL1": "一级品类",
+        "categoryL2": "二级品类",
+        "materialShortName": "材料简称",
+        "materialName": "材料名称",
+        "investment": "投资总额"
+      },
+      "units": {
+        "projects": " 个",
+        "categoryL1": " 类",
+        "categoryL2": " 类",
+        "materialShortName": " 个",
+        "materialName": " 种",
+        "investment": " 亿元"
+      },
+      "regionTitle": "地区机会热度",
+      "materialTitle": "重点采购材料",
+      "categoryTitle": "重点采购品类",
+      "projectCount": "关联项目",
+      "materialCount": "材料数量",
+      "distributionEmpty": "接口暂未返回分布数据。",
+      "categoryEmpty": "接口暂未返回采购品类下钻数据。"
+    },
+    "catalog": {
+      "eyebrow": "已校验项目索引 / 02",
+      "title": "项目清单",
+      "description": "选择一行快速预览，或进入经过校验的项目详情。"
+    },
+    "quickView": {
+      "label": "项目快速预览",
+      "index": "项目 / {{index}}",
+      "title": "当前选中项目",
+      "hint": "详情页会先根据接口购买状态，再决定是否展示建设单位与联系方式。"
+    },
+    "empty": {
+      "title": "未找到符合条件的项目",
+      "description": "请减少筛选条件或重置后重新查询。"
+    },
+    "error": {
+      "title": "暂时无法加载项目雷达",
+      "description": "企业服务未返回有效的看板和项目列表，请重试。"
+    }
+  },
+  "projectDetail": {
+    "eyebrow": "已校验项目档案",
+    "profileEyebrow": "项目采购需求",
+    "backToList": "返回在建项目",
+    "loading": "正在加载项目详情",
+    "lockedProjectTitle": "{{province}}{{investor}}{{investment}}{{nature}}项目",
+    "lockedInvestment": "{{value}}万元",
+    "contactPermissionNote": "仅在接口确认项目已购买后展示联系方式；本页面不提供拨号或解锁操作。",
+    "sections": {
+      "profile": "项目基本信息",
+      "contact": "已授权主体与联系方式",
+      "composition": "建设内容",
+      "equipment": "设备购置需求",
+      "materials": "原材料采购需求"
+    },
+    "fields": {
+      "region": "所在地区",
+      "nature": "项目性质",
+      "investment": "投资额",
+      "period": "建设周期",
+      "constructionUnit": "建设单位",
+      "contactName": "联系人",
+      "phone": "联系电话",
+      "address": "联系地址"
+    },
+    "locked": {
+      "title": "项目主体信息受限",
+      "description": "接口尚未确认查看权限，建设单位、联系人、电话与地址已隐藏；本页面不会自动解锁。",
+      "enterpriseInvestor": "某企业投资",
+      "governmentInvestor": "政府投资"
+    },
+    "invalid": {
+      "title": "项目链接无效",
+      "description": "请返回项目清单并选择有效的数字项目记录。"
+    },
+    "error": {
+      "title": "暂时无法加载项目详情",
+      "description": "企业服务未返回有效的项目档案，请重试。"
     }
   },
   "productDetail": {

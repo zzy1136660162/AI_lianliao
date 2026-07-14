@@ -567,6 +567,8 @@ const projectListQuerySchema = guardedObject(
       investmentType: z.string().optional(),
       publishedFrom: z.string().optional(),
       publishedTo: z.string().optional(),
+      minInvestment: z.number().finite().nonnegative().optional(),
+      maxInvestment: z.number().finite().nonnegative().optional(),
       pageNum: positiveIntegerSchema,
       pageSize: positiveIntegerSchema,
     })

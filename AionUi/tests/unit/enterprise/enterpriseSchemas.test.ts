@@ -1012,6 +1012,33 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it.each([
+    ['explicitly unpurchased', false],
+    ['missing purchase state', undefined],
+  ] as const)('masks a project phone before renderer IPC when access is %s', (_label, purchased) => {
+    const response = parseEnterpriseResponse('project.detail', {
+      HP_INFO_ID: 901,
+      PROJECT_NAME: 'Factory Project',
+      PHONE: '13800000000',
+      IS_PURCHASED: purchased,
+    });
+
+    expect(response).toMatchObject({ data: { phone: '1380000****' } });
+    if (purchased === false) expect(response).toMatchObject({ data: { purchased: false } });
+    expect(JSON.stringify(response)).not.toContain('13800000000');
+  });
+
+  it('keeps a purchased project phone available after the service confirms access', () => {
+    expect(
+      parseEnterpriseResponse('project.detail', {
+        HP_INFO_ID: 901,
+        PROJECT_NAME: 'Factory Project',
+        PHONE: '13800000000',
+        IS_PURCHASED: true,
+      })
+    ).toMatchObject({ data: { phone: '13800000000', purchased: true } });
+  });
+
   it('accepts a precise ordinary decimal project investment string', () => {
     expect(
       parseEnterpriseResponse('project.detail', {

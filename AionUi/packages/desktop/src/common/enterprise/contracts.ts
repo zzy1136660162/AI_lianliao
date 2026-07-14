@@ -232,6 +232,8 @@ export type ProjectListQuery = {
   investmentType?: string;
   publishedFrom?: string;
   publishedTo?: string;
+  minInvestment?: number;
+  maxInvestment?: number;
   pageNum: number;
   pageSize: number;
 };

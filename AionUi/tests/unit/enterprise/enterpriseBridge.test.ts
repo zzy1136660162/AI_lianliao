@@ -856,6 +856,31 @@ describe('enterprise bridge', () => {
     }
   );
 
+  it.each([
+    ['explicitly unpurchased', false],
+    ['missing purchase state', undefined],
+  ] as const)(
+    'masks a project phone again at the final main-process IPC boundary when access is %s',
+    async (_label, purchased) => {
+      const rawPhone = '13800000000';
+      const request: EnterpriseRequest = { operation: 'project.detail', payload: { hpInfoId: '901' } };
+      const apiClient = makeApiClient();
+      apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+      apiClient.request.mockResolvedValue({
+        operation: 'project.detail',
+        data: { hpInfoId: '901', projectName: 'Factory', phone: rawPhone, purchased },
+      });
+      const { handlers } = await initializeBridge(apiClient);
+      await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+      const response = await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
+
+      expect(response).toMatchObject({ data: { phone: '1380000****' } });
+      if (purchased === false) expect(response).toMatchObject({ data: { purchased: false } });
+      expect(JSON.stringify(response)).not.toContain(rawPhone);
+    }
+  );
+
   it('discards a pending business response after a successful clear changes the session generation', async () => {
     const pendingResponse = createDeferred<{ operation: 'project.dashboard'; data: { secret: string } }>();
     const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };

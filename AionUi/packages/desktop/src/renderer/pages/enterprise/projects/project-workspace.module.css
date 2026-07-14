@@ -1,0 +1,543 @@
+.page {
+  min-width: 0;
+  color: var(--text-primary);
+}
+
+.pageHeader,
+.detailPageHeader,
+.sectionHeading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+}
+
+.pageHeader {
+  margin-bottom: 22px;
+}
+
+.pageHeader h1,
+.detailPageHeader h1,
+.sectionHeading h2,
+.quickViewHeading h2,
+.detailHero h2,
+.projectNameCell h2 {
+  margin: 4px 0 0;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  letter-spacing: -0.025em;
+}
+
+.pageHeader h1,
+.detailPageHeader h1 {
+  font-size: clamp(25px, 3vw, 36px);
+}
+
+.pageHeader p,
+.sectionHeading > p {
+  max-width: 680px;
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.eyebrow,
+.sectionHeading span,
+.quickViewIndex {
+  color: var(--primary);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.headerRule {
+  width: min(26%, 220px);
+  height: 1px;
+  margin-bottom: 9px;
+  background: var(--primary);
+  opacity: 0.62;
+}
+
+.filterForm {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(128px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid var(--border-base);
+  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+}
+
+.filterForm :global(.arco-form-item) {
+  margin: 0;
+}
+
+.filterForm :global(.arco-form-label-item) {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.filterForm :global(.arco-input-number) {
+  width: 100%;
+}
+
+.filterActions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.workspace {
+  min-width: 0;
+  margin-top: 14px;
+}
+
+.workspace > :global(.enterprise-page-state),
+.detailContent > :global(.enterprise-page-state) {
+  min-height: min(430px, calc(100vh - 320px));
+  border: 1px solid var(--border-base);
+  background: var(--bg-1);
+}
+
+.dashboard,
+.catalogSection,
+.detailContent {
+  min-width: 0;
+  border: 1px solid var(--border-base);
+  background: color-mix(in srgb, var(--bg-1) 95%, transparent);
+}
+
+.dashboard,
+.catalogSection {
+  padding: 18px;
+}
+
+.sectionHeading {
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sectionHeading h2 {
+  font-size: 20px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metricCard,
+.metricPrimary {
+  position: relative;
+  overflow: hidden;
+}
+
+.metricPrimary {
+  border-top: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 7%, var(--bg-2));
+}
+
+.metricCard::after,
+.metricPrimary::after {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  width: 22px;
+  height: 1px;
+  content: '';
+  background: var(--primary);
+  opacity: 0.55;
+}
+
+.metricGrid :global(.arco-statistic-title) {
+  min-height: 32px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.metricGrid :global(.arco-statistic-value) {
+  color: var(--text-primary);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 24px;
+}
+
+.insightGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.distributionList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.distributionList li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.distributionList strong {
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+}
+
+.distributionList :global(.arco-progress-line-bar) {
+  background: var(--primary);
+}
+
+.distributionEmpty {
+  margin: 10px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.drillCard {
+  margin-top: 12px;
+}
+
+.drillGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.drillGrid article {
+  padding: 12px;
+  border-left: 2px solid var(--primary);
+  background: color-mix(in srgb, var(--bg-2) 88%, transparent);
+}
+
+.drillGrid article > span {
+  color: var(--primary);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 10px;
+}
+
+.drillGrid h3 {
+  min-height: 36px;
+  margin: 6px 0 10px;
+  font-size: 13px;
+}
+
+.drillGrid dl {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+}
+
+.drillGrid dt {
+  color: var(--text-secondary);
+  font-size: 9px;
+}
+
+.drillGrid dd {
+  margin: 2px 0 0;
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+}
+
+.catalogSection {
+  margin-top: 14px;
+}
+
+.catalog,
+.catalogWithPreview {
+  display: grid;
+  min-width: 0;
+  margin: 0 -18px -18px;
+}
+
+.catalog {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.catalogWithPreview {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 29%);
+}
+
+.tablePanel {
+  min-width: 0;
+  padding: 16px 18px;
+}
+
+.tablePanel :global(.arco-table-tr[tabindex='0']) {
+  cursor: pointer;
+}
+
+.tablePanel :global(.arco-table-tr[tabindex='0']:focus-visible) {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.selectedRow :global(.arco-table-td) {
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-2));
+}
+
+.projectNameCell {
+  min-width: 0;
+}
+
+.projectNameCell h2 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectNameCell span {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paginationBar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+}
+
+.paginationBar > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.quickView {
+  position: relative;
+  min-width: 0;
+  padding: 22px 20px;
+  border-left: 1px solid var(--border-base);
+  background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  animation: project-preview-enter 160ms ease-out;
+}
+
+.quickView::before {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  width: 44px;
+  height: 2px;
+  content: '';
+  background: var(--primary);
+}
+
+.quickViewClose {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+}
+
+.quickViewHeading {
+  margin: 30px 0 22px;
+}
+
+.quickViewHeading > span {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.quickViewHeading h2 {
+  margin-bottom: 10px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.quickViewFacts,
+.detailFacts {
+  display: grid;
+  margin: 0;
+}
+
+.quickViewFacts {
+  border-top: 1px solid var(--border-light);
+}
+
+.quickViewFacts > div {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.quickViewFacts dt,
+.detailFacts dt {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.quickViewFacts dd,
+.detailFacts dd {
+  margin: 5px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.quickViewHint,
+.permissionNote {
+  margin: 18px 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.detailPageHeader {
+  align-items: center;
+  justify-content: flex-start;
+  margin-bottom: 14px;
+}
+
+.detailPageHeader > div {
+  padding-left: 18px;
+  border-left: 1px solid var(--border-base);
+}
+
+.detailBody {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.detailHero {
+  padding: 20px;
+  border-left: 3px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, var(--bg-2));
+}
+
+.detailHero h2 {
+  max-width: 900px;
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.3;
+}
+
+.detailTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.detailColumns,
+.detailContentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.detailContentGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.detailFacts > div {
+  display: grid;
+  grid-template-columns: minmax(100px, 34%) minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.detailFacts dd {
+  margin: 0;
+}
+
+.plainText {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@keyframes project-preview-enter {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 1180px) {
+  .filterForm {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+  }
+
+  .metricGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .drillGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .detailContentGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 820px) {
+  .pageHeader,
+  .sectionHeading {
+    display: block;
+  }
+
+  .headerRule {
+    width: 100%;
+    margin-top: 16px;
+  }
+
+  .filterForm,
+  .metricGrid,
+  .insightGrid,
+  .drillGrid,
+  .detailColumns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .catalogWithPreview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quickView {
+    order: -1;
+    border-bottom: 1px solid var(--border-base);
+    border-left: 0;
+  }
+
+  .paginationBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quickView {
+    animation: none;
+  }
+}

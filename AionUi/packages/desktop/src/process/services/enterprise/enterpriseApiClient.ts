@@ -280,6 +280,8 @@ const serializeProjectRequest = (
       setDefined(body, 'investmentType', request.payload.investmentType);
       setDefined(body, 'publishedFrom', request.payload.publishedFrom);
       setDefined(body, 'publishedTo', request.payload.publishedTo);
+      setDefined(body, 'minInvestment', request.payload.minInvestment);
+      setDefined(body, 'maxInvestment', request.payload.maxInvestment);
       setDefined(body, 'pageNum', request.payload.pageNum);
       setDefined(body, 'pageSize', request.payload.pageSize);
       return body;

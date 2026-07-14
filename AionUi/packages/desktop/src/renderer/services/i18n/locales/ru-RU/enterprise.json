@@ -141,11 +141,11 @@
     },
     "projects": {
       "title": "Projects under construction",
-      "description": "The live project dashboard and project directory will be connected in the project development task."
+      "description": "Review live project demand, procurement categories and investment signals."
     },
     "projectDetail": {
       "title": "Project profile",
-      "description": "Verified project details and access state will be connected in the project development task."
+      "description": "Review verified project content and its current contact-access state."
     },
     "favorites": {
       "title": "My favorites",
@@ -329,6 +329,143 @@
     "error": {
       "title": "The product profile could not be loaded",
       "description": "The enterprise service did not return a valid product record. Try again."
+    }
+  },
+  "projects": {
+    "eyebrow": "Industrial procurement radar / Liaoning",
+    "description": "Read live project signals from region, investment and procurement demand, then open a verified record without silent fallback data.",
+    "loading": "Loading the project radar",
+    "missing": "Not provided",
+    "resultCount": "{{count}} project records",
+    "rowLabel": "Preview project {{name}}",
+    "investmentWan": "{{value}} ten-thousand yuan",
+    "filters": {
+      "keywordLabel": "Project keyword",
+      "keywordPlaceholder": "Enter a project or owner keyword",
+      "categoryL1Label": "Primary category",
+      "categoryL1Placeholder": "Enter a primary category",
+      "categoryL2Label": "Secondary category",
+      "categoryL2Placeholder": "Enter a secondary category",
+      "materialShortNameLabel": "Material term",
+      "materialShortNamePlaceholder": "Enter a material term",
+      "materialNameLabel": "Material name",
+      "materialNamePlaceholder": "Enter a material name",
+      "provinceLabel": "Province",
+      "provincePlaceholder": "Enter a province",
+      "cityLabel": "City",
+      "cityPlaceholder": "Enter a city",
+      "minInvestmentLabel": "Minimum investment",
+      "minInvestmentPlaceholder": "Minimum, ten-thousand yuan",
+      "maxInvestmentLabel": "Maximum investment",
+      "maxInvestmentPlaceholder": "Maximum, ten-thousand yuan"
+    },
+    "actions": {
+      "search": "Search projects",
+      "reset": "Reset filters",
+      "viewDetails": "View project details",
+      "closeQuickView": "Close project preview"
+    },
+    "columns": {
+      "name": "Project",
+      "region": "Region",
+      "investment": "Investment",
+      "nature": "Nature",
+      "procurement": "Procurement summary",
+      "publishedAt": "Published",
+      "actions": "Actions"
+    },
+    "fields": {
+      "region": "Region",
+      "investment": "Investment",
+      "procurement": "Procurement demand",
+      "publishedAt": "Published"
+    },
+    "dashboard": {
+      "eyebrow": "Live project signal / 01",
+      "title": "Project opportunity overview",
+      "updatedAt": "Data updated {{date}}",
+      "metrics": {
+        "projects": "Projects",
+        "categoryL1": "Primary categories",
+        "categoryL2": "Secondary categories",
+        "materialShortName": "Material terms",
+        "materialName": "Materials",
+        "investment": "Total investment"
+      },
+      "units": {
+        "projects": " projects",
+        "categoryL1": " categories",
+        "categoryL2": " categories",
+        "materialShortName": " terms",
+        "materialName": " materials",
+        "investment": " CNY 100m"
+      },
+      "regionTitle": "Regional opportunity density",
+      "materialTitle": "Top procurement materials",
+      "categoryTitle": "Priority procurement categories",
+      "projectCount": "Projects",
+      "materialCount": "Materials",
+      "distributionEmpty": "No distribution data was returned.",
+      "categoryEmpty": "No procurement category drill data was returned."
+    },
+    "catalog": {
+      "eyebrow": "Verified project index / 02",
+      "title": "Project directory",
+      "description": "Select a row for a focused preview or open the verified detail record."
+    },
+    "quickView": {
+      "label": "Project quick view",
+      "index": "Project / {{index}}",
+      "title": "Selected project",
+      "hint": "The detail view applies the service purchase state before showing protected owner and contact fields."
+    },
+    "empty": {
+      "title": "No projects match these filters",
+      "description": "Reset one or more filters and search again."
+    },
+    "error": {
+      "title": "The project radar could not be loaded",
+      "description": "The enterprise service did not return a valid dashboard and project page. Try again."
+    }
+  },
+  "projectDetail": {
+    "eyebrow": "Verified project record",
+    "profileEyebrow": "Project demand profile",
+    "backToList": "Back to projects",
+    "loading": "Loading the project profile",
+    "lockedProjectTitle": "{{province}} {{investor}} {{investment}} {{nature}} project",
+    "lockedInvestment": "{{value}} ten-thousand yuan",
+    "contactPermissionNote": "Contact details are shown only after the service confirms this project is purchased. Dialing and unlocking are not available here.",
+    "sections": {
+      "profile": "Project profile",
+      "contact": "Authorized owner and contact",
+      "composition": "Construction content",
+      "equipment": "Equipment demand",
+      "materials": "Raw material demand"
+    },
+    "fields": {
+      "region": "Region",
+      "nature": "Project nature",
+      "investment": "Investment",
+      "period": "Construction period",
+      "constructionUnit": "Construction unit",
+      "contactName": "Contact",
+      "phone": "Phone",
+      "address": "Address"
+    },
+    "locked": {
+      "title": "Protected project identity",
+      "description": "The service has not confirmed access. Owner, contact, phone and address are withheld; this page does not unlock them.",
+      "enterpriseInvestor": "enterprise investment",
+      "governmentInvestor": "government investment"
+    },
+    "invalid": {
+      "title": "This project link is invalid",
+      "description": "Return to the project directory and choose a valid numeric record."
+    },
+    "error": {
+      "title": "The project profile could not be loaded",
+      "description": "The enterprise service did not return a valid project record. Try again."
     }
   }
 }

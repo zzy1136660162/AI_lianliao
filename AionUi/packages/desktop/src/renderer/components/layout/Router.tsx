@@ -30,6 +30,8 @@ const CompanyListPage = React.lazy(() => import('@renderer/pages/enterprise/comp
 const CompanyDetailPage = React.lazy(() => import('@renderer/pages/enterprise/companies/CompanyDetailPage'));
 const ProductListPage = React.lazy(() => import('@renderer/pages/enterprise/products/ProductListPage'));
 const ProductDetailPage = React.lazy(() => import('@renderer/pages/enterprise/products/ProductDetailPage'));
+const ProjectPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectPage'));
+const ProjectDetailPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectDetailPage'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -91,8 +93,6 @@ type EnterprisePlaceholderPageProps = {
 
 const ENTERPRISE_PLACEHOLDER_ROUTES = [
   ['dashboard', 'enterprise.routes.dashboard.title', 'enterprise.routes.dashboard.description'],
-  ['projects', 'enterprise.routes.projects.title', 'enterprise.routes.projects.description'],
-  ['projects/:hpInfoId', 'enterprise.routes.projectDetail.title', 'enterprise.routes.projectDetail.description'],
   ['favorites', 'enterprise.routes.favorites.title', 'enterprise.routes.favorites.description'],
   ['leads', 'enterprise.routes.leads.title', 'enterprise.routes.leads.description'],
 ] as const;
@@ -134,6 +134,8 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
           <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
           <Route path='products' element={withRouteFallback(ProductListPage)} />
           <Route path='products/:productId' element={withRouteFallback(ProductDetailPage)} />
+          <Route path='projects' element={withRouteFallback(ProjectPage)} />
+          <Route path='projects/:hpInfoId' element={withRouteFallback(ProjectDetailPage)} />
           {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
             <Route
               key={path}
