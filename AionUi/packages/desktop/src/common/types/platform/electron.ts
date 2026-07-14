@@ -1,4 +1,5 @@
 import type {
+  EnterpriseIpcResult,
   EnterpriseLoginPollResult,
   EnterpriseLoginSession,
   EnterpriseRequest,
@@ -30,12 +31,12 @@ export interface ElectronBridgeAPI {
   // Forward feedback diagnostics logs to the main process console / 转发反馈诊断日志到主进程控制台
   logFeedbackEvent?: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) => void;
   enterprise?: {
-    createLoginSession: () => Promise<EnterpriseLoginSession>;
-    pollLoginSession: (loginKey: string) => Promise<EnterpriseLoginPollResult>;
-    completeRegistration: (openId: string) => Promise<EnterpriseUserContext>;
-    restoreSession: () => Promise<EnterpriseUserContext | null>;
-    clearSession: () => Promise<void>;
-    request: (request: EnterpriseRequest) => Promise<EnterpriseResponse>;
+    createLoginSession: () => Promise<EnterpriseIpcResult<EnterpriseLoginSession>>;
+    pollLoginSession: (loginKey: string) => Promise<EnterpriseIpcResult<EnterpriseLoginPollResult>>;
+    completeRegistration: (openId: string) => Promise<EnterpriseIpcResult<EnterpriseUserContext>>;
+    restoreSession: () => Promise<EnterpriseIpcResult<EnterpriseUserContext | null>>;
+    clearSession: () => Promise<EnterpriseIpcResult<void>>;
+    request: (request: EnterpriseRequest) => Promise<EnterpriseIpcResult<EnterpriseResponse>>;
   };
 }
 

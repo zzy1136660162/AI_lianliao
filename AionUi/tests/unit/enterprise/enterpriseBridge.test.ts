@@ -16,6 +16,7 @@ const electronMocks = vi.hoisted(() => ({
   browserWindows: new Map<object, unknown>(),
   fromWebContents: vi.fn(),
   getPath: vi.fn(() => 'C:/safe-user-data'),
+  isPackaged: false,
   exposed: new Map<string, unknown>(),
   invoke: vi.fn(),
   on: vi.fn(),
@@ -26,7 +27,12 @@ const electronMocks = vi.hoisted(() => ({
 
 vi.mock('@sentry/electron/preload', () => ({}));
 vi.mock('electron', () => ({
-  app: { getPath: electronMocks.getPath },
+  app: {
+    getPath: electronMocks.getPath,
+    get isPackaged() {
+      return electronMocks.isPackaged;
+    },
+  },
   BrowserWindow: { fromWebContents: electronMocks.fromWebContents },
   contextBridge: {
     exposeInMainWorld: vi.fn((name: string, value: unknown) => electronMocks.exposed.set(name, value)),
@@ -165,6 +171,7 @@ describe('enterprise bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    electronMocks.isPackaged = false;
     electronMocks.browserWindows.clear();
     electronMocks.fromWebContents.mockImplementation((sender: object) => electronMocks.browserWindows.get(sender));
     electronMocks.exposed.clear();
@@ -275,7 +282,47 @@ describe('enterprise bridge', () => {
     }
   });
 
+  it.each([
+    ['localhost', 'http://localhost:5173/app/index.html?mode=desktop'],
+    ['IPv4 loopback', 'https://127.0.0.1:5173/app/index.html?mode=desktop'],
+    ['IPv6 loopback', 'http://[::1]:5173/app/index.html?mode=desktop'],
+  ])('accepts an exact %s development renderer URL with hash-only navigation', async (_label, configuredUrl) => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', `${configuredUrl}#configured`);
+    const { isTrustedEnterpriseSender } = await import('@/process/bridge/enterpriseBridge');
+
+    expect(isTrustedEnterpriseSender(makeTrustedEvent(`${configuredUrl}#runtime`).event as never)).toBe(true);
+  });
+
+  it.each([
+    ['external origin', 'https://example.com/app/index.html?mode=desktop'],
+    ['userinfo', 'http://user:secret@localhost:5173/app/index.html?mode=desktop'],
+    ['non-HTTP protocol', 'ftp://localhost:5173/app/index.html?mode=desktop'],
+  ])('fails closed to the file renderer when the development URL uses %s', async (_label, configuredUrl) => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', configuredUrl);
+    const expectedFileUrl = pathToFileURL(
+      path.join(process.cwd(), 'packages/desktop/src/process/renderer/index.html')
+    ).href;
+    const { isTrustedEnterpriseSender } = await import('@/process/bridge/enterpriseBridge');
+
+    expect(isTrustedEnterpriseSender(makeTrustedEvent(`${expectedFileUrl}#route`).event as never)).toBe(true);
+    expect(isTrustedEnterpriseSender(makeTrustedEvent(configuredUrl).event as never)).toBe(false);
+  });
+
+  it('ignores a residual development URL in packaged builds and trusts only the file renderer', async () => {
+    electronMocks.isPackaged = true;
+    const residualUrl = 'https://example.com/app/index.html?mode=desktop';
+    vi.stubEnv('ELECTRON_RENDERER_URL', residualUrl);
+    const expectedFileUrl = pathToFileURL(
+      path.join(process.cwd(), 'packages/desktop/src/process/renderer/index.html')
+    ).href;
+    const { isTrustedEnterpriseSender } = await import('@/process/bridge/enterpriseBridge');
+
+    expect(isTrustedEnterpriseSender(makeTrustedEvent(`${expectedFileUrl}#route`).event as never)).toBe(true);
+    expect(isTrustedEnterpriseSender(makeTrustedEvent(residualUrl).event as never)).toBe(false);
+  });
+
   it('accepts only the exact production file URL when no development URL is configured', async () => {
+    electronMocks.isPackaged = true;
     vi.stubEnv('ELECTRON_RENDERER_URL', '');
     const expectedUrl = pathToFileURL(
       path.join(process.cwd(), 'packages/desktop/src/process/renderer/index.html')
@@ -982,12 +1029,78 @@ describe('enterprise bridge', () => {
       error: { code: 'REQUEST_FAILED', message: ERROR_MESSAGES.REQUEST_FAILED },
     });
   });
+
+  it('does not read accessor error codes from bridge or API failures', async () => {
+    let bridgeGetterRead = false;
+    let apiGetterRead = false;
+    const bridgeFailure = new EnterpriseBridgeError('TIMEOUT');
+    Object.defineProperty(bridgeFailure, 'code', {
+      configurable: true,
+      get: () => {
+        bridgeGetterRead = true;
+        return 'TIMEOUT';
+      },
+    });
+    const apiFailure = new EnterpriseApiError('TIMEOUT', ERROR_MESSAGES.TIMEOUT);
+    Object.defineProperty(apiFailure, 'code', {
+      configurable: true,
+      get: () => {
+        apiGetterRead = true;
+        return 'TIMEOUT';
+      },
+    });
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockRejectedValueOnce(bridgeFailure).mockRejectedValueOnce(apiFailure);
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockResolvedValue(OPEN_ID);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
+
+    await expect(invokeRawHandler(handlers, {}, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'REQUEST_FAILED' },
+    });
+    await expect(invokeRawHandler(handlers, {}, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'REQUEST_FAILED' },
+    });
+    expect(bridgeGetterRead).toBe(false);
+    expect(apiGetterRead).toBe(false);
+  });
+
+  it('rejects inherited and unknown own error codes from typed failures', async () => {
+    const inheritedFailure = new EnterpriseBridgeError('TIMEOUT');
+    Reflect.deleteProperty(inheritedFailure, 'code');
+    const inheritedCodePrototype = Object.create(Object.getPrototypeOf(inheritedFailure)) as object;
+    Object.defineProperty(inheritedCodePrototype, 'code', { value: 'TIMEOUT' });
+    Object.setPrototypeOf(inheritedFailure, inheritedCodePrototype);
+    const unknownFailure = new EnterpriseApiError('TIMEOUT', ERROR_MESSAGES.TIMEOUT);
+    Object.defineProperty(unknownFailure, 'code', { value: 'FORGED_CODE' });
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockRejectedValueOnce(inheritedFailure).mockRejectedValueOnce(unknownFailure);
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockResolvedValue(OPEN_ID);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
+
+    await expect(invokeRawHandler(handlers, {}, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'REQUEST_FAILED' },
+    });
+    await expect(invokeRawHandler(handlers, {}, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'REQUEST_FAILED' },
+    });
+  });
 });
 
 describe('enterprise preload surface', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    electronMocks.isPackaged = false;
     electronMocks.exposed.clear();
     electronMocks.sendSync.mockReturnValue(null);
   });
@@ -1014,12 +1127,12 @@ describe('enterprise preload surface', () => {
     ]);
 
     const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
-    await enterprise.createLoginSession();
-    await enterprise.pollLoginSession('login-key');
-    await enterprise.completeRegistration(OPEN_ID);
-    await enterprise.restoreSession();
-    await enterprise.clearSession();
-    await enterprise.request(request);
+    await expect(enterprise.createLoginSession()).resolves.toEqual({ ok: true, data: null });
+    await expect(enterprise.pollLoginSession('login-key')).resolves.toEqual({ ok: true, data: null });
+    await expect(enterprise.completeRegistration(OPEN_ID)).resolves.toEqual({ ok: true, data: null });
+    await expect(enterprise.restoreSession()).resolves.toEqual({ ok: true, data: null });
+    await expect(enterprise.clearSession()).resolves.toEqual({ ok: true, data: null });
+    await expect(enterprise.request(request)).resolves.toEqual({ ok: true, data: null });
 
     expect(electronMocks.invoke.mock.calls).toEqual([
       [ENTERPRISE_IPC_CHANNELS.AUTH_CREATE],
@@ -1031,7 +1144,7 @@ describe('enterprise preload surface', () => {
     ]);
   });
 
-  it('round-trips a real handler failure envelope into a renderer-readable readonly error code', async () => {
+  it('round-trips a real handler failure as a structured-clone-safe plain envelope', async () => {
     const { EnterpriseApiError: CurrentEnterpriseApiError } =
       await import('@/process/services/enterprise/enterpriseApiClient');
     const apiClient = makeApiClient();
@@ -1046,22 +1159,39 @@ describe('enterprise preload surface', () => {
     });
     const enterprise = await loadEnterprisePreloadApi();
 
-    const error = await enterprise.createLoginSession().catch((reason: unknown) => reason);
+    const result = structuredClone(await enterprise.createLoginSession());
 
-    expect(error).toBeInstanceOf(Error);
-    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.TIMEOUT}`);
-    expect(Object.getOwnPropertyDescriptor(error, 'code')).toEqual({
-      value: 'TIMEOUT',
-      writable: false,
-      enumerable: true,
-      configurable: false,
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'TIMEOUT', message: ERROR_MESSAGES.TIMEOUT },
     });
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect(Object.getPrototypeOf((result as { error: object }).error)).toBe(Object.prototype);
   });
 
   it.each([
     ['undefined', undefined],
     ['raw data', { loginKey: LOGIN_KEY }],
     ['extra envelope key', { ok: true, data: null, extra: true }],
+    ['symbol envelope key', { ok: true, data: null, [Symbol('secret')]: true }],
+    [
+      'dangerous envelope key',
+      (() => {
+        const envelope = { ok: true, data: null } as Record<PropertyKey, unknown>;
+        Object.defineProperty(envelope, '__proto__', { enumerable: true, value: { injected: true } });
+        return envelope;
+      })(),
+    ],
+    ['function success data', { ok: true, data: () => undefined }],
+    [
+      'class success data',
+      {
+        ok: true,
+        data: new (class UnsafeData {
+          readonly value = true;
+        })(),
+      },
+    ],
     ['unknown code', { ok: false, error: { code: 'SECRET_BACKEND', message: 'secret' } }],
     [
       'wrong fixed message',
@@ -1071,15 +1201,14 @@ describe('enterprise preload surface', () => {
       'prototype-bearing envelope',
       Object.assign(Object.create({ injected: true }) as Record<string, unknown>, { ok: true, data: null }),
     ],
-  ])('maps a malformed %s to a fixed INVALID_IPC_RESPONSE error', async (_label, response) => {
+  ])('maps a malformed %s to a fixed INVALID_IPC_RESPONSE envelope', async (_label, response) => {
     electronMocks.invoke.mockResolvedValue(response);
     const enterprise = await loadEnterprisePreloadApi();
 
-    const error = await enterprise.restoreSession().catch((reason: unknown) => reason);
-
-    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.INVALID_IPC_RESPONSE}`);
-    expect(Object.getOwnPropertyDescriptor(error, 'code')?.value).toBe('INVALID_IPC_RESPONSE');
-    expect(String(error)).not.toContain('SECRET_BACKEND');
+    await expect(enterprise.restoreSession()).resolves.toEqual({
+      ok: false,
+      error: { code: 'INVALID_IPC_RESPONSE', message: ERROR_MESSAGES.INVALID_IPC_RESPONSE },
+    });
   });
 
   it('rejects accessor envelopes without executing the getter or exposing its value', async () => {
@@ -1096,22 +1225,43 @@ describe('enterprise preload surface', () => {
     electronMocks.invoke.mockResolvedValue(response);
     const enterprise = await loadEnterprisePreloadApi();
 
-    const error = await enterprise.restoreSession().catch((reason: unknown) => reason);
-
+    const result = await enterprise.restoreSession();
     expect(getterRead).toBe(false);
-    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.INVALID_IPC_RESPONSE}`);
-    expect(String(error)).not.toContain(OPEN_ID);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'INVALID_IPC_RESPONSE', message: ERROR_MESSAGES.INVALID_IPC_RESPONSE },
+    });
   });
 
-  it('maps raw Electron invoke rejection to a fixed IPC_UNAVAILABLE error without echoing details', async () => {
+  it('rejects nested success-data accessors without executing the getter', async () => {
+    let getterRead = false;
+    const data: Record<string, unknown> = {};
+    Object.defineProperty(data, 'openId', {
+      enumerable: true,
+      get: () => {
+        getterRead = true;
+        return OPEN_ID;
+      },
+    });
+    electronMocks.invoke.mockResolvedValue({ ok: true, data });
+    const enterprise = await loadEnterprisePreloadApi();
+
+    const result = await enterprise.restoreSession();
+
+    expect(getterRead).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'INVALID_IPC_RESPONSE', message: ERROR_MESSAGES.INVALID_IPC_RESPONSE },
+    });
+  });
+
+  it('maps raw Electron invoke rejection to a fixed IPC_UNAVAILABLE envelope without echoing details', async () => {
     electronMocks.invoke.mockRejectedValue(new Error(`${OPEN_ID} at C:/private/path`));
     const enterprise = await loadEnterprisePreloadApi();
 
-    const error = await enterprise.restoreSession().catch((reason: unknown) => reason);
-
-    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.IPC_UNAVAILABLE}`);
-    expect(Object.getOwnPropertyDescriptor(error, 'code')?.value).toBe('IPC_UNAVAILABLE');
-    expect(String(error)).not.toContain(OPEN_ID);
-    expect(String(error)).not.toContain('C:/private/path');
+    await expect(enterprise.restoreSession()).resolves.toEqual({
+      ok: false,
+      error: { code: 'IPC_UNAVAILABLE', message: ERROR_MESSAGES.IPC_UNAVAILABLE },
+    });
   });
 });

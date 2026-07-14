@@ -85,13 +85,23 @@ export class EnterpriseBridgeError extends Error {
 
 const bridgeError = (code: EnterpriseIpcErrorCode): EnterpriseBridgeError => new EnterpriseBridgeError(code);
 
+const getOwnFailureCode = (error: object): EnterpriseIpcErrorCode | undefined => {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(error, 'code');
+    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return undefined;
+    const code = descriptor.value;
+    if (typeof code !== 'string' || !Object.prototype.hasOwnProperty.call(ENTERPRISE_IPC_ERROR_MESSAGES, code)) {
+      return undefined;
+    }
+    return code as EnterpriseIpcErrorCode;
+  } catch {
+    return undefined;
+  }
+};
+
 const sanitizeFailureCode = (error: unknown, fallbackCode: EnterpriseIpcErrorCode): EnterpriseIpcErrorCode => {
-  if (error instanceof EnterpriseBridgeError) return error.code;
-  if (
-    error instanceof EnterpriseApiError &&
-    Object.prototype.hasOwnProperty.call(ENTERPRISE_IPC_ERROR_MESSAGES, error.code)
-  ) {
-    return error.code;
+  if (error instanceof EnterpriseBridgeError || error instanceof EnterpriseApiError) {
+    return getOwnFailureCode(error) ?? fallbackCode;
   }
   return fallbackCode;
 };
@@ -146,15 +156,23 @@ const hasExactRendererLocation = (actualUrl: string, expectedUrl: string): boole
 };
 
 const getExpectedRendererUrl = (): string | undefined => {
+  const fileRendererUrl = pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
+  if (app.isPackaged) return fileRendererUrl;
+
   const developmentUrl = process.env.ELECTRON_RENDERER_URL;
   if (developmentUrl !== undefined && developmentUrl !== '') {
     try {
-      return new URL(developmentUrl).href;
+      const parsedUrl = new URL(developmentUrl);
+      const isLoopbackHost = ['localhost', '127.0.0.1', '[::1]'].includes(parsedUrl.hostname);
+      const isHttpProtocol = parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+      if (isHttpProtocol && isLoopbackHost && parsedUrl.username === '' && parsedUrl.password === '') {
+        return parsedUrl.href;
+      }
     } catch {
-      return undefined;
+      // Invalid development configuration falls back to the packaged renderer URL.
     }
   }
-  return pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
+  return fileRendererUrl;
 };
 
 /** Verifies the actual Electron sender/window/frame binding and exact renderer location. */

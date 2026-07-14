@@ -14,6 +14,7 @@ import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
 import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '../common/enterprise/constants';
 import type {
   EnterpriseIpcErrorCode,
+  EnterpriseIpcResult,
   EnterpriseLoginPollResult,
   EnterpriseLoginSession,
   EnterpriseRequest,
@@ -21,9 +22,7 @@ import type {
   EnterpriseUserContext,
 } from '../common/enterprise/contracts';
 
-type ParsedEnterpriseIpcResult =
-  | { ok: true; data: unknown }
-  | { ok: false; error: { code: EnterpriseIpcErrorCode; message: string } };
+const DANGEROUS_DATA_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 const hasExactPlainDataProperties = (value: unknown, keys: readonly string[]): value is Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Object.getPrototypeOf(value) !== Object.prototype) return false;
@@ -33,7 +32,9 @@ const hasExactPlainDataProperties = (value: unknown, keys: readonly string[]): v
   }
   return keys.every((key) => {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
-    return descriptor !== undefined && Object.prototype.hasOwnProperty.call(descriptor, 'value');
+    return (
+      descriptor !== undefined && descriptor.enumerable && Object.prototype.hasOwnProperty.call(descriptor, 'value')
+    );
   });
 };
 
@@ -43,14 +44,69 @@ const getOwnDataValue = (value: Record<string, unknown>, key: string): unknown =
 const isEnterpriseIpcErrorCode = (value: unknown): value is EnterpriseIpcErrorCode =>
   typeof value === 'string' && Object.prototype.hasOwnProperty.call(ENTERPRISE_IPC_ERROR_MESSAGES, value);
 
-const parseEnterpriseIpcResult = (value: unknown): ParsedEnterpriseIpcResult | undefined => {
+const isSafePlainCloneValue = (value: unknown, ancestors = new WeakSet<object>()): boolean => {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return true;
+  }
+  if (typeof value !== 'object') return false;
+
+  try {
+    if (ancestors.has(value)) return false;
+    ancestors.add(value);
+    const prototype = Object.getPrototypeOf(value);
+    const keys = Reflect.ownKeys(value);
+
+    if (Array.isArray(value)) {
+      if (prototype !== Array.prototype) return false;
+      for (const key of keys) {
+        if (typeof key !== 'string') return false;
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) return false;
+        if (key === 'length') continue;
+        if (!/^(0|[1-9][0-9]*)$/.test(key) || !descriptor.enumerable) return false;
+        if (!isSafePlainCloneValue(descriptor.value, ancestors)) return false;
+      }
+      ancestors.delete(value);
+      return true;
+    }
+
+    if (prototype !== Object.prototype) return false;
+    for (const key of keys) {
+      if (typeof key !== 'string' || DANGEROUS_DATA_KEYS.has(key)) return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        !descriptor ||
+        !descriptor.enumerable ||
+        !Object.prototype.hasOwnProperty.call(descriptor, 'value') ||
+        !isSafePlainCloneValue(descriptor.value, ancestors)
+      ) {
+        return false;
+      }
+    }
+    ancestors.delete(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const parseEnterpriseIpcResult = <T>(value: unknown): EnterpriseIpcResult<T> | undefined => {
   try {
     if (!hasExactPlainDataProperties(value, ['ok', 'data']) && !hasExactPlainDataProperties(value, ['ok', 'error'])) {
       return undefined;
     }
     const ok = getOwnDataValue(value, 'ok');
     if (ok === true && hasExactPlainDataProperties(value, ['ok', 'data'])) {
-      return { ok: true, data: getOwnDataValue(value, 'data') };
+      const data = getOwnDataValue(value, 'data');
+      if (!isSafePlainCloneValue(data)) return undefined;
+      return { ok: true, data: data as T };
     }
     if (ok !== false || !hasExactPlainDataProperties(value, ['ok', 'error'])) return undefined;
 
@@ -65,31 +121,20 @@ const parseEnterpriseIpcResult = (value: unknown): ParsedEnterpriseIpcResult | u
   }
 };
 
-const createEnterpriseRendererError = (
-  code: EnterpriseIpcErrorCode
-): Error & { readonly code: EnterpriseIpcErrorCode } => {
-  const error = new Error(ENTERPRISE_IPC_ERROR_MESSAGES[code]);
-  Object.defineProperty(error, 'code', {
-    value: code,
-    writable: false,
-    enumerable: true,
-    configurable: false,
-  });
-  return error as Error & { readonly code: EnterpriseIpcErrorCode };
-};
+const enterpriseFailureResult = (code: EnterpriseIpcErrorCode): EnterpriseIpcResult<never> => ({
+  ok: false,
+  error: { code, message: ENTERPRISE_IPC_ERROR_MESSAGES[code] },
+});
 
-const invokeEnterprise = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
+const invokeEnterprise = async <T>(channel: string, ...args: unknown[]): Promise<EnterpriseIpcResult<T>> => {
   let untrustedResult: unknown;
   try {
     untrustedResult = await ipcRenderer.invoke(channel, ...args);
   } catch {
-    throw createEnterpriseRendererError('IPC_UNAVAILABLE');
+    return enterpriseFailureResult('IPC_UNAVAILABLE');
   }
 
-  const result = parseEnterpriseIpcResult(untrustedResult);
-  if (!result) throw createEnterpriseRendererError('INVALID_IPC_RESPONSE');
-  if (result.ok === false) throw createEnterpriseRendererError(result.error.code);
-  return result.data as T;
+  return parseEnterpriseIpcResult<T>(untrustedResult) ?? enterpriseFailureResult('INVALID_IPC_RESPONSE');
 };
 
 /**
