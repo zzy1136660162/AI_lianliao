@@ -74,6 +74,87 @@
   },
   "accessibility": {
     "loginRegion": "Enterprise sign-in",
-    "statusRegion": "Enterprise sign-in status"
+    "statusRegion": "Enterprise sign-in status",
+    "primaryNavigation": "Enterprise workspace navigation",
+    "userIdentity": "Current enterprise identity",
+    "workspace": "Enterprise workspace content",
+    "assistant": "Enterprise AI assistant"
+  },
+  "navigation": {
+    "dashboard": "Workbench",
+    "companies": "Companies",
+    "products": "Products",
+    "projects": "Projects",
+    "favorites": "Favorites",
+    "leads": "Follow-ups"
+  },
+  "shell": {
+    "brand": "Enterprise Code",
+    "brandMark": "EC",
+    "brandCaption": "Liaoning industry desk",
+    "eyebrow": "Liaoning industrial blueprint",
+    "unknownCompany": "Enterprise not linked",
+    "unknownUser": "Current user",
+    "loggingOut": "Signing out…",
+    "logoutError": "The enterprise session could not be cleared. Try again.",
+    "actions": {
+      "ai": "AI workspace",
+      "settings": "Settings",
+      "logout": "Sign out"
+    }
+  },
+  "assistant": {
+    "index": "AI assistant / 01",
+    "title": "Enterprise assistant slot",
+    "description": "Context-aware enterprise assistance will be connected in the next phase. No data is sent from this placeholder.",
+    "actions": {
+      "show": "Show assistant panel",
+      "hide": "Hide assistant panel"
+    }
+  },
+  "routes": {
+    "dashboard": {
+      "title": "Enterprise workbench",
+      "description": "The live enterprise overview and unified search will be connected after the company, product and project pages are complete."
+    },
+    "companies": {
+      "title": "Company directory",
+      "description": "The live company directory will be connected in the next development task."
+    },
+    "companyDetail": {
+      "title": "Company profile",
+      "description": "Verified company profile fields will be connected in the next development task."
+    },
+    "products": {
+      "title": "Product directory",
+      "description": "The live product directory will be connected after the company experience."
+    },
+    "productDetail": {
+      "title": "Product profile",
+      "description": "Verified product details will be connected in the product development task."
+    },
+    "projects": {
+      "title": "Projects under construction",
+      "description": "The live project dashboard and project directory will be connected in the project development task."
+    },
+    "projectDetail": {
+      "title": "Project profile",
+      "description": "Verified project details and access state will be connected in the project development task."
+    },
+    "favorites": {
+      "title": "My favorites",
+      "description": "Enterprise favorites will be enabled in the next product phase."
+    },
+    "leads": {
+      "title": "Opportunity follow-ups",
+      "description": "Opportunity follow-ups will be enabled in the next product phase."
+    }
+  },
+  "pageState": {
+    "loadingTitle": "Loading enterprise data",
+    "emptyTitle": "No enterprise data is available",
+    "emptyDescription": "Adjust the current filters and try again.",
+    "errorTitle": "Enterprise data could not be loaded",
+    "errorDescription": "The enterprise service is temporarily unavailable. Try again."
   }
 }

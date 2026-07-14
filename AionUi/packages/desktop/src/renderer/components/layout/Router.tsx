@@ -2,6 +2,10 @@ import React, { Suspense } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLoader from '@renderer/components/layout/AppLoader';
 import { useAuth } from '@renderer/hooks/context/AuthContext';
+import { useEnterpriseAuth } from '@renderer/hooks/context/EnterpriseAuthContext';
+import EnterprisePageState from '@renderer/pages/enterprise/layout/EnterprisePageState';
+import { isElectronDesktop } from '@renderer/utils/platform';
+import { useTranslation } from 'react-i18next';
 import { TEAM_MODE_ENABLED } from '@/common/config/constants';
 const Conversation = React.lazy(() => import('@renderer/pages/conversation'));
 const Guid = React.lazy(() => import('@renderer/pages/guid'));
@@ -20,6 +24,8 @@ const ComponentsShowcase = React.lazy(() => import('@renderer/pages/TestShowcase
 const ScheduledTasksPage = React.lazy(() => import('@renderer/pages/cron/ScheduledTasksPage'));
 const TaskDetailPage = React.lazy(() => import('@renderer/pages/cron/ScheduledTasksPage/TaskDetailPage'));
 const TeamIndex = React.lazy(() => import('@renderer/pages/team'));
+const EnterpriseLoginPage = React.lazy(() => import('@renderer/pages/enterprise/login/EnterpriseLoginPage'));
+const EnterpriseShell = React.lazy(() => import('@renderer/pages/enterprise/layout/EnterpriseShell'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -41,18 +47,103 @@ const ProtectedLayout: React.FC<{ layout: React.ReactElement }> = ({ layout }) =
   return React.cloneElement(layout);
 };
 
+const EnterpriseLoginRoute: React.FC = () => {
+  const { status } = useEnterpriseAuth();
+
+  if (!isElectronDesktop()) return <Navigate to='/' replace />;
+  if (status === 'checking') return <AppLoader />;
+  if (status === 'authenticated') return <Navigate to='/enterprise/dashboard' replace />;
+  return withRouteFallback(EnterpriseLoginPage);
+};
+
+const EnterpriseProtectedLayout: React.FC = () => {
+  const { status } = useEnterpriseAuth();
+
+  if (!isElectronDesktop()) return <Navigate to='/' replace />;
+  if (status === 'checking') return <AppLoader />;
+  if (status !== 'authenticated') return <Navigate to='/enterprise/login' replace />;
+  return withRouteFallback(EnterpriseShell);
+};
+
+const RootRoute: React.FC = () => {
+  const { status: appStatus } = useAuth();
+  const { status: enterpriseStatus } = useEnterpriseAuth();
+
+  if (isElectronDesktop()) {
+    if (enterpriseStatus === 'checking') return <AppLoader />;
+    return (
+      <Navigate to={enterpriseStatus === 'authenticated' ? '/enterprise/dashboard' : '/enterprise/login'} replace />
+    );
+  }
+
+  if (appStatus === 'checking') return <AppLoader />;
+  return <Navigate to={appStatus === 'authenticated' ? '/guid' : '/login'} replace />;
+};
+
+type EnterprisePlaceholderPageProps = {
+  titleKey: string;
+  descriptionKey: string;
+};
+
+const ENTERPRISE_PLACEHOLDER_ROUTES = [
+  ['dashboard', 'enterprise.routes.dashboard.title', 'enterprise.routes.dashboard.description'],
+  ['companies', 'enterprise.routes.companies.title', 'enterprise.routes.companies.description'],
+  ['companies/:companyId', 'enterprise.routes.companyDetail.title', 'enterprise.routes.companyDetail.description'],
+  ['products', 'enterprise.routes.products.title', 'enterprise.routes.products.description'],
+  ['products/:productId', 'enterprise.routes.productDetail.title', 'enterprise.routes.productDetail.description'],
+  ['projects', 'enterprise.routes.projects.title', 'enterprise.routes.projects.description'],
+  ['projects/:hpInfoId', 'enterprise.routes.projectDetail.title', 'enterprise.routes.projectDetail.description'],
+  ['favorites', 'enterprise.routes.favorites.title', 'enterprise.routes.favorites.description'],
+  ['leads', 'enterprise.routes.leads.title', 'enterprise.routes.leads.description'],
+] as const;
+
+const EnterprisePlaceholderPage: React.FC<EnterprisePlaceholderPageProps> = ({ titleKey, descriptionKey }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className='enterprise-route-placeholder'>
+      <EnterprisePageState state='empty' title={t(titleKey)} description={t(descriptionKey)} />
+    </div>
+  );
+};
+
+const FallbackRoute: React.FC = () => {
+  const { status: appStatus } = useAuth();
+  const { status: enterpriseStatus } = useEnterpriseAuth();
+
+  if (isElectronDesktop()) {
+    if (enterpriseStatus === 'checking') return <AppLoader />;
+    return (
+      <Navigate to={enterpriseStatus === 'authenticated' ? '/enterprise/dashboard' : '/enterprise/login'} replace />
+    );
+  }
+  return <Navigate to={appStatus === 'authenticated' ? '/guid' : '/login'} replace />;
+};
+
 const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
   const { status } = useAuth();
 
   return (
     <HashRouter>
       <Routes>
+        <Route index element={<RootRoute />} />
+        <Route path='/enterprise/login' element={<EnterpriseLoginRoute />} />
+        <Route path='/enterprise' element={<EnterpriseProtectedLayout />}>
+          <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
+          {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
+            <Route
+              key={path}
+              path={path}
+              element={<EnterprisePlaceholderPage titleKey={titleKey} descriptionKey={descriptionKey} />}
+            />
+          ))}
+          <Route path='*' element={<Navigate to='/enterprise/dashboard' replace />} />
+        </Route>
         <Route
           path='/login'
           element={status === 'authenticated' ? <Navigate to='/guid' replace /> : withRouteFallback(LoginPage)}
         />
         <Route element={<ProtectedLayout layout={layout} />}>
-          <Route index element={<Navigate to='/guid' replace />} />
           <Route path='/guid' element={withRouteFallback(Guid)} />
           <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
           <Route
@@ -83,7 +174,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
           <Route path='/scheduled' element={withRouteFallback(ScheduledTasksPage)} />
           <Route path='/scheduled/:job_id' element={withRouteFallback(TaskDetailPage)} />
         </Route>
-        <Route path='*' element={<Navigate to={status === 'authenticated' ? '/guid' : '/login'} replace />} />
+        <Route path='*' element={<FallbackRoute />} />
       </Routes>
     </HashRouter>
   );

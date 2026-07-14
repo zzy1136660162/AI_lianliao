@@ -74,6 +74,87 @@
   },
   "accessibility": {
     "loginRegion": "企业码登录",
-    "statusRegion": "企业码登录状态"
+    "statusRegion": "企业码登录状态",
+    "primaryNavigation": "企业工作台主导航",
+    "userIdentity": "当前企业身份",
+    "workspace": "企业工作台内容",
+    "assistant": "企业 AI 助手"
+  },
+  "navigation": {
+    "dashboard": "工作台",
+    "companies": "企业库",
+    "products": "产品库",
+    "projects": "在建项目",
+    "favorites": "我的收藏",
+    "leads": "商机跟进"
+  },
+  "shell": {
+    "brand": "企业码",
+    "brandMark": "企",
+    "brandCaption": "辽宁产业工作台",
+    "eyebrow": "辽宁产业蓝图",
+    "unknownCompany": "暂未关联企业",
+    "unknownUser": "当前用户",
+    "loggingOut": "正在退出…",
+    "logoutError": "暂时无法清除企业会话，请重试。",
+    "actions": {
+      "ai": "AI 工作区",
+      "settings": "设置",
+      "logout": "退出登录"
+    }
+  },
+  "assistant": {
+    "index": "AI 助手 / 01",
+    "title": "企业助手预留区",
+    "description": "下一阶段将接入理解当前企业上下文的智能助手。此预留区域现在不会发送任何数据。",
+    "actions": {
+      "show": "展开助手面板",
+      "hide": "收起助手面板"
+    }
+  },
+  "routes": {
+    "dashboard": {
+      "title": "企业工作台",
+      "description": "企业实时总览与统一搜索将在企业、产品和项目页面完成后接入。"
+    },
+    "companies": {
+      "title": "企业库",
+      "description": "真实企业数据将在下一项开发任务中接入。"
+    },
+    "companyDetail": {
+      "title": "企业详情",
+      "description": "经过接口校验的企业档案字段将在下一项开发任务中接入。"
+    },
+    "products": {
+      "title": "产品库",
+      "description": "真实产品数据将在企业库体验完成后接入。"
+    },
+    "productDetail": {
+      "title": "产品详情",
+      "description": "经过接口校验的产品详情将在产品开发任务中接入。"
+    },
+    "projects": {
+      "title": "在建项目",
+      "description": "真实项目看板与项目列表将在项目开发任务中接入。"
+    },
+    "projectDetail": {
+      "title": "项目详情",
+      "description": "经过接口校验的项目详情与权限状态将在项目开发任务中接入。"
+    },
+    "favorites": {
+      "title": "我的收藏",
+      "description": "企业收藏能力将在下一产品阶段启用。"
+    },
+    "leads": {
+      "title": "商机跟进",
+      "description": "商机跟进能力将在下一产品阶段启用。"
+    }
+  },
+  "pageState": {
+    "loadingTitle": "正在加载企业数据",
+    "emptyTitle": "暂无企业数据",
+    "emptyDescription": "请调整当前筛选条件后重试。",
+    "errorTitle": "暂时无法加载企业数据",
+    "errorDescription": "企业服务暂时不可用，请重试。"
   }
 }
