@@ -1,0 +1,79 @@
+{
+  "brand": {
+    "eyebrow": "Liaoning industrial intelligence workspace",
+    "title": "Connect industrial insight. Find the next opportunity.",
+    "description": "Sign in with your enterprise identity to explore company profiles, products and projects under construction in one focused desktop workspace.",
+    "security": "Identity verification is completed in WeChat. The desktop app never asks for your password."
+  },
+  "login": {
+    "checkingTitle": "Checking your enterprise identity",
+    "checkingDescription": "Restoring the secure sign-in state on this device.",
+    "scanEyebrow": "Desktop identity verification",
+    "scanTitle": "Scan with WeChat to sign in",
+    "scanDescription": "Open WeChat on your phone and scan the code. This page will continue automatically.",
+    "qrAlt": "Enterprise WeChat sign-in QR code",
+    "remainingLabel": "remaining",
+    "autoChecking": "Checking sign-in status automatically",
+    "imageError": "The sign-in QR code could not be displayed.",
+    "expiredTitle": "This QR code has expired",
+    "expiredDescription": "Refresh the code before scanning again.",
+    "authenticatedTitle": "Identity verified",
+    "authenticatedDescription": "Preparing your enterprise workspace.",
+    "errorTitle": "Sign-in could not continue"
+  },
+  "registration": {
+    "eyebrow": "Enterprise registration required",
+    "title": "Complete enterprise registration on your phone",
+    "description": "Scan this registration code with WeChat, finish the required details, then return here.",
+    "qrAlt": "Enterprise registration QR code",
+    "autoChecking": "Registration will be checked automatically after completion",
+    "manualCheck": "I have completed registration",
+    "restartLogin": "Restart QR sign-in",
+    "privacy": "Your OpenID is used only for this sign-in flow and is never shown on screen."
+  },
+  "actions": {
+    "retry": "Try again",
+    "refreshQr": "Refresh QR code"
+  },
+  "steps": {
+    "scan": {
+      "title": "Scan in WeChat",
+      "description": "Use the familiar mobile identity you already have."
+    },
+    "identify": {
+      "title": "Match your enterprise",
+      "description": "Load the company and role linked to your account."
+    },
+    "work": {
+      "title": "Enter the workspace",
+      "description": "Continue to enterprise, product and project intelligence."
+    }
+  },
+  "errors": {
+    "INVALID_BASE_URL": "The enterprise service address is unavailable.",
+    "INVALID_REQUEST": "The enterprise sign-in request is invalid.",
+    "MISSING_CONTEXT": "Your enterprise identity is incomplete.",
+    "TIMEOUT": "The enterprise service took too long to respond.",
+    "NETWORK": "The enterprise service cannot be reached. Check your network and try again.",
+    "HTTP": "The enterprise service returned an unsuccessful response.",
+    "INVALID_JSON": "The enterprise service returned an unreadable response.",
+    "API_FAILURE": "The enterprise service could not complete the request.",
+    "INVALID_RESPONSE": "The enterprise service returned an invalid response.",
+    "AUTH_CREATE_FAILED": "A sign-in QR code could not be created.",
+    "AUTH_POLL_FAILED": "The sign-in status could not be checked.",
+    "INVALID_AUTH_RESULT": "The sign-in result could not be verified.",
+    "REGISTRATION_INCOMPLETE": "Enterprise registration is not complete yet.",
+    "REGISTRATION_FAILED": "Enterprise registration could not be verified.",
+    "SESSION_RESTORE_FAILED": "The saved enterprise session could not be restored.",
+    "SESSION_CLEAR_FAILED": "The enterprise session could not be cleared.",
+    "REQUEST_FAILED": "The enterprise request could not be completed.",
+    "UNTRUSTED_SENDER": "The enterprise request did not come from a trusted window.",
+    "IPC_UNAVAILABLE": "Desktop enterprise services are unavailable.",
+    "INVALID_IPC_RESPONSE": "Desktop enterprise services returned an invalid response.",
+    "UNKNOWN": "An unexpected sign-in error occurred."
+  },
+  "accessibility": {
+    "loginRegion": "Enterprise sign-in",
+    "statusRegion": "Enterprise sign-in status"
+  }
+}

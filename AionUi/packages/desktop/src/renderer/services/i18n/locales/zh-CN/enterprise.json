@@ -1,0 +1,79 @@
+{
+  "brand": {
+    "eyebrow": "辽宁产业智能工作台",
+    "title": "连接产业信息，发现增长机会",
+    "description": "使用企业身份登录，在一个专注的桌面工作台中查看企业档案、产品信息与在建项目。",
+    "security": "身份验证在微信中完成，桌面端不会要求你输入密码。"
+  },
+  "login": {
+    "checkingTitle": "正在检查企业身份",
+    "checkingDescription": "正在恢复此设备上的安全登录状态。",
+    "scanEyebrow": "桌面端身份验证",
+    "scanTitle": "请使用微信扫码登录",
+    "scanDescription": "打开手机微信扫描二维码，验证完成后本页面将自动继续。",
+    "qrAlt": "企业码微信登录二维码",
+    "remainingLabel": "后过期",
+    "autoChecking": "正在自动检测登录状态",
+    "imageError": "二维码图片加载失败。",
+    "expiredTitle": "二维码已过期",
+    "expiredDescription": "请刷新二维码后重新扫码。",
+    "authenticatedTitle": "身份验证完成",
+    "authenticatedDescription": "正在准备你的企业工作台。",
+    "errorTitle": "登录流程暂时无法继续"
+  },
+  "registration": {
+    "eyebrow": "需要完成企业注册",
+    "title": "请在手机上完成企业注册",
+    "description": "使用微信扫描注册二维码，填写所需信息后返回桌面端。",
+    "qrAlt": "企业码注册二维码",
+    "autoChecking": "注册完成后将自动检测",
+    "manualCheck": "我已完成注册",
+    "restartLogin": "重新扫码登录",
+    "privacy": "OpenID 仅用于本次登录流程，不会在界面中显示。"
+  },
+  "actions": {
+    "retry": "重试",
+    "refreshQr": "刷新二维码"
+  },
+  "steps": {
+    "scan": {
+      "title": "微信扫码",
+      "description": "使用你已有的手机身份完成验证。"
+    },
+    "identify": {
+      "title": "匹配企业",
+      "description": "加载账号关联的企业与角色信息。"
+    },
+    "work": {
+      "title": "进入工作台",
+      "description": "继续查看企业、产品与项目情报。"
+    }
+  },
+  "errors": {
+    "INVALID_BASE_URL": "企业服务地址当前不可用。",
+    "INVALID_REQUEST": "企业登录请求无效。",
+    "MISSING_CONTEXT": "你的企业身份信息不完整。",
+    "TIMEOUT": "企业服务响应超时，请稍后重试。",
+    "NETWORK": "无法连接企业服务，请检查网络后重试。",
+    "HTTP": "企业服务返回了异常状态。",
+    "INVALID_JSON": "企业服务返回了无法读取的数据。",
+    "API_FAILURE": "企业服务未能完成本次请求。",
+    "INVALID_RESPONSE": "企业服务返回的数据无效。",
+    "AUTH_CREATE_FAILED": "暂时无法生成登录二维码。",
+    "AUTH_POLL_FAILED": "暂时无法检测登录状态。",
+    "INVALID_AUTH_RESULT": "无法验证本次登录结果。",
+    "REGISTRATION_INCOMPLETE": "企业注册尚未完成。",
+    "REGISTRATION_FAILED": "暂时无法验证企业注册信息。",
+    "SESSION_RESTORE_FAILED": "无法恢复已保存的企业会话。",
+    "SESSION_CLEAR_FAILED": "无法清除企业会话。",
+    "REQUEST_FAILED": "企业请求未能完成。",
+    "UNTRUSTED_SENDER": "企业请求来自不受信任的窗口。",
+    "IPC_UNAVAILABLE": "桌面端企业服务当前不可用。",
+    "INVALID_IPC_RESPONSE": "桌面端企业服务返回的数据无效。",
+    "UNKNOWN": "登录时发生未知错误，请重试。"
+  },
+  "accessibility": {
+    "loginRegion": "企业码登录",
+    "statusRegion": "企业码登录状态"
+  }
+}

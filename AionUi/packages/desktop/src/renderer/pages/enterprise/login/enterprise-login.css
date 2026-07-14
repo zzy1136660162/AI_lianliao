@@ -1,0 +1,374 @@
+.enterprise-login {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(410px, 1.18fr);
+  min-height: 100vh;
+  overflow: hidden;
+  color: var(--text-primary);
+  background: var(--bg-1);
+}
+
+.enterprise-login__blueprint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.44;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--border-2) 44%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--border-2) 44%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(90deg, transparent, var(--text-primary) 42%, var(--text-primary));
+}
+
+.enterprise-login__story,
+.enterprise-login__stage-card {
+  position: relative;
+  z-index: 1;
+}
+
+.enterprise-login__story {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(48px, 7vw, 104px) clamp(36px, 6vw, 88px);
+  border-right: 1px solid var(--border-2);
+  background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  animation: enterprise-story-enter 520ms ease-out both;
+}
+
+.enterprise-login__brand-mark,
+.enterprise-login__stage-index {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-2));
+}
+
+.enterprise-login__brand-eyebrow,
+.enterprise-login__overline {
+  margin: 28px 0 10px;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.enterprise-login__story h1 {
+  max-width: 520px;
+  margin: 0;
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-size: clamp(38px, 5vw, 68px);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 1.04;
+}
+
+.enterprise-login__brand-description {
+  max-width: 520px;
+  margin: 24px 0 0;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.enterprise-login__steps {
+  display: grid;
+  gap: 0;
+  max-width: 520px;
+  margin: 42px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-2);
+}
+
+.enterprise-login__steps li {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 18px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border-2);
+  animation: enterprise-step-enter 440ms ease-out both;
+}
+
+.enterprise-login__steps li:nth-child(2) {
+  animation-delay: 80ms;
+}
+
+.enterprise-login__steps li:nth-child(3) {
+  animation-delay: 160ms;
+}
+
+.enterprise-login__steps li > span {
+  color: var(--primary);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+.enterprise-login__steps strong {
+  font-size: 15px;
+}
+
+.enterprise-login__steps p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.enterprise-login__security-note {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 28px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.enterprise-login__stage-card {
+  align-self: center;
+  width: min(560px, calc(100% - 64px));
+  min-height: 620px;
+  margin: 48px auto;
+  border-color: var(--border-2) !important;
+  border-radius: 6px !important;
+  background: color-mix(in srgb, var(--bg-2) 96%, transparent) !important;
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--text-primary) 9%, transparent);
+  animation: enterprise-stage-enter 560ms 90ms ease-out both;
+}
+
+.enterprise-login__stage-card .arco-card-body {
+  display: flex;
+  min-height: 570px;
+  padding: clamp(28px, 5vw, 54px);
+}
+
+.enterprise-login__qr-stage,
+.enterprise-login__registration,
+.enterprise-login__center-state,
+.enterprise-login__error-state {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.enterprise-login__qr-stage h2,
+.enterprise-login__registration h2,
+.enterprise-login__center-state h2 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: -0.02em;
+}
+
+.enterprise-login__stage-description,
+.enterprise-login__registration-copy p,
+.enterprise-login__center-state p {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+.enterprise-login__qr-frame,
+.enterprise-login__registration-qr {
+  position: relative;
+  display: grid;
+  margin: 34px 0 24px;
+  padding: 18px;
+  place-items: center;
+  border: 1px solid var(--border-2);
+  background: var(--bg-1);
+}
+
+.enterprise-login__qr-frame img {
+  display: block;
+  width: 220px;
+  height: 220px;
+  object-fit: contain;
+}
+
+.enterprise-login__scan-corners {
+  position: absolute;
+  inset: -5px;
+  pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--primary) 54%, transparent);
+  clip-path: polygon(
+    0 0,
+    18% 0,
+    18% 2px,
+    2px 2px,
+    2px 18%,
+    0 18%,
+    0 0,
+    100% 0,
+    100% 18%,
+    calc(100% - 2px) 18%,
+    calc(100% - 2px) 2px,
+    82% 2px,
+    82% 0,
+    100% 0,
+    100% 100%,
+    82% 100%,
+    82% calc(100% - 2px),
+    calc(100% - 2px) calc(100% - 2px),
+    calc(100% - 2px) 82%,
+    100% 82%,
+    100% 100%,
+    0 100%,
+    0 82%,
+    2px 82%,
+    2px calc(100% - 2px),
+    18% calc(100% - 2px),
+    18% 100%
+  );
+}
+
+.enterprise-login__qr-meta {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.enterprise-login__countdown {
+  color: var(--text-primary);
+  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-size: 25px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.enterprise-login__auto-status {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  margin-top: 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.enterprise-login__registration-copy {
+  text-align: center;
+}
+
+.enterprise-login__registration-copy .enterprise-login__overline {
+  margin-top: 24px;
+}
+
+.enterprise-login__registration .arco-alert {
+  width: 100%;
+  border-radius: 4px;
+}
+
+.enterprise-login__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.enterprise-login__privacy-note {
+  margin: 20px 0 0;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.enterprise-login__image-error,
+.enterprise-login__error-state {
+  gap: 20px;
+}
+
+.enterprise-login__image-error {
+  display: flex;
+  width: 100%;
+  min-height: 292px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.enterprise-login__center-state {
+  gap: 12px;
+}
+
+.enterprise-login__center-state--success > svg {
+  color: var(--primary);
+}
+
+.enterprise-login button:focus-visible,
+.enterprise-login [role='button']:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+@keyframes enterprise-story-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes enterprise-stage-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes enterprise-step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 880px) {
+  .enterprise-login {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .enterprise-login__story {
+    padding: 44px 32px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-2);
+  }
+
+  .enterprise-login__steps {
+    margin-top: 28px;
+  }
+
+  .enterprise-login__stage-card {
+    width: min(560px, calc(100% - 32px));
+    min-height: 540px;
+    margin: 28px auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enterprise-login__story,
+  .enterprise-login__stage-card,
+  .enterprise-login__steps li {
+    animation: none;
+  }
+}
