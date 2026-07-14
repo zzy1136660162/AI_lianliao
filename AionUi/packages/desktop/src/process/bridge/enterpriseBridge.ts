@@ -1,23 +1,25 @@
-import { app, ipcMain as electronIpcMain } from 'electron';
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import { app, BrowserWindow, ipcMain as electronIpcMain } from 'electron';
+import type { IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
 
+import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '@/common/enterprise/constants';
 import type {
+  EnterpriseIpcErrorCode,
+  EnterpriseIpcResult,
   EnterpriseLoginPollResult,
   EnterpriseLoginSession,
   EnterpriseRequest,
   EnterpriseResponse,
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
-import { ENTERPRISE_IPC_CHANNELS } from '@/common/enterprise/constants';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
-import {
-  EnterpriseApiClient,
-  EnterpriseApiError,
-  type EnterpriseApiErrorCode,
-} from '@process/services/enterprise/enterpriseApiClient';
+import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
 
-type EnterpriseIpcHandler = (event: unknown, ...args: unknown[]) => Promise<unknown>;
+type EnterpriseIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<EnterpriseIpcResult<unknown>>;
 
 export type EnterpriseIpcMain = {
   handle: (channel: string, handler: EnterpriseIpcHandler) => void;
@@ -37,45 +39,16 @@ export type EnterpriseSessionStoreDependency = {
   clear: () => Promise<void>;
 };
 
+export type EnterpriseSenderGuard = (event: IpcMainInvokeEvent) => boolean;
+
 export type EnterpriseBridgeDependencies = {
   apiClient?: EnterpriseApiClientDependency;
   ipcMain?: EnterpriseIpcMain;
+  senderGuard?: EnterpriseSenderGuard;
   sessionStore?: EnterpriseSessionStoreDependency;
 };
 
-type EnterpriseBridgeErrorCode =
-  | EnterpriseApiErrorCode
-  | 'AUTH_CREATE_FAILED'
-  | 'AUTH_POLL_FAILED'
-  | 'INVALID_AUTH_RESULT'
-  | 'REGISTRATION_INCOMPLETE'
-  | 'REGISTRATION_FAILED'
-  | 'SESSION_RESTORE_FAILED'
-  | 'SESSION_CLEAR_FAILED'
-  | 'REQUEST_FAILED';
-
-const API_ERROR_MESSAGES: Record<EnterpriseApiErrorCode, string> = {
-  INVALID_BASE_URL: 'Enterprise API base URL is not allowed.',
-  INVALID_REQUEST: 'Enterprise API request is invalid.',
-  MISSING_CONTEXT: 'Enterprise API user context is incomplete.',
-  TIMEOUT: 'Enterprise API request timed out.',
-  NETWORK: 'Enterprise API request failed.',
-  HTTP: 'Enterprise API request returned an unsuccessful HTTP status.',
-  INVALID_JSON: 'Enterprise API response is not valid JSON.',
-  API_FAILURE: 'Enterprise API rejected the request.',
-  INVALID_RESPONSE: 'Enterprise API response is invalid.',
-};
-
-const BRIDGE_ERROR_MESSAGES: Record<Exclude<EnterpriseBridgeErrorCode, EnterpriseApiErrorCode>, string> = {
-  AUTH_CREATE_FAILED: 'Enterprise login session creation failed.',
-  AUTH_POLL_FAILED: 'Enterprise login polling failed.',
-  INVALID_AUTH_RESULT: 'Enterprise login result is invalid.',
-  REGISTRATION_INCOMPLETE: 'Enterprise registration is incomplete.',
-  REGISTRATION_FAILED: 'Enterprise registration verification failed.',
-  SESSION_RESTORE_FAILED: 'Enterprise session restoration failed.',
-  SESSION_CLEAR_FAILED: 'Enterprise session clearing failed.',
-  REQUEST_FAILED: 'Enterprise request failed.',
-};
+type EnterpriseOperation = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>;
 
 const loginKeySchema = z.string().regex(/^enterprise_desktop_[A-Za-z0-9]{18}$/);
 const registrationOpenIdSchema = z
@@ -99,30 +72,36 @@ const parseStrictEnterpriseRequest = (value: unknown): EnterpriseRequest | undef
   return parsed.data;
 };
 
-/** A stable, non-sensitive failure crossing the enterprise IPC boundary. */
+/** Internal typed failure; handlers always convert it to a plain IPC result. */
 export class EnterpriseBridgeError extends Error {
-  readonly code: EnterpriseBridgeErrorCode;
+  readonly code: EnterpriseIpcErrorCode;
 
-  constructor(code: EnterpriseBridgeErrorCode, message: string) {
+  constructor(code: EnterpriseIpcErrorCode, message = ENTERPRISE_IPC_ERROR_MESSAGES[code]) {
     super(`[${code}] ${message}`);
     this.name = 'EnterpriseBridgeError';
     this.code = code;
   }
 }
 
-const bridgeError = (code: EnterpriseBridgeErrorCode): EnterpriseBridgeError => {
-  const message =
-    code in API_ERROR_MESSAGES
-      ? API_ERROR_MESSAGES[code as EnterpriseApiErrorCode]
-      : BRIDGE_ERROR_MESSAGES[code as Exclude<EnterpriseBridgeErrorCode, EnterpriseApiErrorCode>];
-  return new EnterpriseBridgeError(code, message);
+const bridgeError = (code: EnterpriseIpcErrorCode): EnterpriseBridgeError => new EnterpriseBridgeError(code);
+
+const sanitizeFailureCode = (error: unknown, fallbackCode: EnterpriseIpcErrorCode): EnterpriseIpcErrorCode => {
+  if (error instanceof EnterpriseBridgeError) return error.code;
+  if (
+    error instanceof EnterpriseApiError &&
+    Object.prototype.hasOwnProperty.call(ENTERPRISE_IPC_ERROR_MESSAGES, error.code)
+  ) {
+    return error.code;
+  }
+  return fallbackCode;
 };
 
-const sanitizeFailure = (error: unknown, fallbackCode: EnterpriseBridgeErrorCode): EnterpriseBridgeError => {
-  if (error instanceof EnterpriseBridgeError) return bridgeError(error.code);
-  if (error instanceof EnterpriseApiError && error.code in API_ERROR_MESSAGES) return bridgeError(error.code);
-  return bridgeError(fallbackCode);
-};
+const successResult = <T>(data: T): EnterpriseIpcResult<T> => ({ ok: true, data });
+
+const failureResult = (code: EnterpriseIpcErrorCode): EnterpriseIpcResult<never> => ({
+  ok: false,
+  error: { code, message: ENTERPRISE_IPC_ERROR_MESSAGES[code] },
+});
 
 const normalizeUntrustedText = (value: unknown): string | undefined => {
   if (typeof value !== 'string') return undefined;
@@ -147,39 +126,141 @@ const isRegisteredContext = (
   );
 };
 
-/** Registers the allowlisted enterprise IPC surface and owns its trusted in-memory identity. */
+const hasExactRendererLocation = (actualUrl: string, expectedUrl: string): boolean => {
+  try {
+    const actual = new URL(actualUrl);
+    const expected = new URL(expectedUrl);
+    if (actual.username !== '' || actual.password !== '' || expected.username !== '' || expected.password !== '') {
+      return false;
+    }
+    return (
+      actual.protocol === expected.protocol &&
+      actual.hostname === expected.hostname &&
+      actual.port === expected.port &&
+      actual.pathname === expected.pathname &&
+      actual.search === expected.search
+    );
+  } catch {
+    return false;
+  }
+};
+
+const getExpectedRendererUrl = (): string | undefined => {
+  const developmentUrl = process.env.ELECTRON_RENDERER_URL;
+  if (developmentUrl !== undefined && developmentUrl !== '') {
+    try {
+      return new URL(developmentUrl).href;
+    } catch {
+      return undefined;
+    }
+  }
+  return pathToFileURL(path.join(__dirname, '../renderer/index.html')).href;
+};
+
+/** Verifies the actual Electron sender/window/frame binding and exact renderer location. */
+export const isTrustedEnterpriseSender: EnterpriseSenderGuard = (event) => {
+  try {
+    const sender = event.sender;
+    if (!sender || sender.isDestroyed()) return false;
+    if (!event.senderFrame || event.senderFrame !== sender.mainFrame) return false;
+    const ownerWindow = BrowserWindow.fromWebContents(sender);
+    if (!ownerWindow || ownerWindow.isDestroyed() || ownerWindow.webContents !== sender) return false;
+    const expectedUrl = getExpectedRendererUrl();
+    return expectedUrl !== undefined && hasExactRendererLocation(event.senderFrame.url, expectedUrl);
+  } catch {
+    return false;
+  }
+};
+
+let lifecycleEpoch = 0;
+let defaultSessionStore: EnterpriseSessionStoreDependency | undefined;
+let sessionMutationQueue: Promise<void> = Promise.resolve();
+let pendingSessionMutations = 0;
+
+const getDefaultSessionStore = (): EnterpriseSessionStoreDependency => {
+  defaultSessionStore ??= new EnterpriseSessionStore(app.getPath('userData'));
+  return defaultSessionStore;
+};
+
+const enqueueSessionMutation = <T>(operation: () => Promise<T>): Promise<T> => {
+  pendingSessionMutations += 1;
+  const current = sessionMutationQueue.then(operation, operation);
+  sessionMutationQueue = current.then(
+    (): undefined => undefined,
+    (): undefined => undefined
+  );
+  return current.finally(() => {
+    pendingSessionMutations -= 1;
+  });
+};
+
+/** Registers the fixed enterprise IPC surface and owns its trusted in-memory identity. */
 export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies = {}): void {
+  const epoch = lifecycleEpoch + 1;
+  lifecycleEpoch = epoch;
   const apiClient = dependencies.apiClient ?? new EnterpriseApiClient();
-  const sessionStore = dependencies.sessionStore ?? new EnterpriseSessionStore(app.getPath('userData'));
+  const sessionStore = dependencies.sessionStore ?? getDefaultSessionStore();
   const ipcMain = dependencies.ipcMain ?? (electronIpcMain as EnterpriseIpcMain);
+  const senderGuard = dependencies.senderGuard ?? isTrustedEnterpriseSender;
+  const needsReinitializationCleanup = pendingSessionMutations > 0;
+  const lifecycleReady = needsReinitializationCleanup
+    ? enqueueSessionMutation(() => sessionStore.clear())
+    : Promise.resolve();
+  void lifecycleReady.catch((): undefined => undefined);
 
   let activeContext: EnterpriseUserContext | null = null;
   let hydrationPromise: Promise<EnterpriseUserContext | null> | null = null;
   let sessionGeneration = 0;
+  let automaticHydrationBlocked = false;
+
+  const assertCurrentLifecycle = (): void => {
+    if (lifecycleEpoch !== epoch) throw bridgeError('MISSING_CONTEXT');
+  };
+
+  const runSessionMutation = async <T>(operation: () => Promise<T>): Promise<T> => {
+    assertCurrentLifecycle();
+    const result = await enqueueSessionMutation(async () => {
+      assertCurrentLifecycle();
+      return operation();
+    });
+    assertCurrentLifecycle();
+    return result;
+  };
 
   const clearSessionState = async (): Promise<void> => {
+    assertCurrentLifecycle();
     sessionGeneration += 1;
     activeContext = null;
-    await sessionStore.clear();
+    automaticHydrationBlocked = true;
+    await runSessionMutation(() => sessionStore.clear());
+    assertCurrentLifecycle();
+    automaticHydrationBlocked = false;
   };
 
   const refreshPersistedContext = (): Promise<EnterpriseUserContext | null> => {
+    assertCurrentLifecycle();
     if (activeContext) return Promise.resolve(activeContext);
+    if (automaticHydrationBlocked) return Promise.resolve(null);
     if (hydrationPromise) return hydrationPromise;
 
     const generationAtStart = sessionGeneration;
     const hydration = (async (): Promise<EnterpriseUserContext | null> => {
-      const openId = await sessionStore.loadOpenId();
+      const openId = await runSessionMutation(() => sessionStore.loadOpenId());
+      assertCurrentLifecycle();
+      if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
       if (openId === null) return null;
 
       const context = await apiClient.getUserContext(openId);
+      assertCurrentLifecycle();
       if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
       if (context.registered === false) {
         await clearSessionState();
+        assertCurrentLifecycle();
         return null;
       }
       if (!isRegisteredContext(context, openId)) throw bridgeError('INVALID_RESPONSE');
 
+      assertCurrentLifecycle();
       activeContext = context;
       return context;
     })();
@@ -194,6 +275,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
 
   const requireActiveContext = async (): Promise<EnterpriseUserContext> => {
     const context = await refreshPersistedContext();
+    assertCurrentLifecycle();
     if (!context) throw bridgeError('MISSING_CONTEXT');
     return context;
   };
@@ -203,95 +285,109 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     context: EnterpriseUserContext,
     generationAtStart: number
   ): Promise<void> => {
+    assertCurrentLifecycle();
     if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
     sessionGeneration += 1;
     const commitGeneration = sessionGeneration;
     activeContext = null;
+    automaticHydrationBlocked = true;
 
-    await sessionStore.saveOpenId(openId);
+    await runSessionMutation(() => sessionStore.saveOpenId(openId));
+    assertCurrentLifecycle();
     if (sessionGeneration !== commitGeneration) throw bridgeError('MISSING_CONTEXT');
     activeContext = context;
+    automaticHydrationBlocked = false;
+  };
+
+  const wrapHandler = (fallbackCode: EnterpriseIpcErrorCode, operation: EnterpriseOperation): EnterpriseIpcHandler => {
+    return async (event, ...args) => {
+      let trustedSender = false;
+      try {
+        trustedSender = senderGuard(event);
+      } catch {
+        trustedSender = false;
+      }
+      if (!trustedSender) return failureResult('UNTRUSTED_SENDER');
+
+      try {
+        await lifecycleReady;
+        assertCurrentLifecycle();
+        const data = await operation(event, ...args);
+        assertCurrentLifecycle();
+        return successResult(data);
+      } catch (error) {
+        return failureResult(sanitizeFailureCode(error, fallbackCode));
+      }
+    };
   };
 
   const handlers: ReadonlyArray<readonly [string, EnterpriseIpcHandler]> = [
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_CREATE,
-      async () => {
-        try {
-          return await apiClient.createLoginSession();
-        } catch (error) {
-          throw sanitizeFailure(error, 'AUTH_CREATE_FAILED');
-        }
-      },
+      wrapHandler('AUTH_CREATE_FAILED', async () => {
+        const session = await apiClient.createLoginSession();
+        assertCurrentLifecycle();
+        return session;
+      }),
     ],
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_POLL,
-      async (_event, loginKey) => {
-        try {
-          const parsedLoginKey = loginKeySchema.safeParse(loginKey);
-          if (!parsedLoginKey.success) throw bridgeError('INVALID_REQUEST');
-          const generationAtStart = sessionGeneration;
-          const result = await apiClient.pollLoginSession(parsedLoginKey.data);
-          if (result.status !== 'AUTHENTICATED') return result;
-          if (!isRegisteredContext(result.userContext, result.openId)) throw bridgeError('INVALID_AUTH_RESULT');
+      wrapHandler('AUTH_POLL_FAILED', async (_event, loginKey) => {
+        const parsedLoginKey = loginKeySchema.safeParse(loginKey);
+        if (!parsedLoginKey.success) throw bridgeError('INVALID_REQUEST');
+        const generationAtStart = sessionGeneration;
+        const result = await apiClient.pollLoginSession(parsedLoginKey.data);
+        assertCurrentLifecycle();
+        if (result.status !== 'AUTHENTICATED') return result;
+        if (!isRegisteredContext(result.userContext, result.openId)) throw bridgeError('INVALID_AUTH_RESULT');
 
-          await commitAuthenticatedContext(result.openId, result.userContext, generationAtStart);
-          return result;
-        } catch (error) {
-          throw sanitizeFailure(error, 'AUTH_POLL_FAILED');
-        }
-      },
+        await commitAuthenticatedContext(result.openId, result.userContext, generationAtStart);
+        assertCurrentLifecycle();
+        return result;
+      }),
     ],
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION,
-      async (_event, untrustedOpenId) => {
-        try {
-          const parsedOpenId = registrationOpenIdSchema.safeParse(untrustedOpenId);
-          if (!parsedOpenId.success) throw bridgeError('INVALID_REQUEST');
-          const openId = parsedOpenId.data;
-          const generationAtStart = sessionGeneration;
-          const context = await apiClient.getUserContext(openId);
-          if (!isRegisteredContext(context, openId)) throw bridgeError('REGISTRATION_INCOMPLETE');
+      wrapHandler('REGISTRATION_FAILED', async (_event, untrustedOpenId) => {
+        const parsedOpenId = registrationOpenIdSchema.safeParse(untrustedOpenId);
+        if (!parsedOpenId.success) throw bridgeError('INVALID_REQUEST');
+        const openId = parsedOpenId.data;
+        const generationAtStart = sessionGeneration;
+        const context = await apiClient.getUserContext(openId);
+        assertCurrentLifecycle();
+        if (!isRegisteredContext(context, openId)) throw bridgeError('REGISTRATION_INCOMPLETE');
 
-          await commitAuthenticatedContext(openId, context, generationAtStart);
-          return context;
-        } catch (error) {
-          throw sanitizeFailure(error, 'REGISTRATION_FAILED');
-        }
-      },
+        await commitAuthenticatedContext(openId, context, generationAtStart);
+        assertCurrentLifecycle();
+        return context;
+      }),
     ],
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE,
-      async () => {
-        try {
-          return await refreshPersistedContext();
-        } catch (error) {
-          throw sanitizeFailure(error, 'SESSION_RESTORE_FAILED');
-        }
-      },
+      wrapHandler('SESSION_RESTORE_FAILED', async () => {
+        const context = await refreshPersistedContext();
+        assertCurrentLifecycle();
+        return context;
+      }),
     ],
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR,
-      async () => {
-        try {
-          await clearSessionState();
-        } catch (error) {
-          throw sanitizeFailure(error, 'SESSION_CLEAR_FAILED');
-        }
-      },
+      wrapHandler('SESSION_CLEAR_FAILED', async () => {
+        await clearSessionState();
+        assertCurrentLifecycle();
+      }),
     ],
     [
       ENTERPRISE_IPC_CHANNELS.REQUEST,
-      async (_event, request) => {
-        try {
-          const parsedRequest = parseStrictEnterpriseRequest(request);
-          if (!parsedRequest) throw bridgeError('INVALID_REQUEST');
-          const context = await requireActiveContext();
-          return await apiClient.request(parsedRequest, context);
-        } catch (error) {
-          throw sanitizeFailure(error, 'REQUEST_FAILED');
-        }
-      },
+      wrapHandler('REQUEST_FAILED', async (_event, request) => {
+        const parsedRequest = parseStrictEnterpriseRequest(request);
+        if (!parsedRequest) throw bridgeError('INVALID_REQUEST');
+        const context = await requireActiveContext();
+        assertCurrentLifecycle();
+        const response = await apiClient.request(parsedRequest, context);
+        assertCurrentLifecycle();
+        return response;
+      }),
     ],
   ];
 

@@ -7,6 +7,17 @@ import { z } from 'zod';
 const SESSION_FILE_NAME = 'enterprise-session.json';
 const MAX_SESSION_FILE_BYTES = 4096;
 const MAX_OPEN_ID_LENGTH = 256;
+const CANONICAL_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const WINDOWS_UNSUPPORTED_DIRECTORY_SYNC_CODES = new Set([
+  'EBADF',
+  'EISDIR',
+  'EINVAL',
+  'ENOSYS',
+  'ENOTSUP',
+  'EPERM',
+  'UNKNOWN',
+]);
+const fatalUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
 
 type SessionFileStat = {
   dev: bigint;
@@ -34,11 +45,13 @@ export type EnterpriseSessionFileSystem = {
   lstat: (filePath: string, options: { bigint: true }) => Promise<SessionFileStat>;
   open: (filePath: string, flags: string, mode?: number) => Promise<EnterpriseSessionFileHandle>;
   rename: (oldPath: string, newPath: string) => Promise<void>;
+  syncDirectory: (directoryPath: string) => Promise<void>;
   unlink: (filePath: string) => Promise<void>;
 };
 
 export type EnterpriseSessionStoreOptions = {
   fileSystem?: Partial<EnterpriseSessionFileSystem>;
+  platform?: NodeJS.Platform;
   randomUUID?: () => string;
 };
 
@@ -56,6 +69,14 @@ const defaultFileSystem: EnterpriseSessionFileSystem = {
     };
   },
   rename: (oldPath, newPath) => fs.rename(oldPath, newPath),
+  syncDirectory: async (directoryPath) => {
+    const handle = await fs.open(directoryPath, 'r');
+    try {
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  },
   unlink: (filePath) => fs.unlink(filePath),
 };
 
@@ -111,12 +132,15 @@ export class EnterpriseSessionStoreError extends Error {
 /** Persists only a versioned openId session record under Electron's userData directory. */
 export class EnterpriseSessionStore {
   private readonly fileSystem: EnterpriseSessionFileSystem;
+  private readonly platform: NodeJS.Platform;
   private readonly randomUUID: () => string;
   private readonly sessionPath: string;
   private operationQueue: Promise<void> = Promise.resolve();
 
   constructor(userDataPath: string, options: EnterpriseSessionStoreOptions = {}) {
+    if (!path.isAbsolute(userDataPath) || userDataPath.includes('\0')) throw new EnterpriseSessionStoreError();
     this.fileSystem = { ...defaultFileSystem, ...options.fileSystem };
+    this.platform = options.platform ?? process.platform;
     this.randomUUID = options.randomUUID ?? nodeRandomUUID;
     this.sessionPath = path.join(userDataPath, SESSION_FILE_NAME);
   }
@@ -168,7 +192,9 @@ export class EnterpriseSessionStore {
       let handle: EnterpriseSessionFileHandle | undefined;
       let ownsTemporaryFile = false;
       try {
-        temporaryPath = `${this.sessionPath}.${this.randomUUID()}.tmp`;
+        const temporaryUuid = this.randomUUID();
+        if (!CANONICAL_UUID_PATTERN.test(temporaryUuid)) throw new EnterpriseSessionStoreError();
+        temporaryPath = `${this.sessionPath}.${temporaryUuid}.tmp`;
         const contents = JSON.stringify({ version: 1, openId: parsedOpenId.data });
         await this.fileSystem.mkdir(path.dirname(this.sessionPath), { recursive: true });
         handle = await this.fileSystem.open(temporaryPath, 'wx', 0o600);
@@ -179,6 +205,7 @@ export class EnterpriseSessionStore {
         handle = undefined;
         await this.fileSystem.rename(temporaryPath, this.sessionPath);
         ownsTemporaryFile = false;
+        await this.syncParentDirectory();
       } catch {
         if (handle) await this.closeWriteHandleBestEffort(handle);
         if (ownsTemporaryFile && temporaryPath) await this.removeTemporaryFile(temporaryPath);
@@ -192,6 +219,7 @@ export class EnterpriseSessionStore {
     return this.runSerialized(async () => {
       try {
         await this.fileSystem.unlink(this.sessionPath);
+        await this.syncParentDirectory();
       } catch (error) {
         if (getErrorCode(error) === 'ENOENT') return;
         throw new EnterpriseSessionStoreError();
@@ -211,6 +239,7 @@ export class EnterpriseSessionStore {
   private async removeTemporaryFile(temporaryPath: string): Promise<void> {
     try {
       await this.fileSystem.unlink(temporaryPath);
+      await this.syncParentDirectory();
     } catch {
       // Cleanup is best-effort and must never replace the original sanitized failure.
     }
@@ -230,7 +259,23 @@ export class EnterpriseSessionStore {
       totalBytes += result.bytesRead;
     }
     if (totalBytes > MAX_SESSION_FILE_BYTES) return null;
-    return buffer.subarray(0, totalBytes).toString('utf8');
+    try {
+      return fatalUtf8Decoder.decode(buffer.subarray(0, totalBytes));
+    } catch {
+      return null;
+    }
+  }
+
+  private async syncParentDirectory(): Promise<void> {
+    try {
+      await this.fileSystem.syncDirectory(path.dirname(this.sessionPath));
+    } catch (error) {
+      const code = getErrorCode(error);
+      if (this.platform === 'win32' && code !== undefined && WINDOWS_UNSUPPORTED_DIRECTORY_SYNC_CODES.has(code)) {
+        return;
+      }
+      throw new EnterpriseSessionStoreError();
+    }
   }
 
   private async closeReadHandle(handle: EnterpriseSessionFileHandle): Promise<void> {

@@ -1,3 +1,6 @@
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -10,6 +13,9 @@ import { EnterpriseBridgeError } from '@/process/bridge/enterpriseBridge';
 import { EnterpriseApiError } from '@/process/services/enterprise/enterpriseApiClient';
 
 const electronMocks = vi.hoisted(() => ({
+  browserWindows: new Map<object, unknown>(),
+  fromWebContents: vi.fn(),
+  getPath: vi.fn(() => 'C:/safe-user-data'),
   exposed: new Map<string, unknown>(),
   invoke: vi.fn(),
   on: vi.fn(),
@@ -20,7 +26,8 @@ const electronMocks = vi.hoisted(() => ({
 
 vi.mock('@sentry/electron/preload', () => ({}));
 vi.mock('electron', () => ({
-  app: { getPath: vi.fn(() => 'C:/safe-user-data') },
+  app: { getPath: electronMocks.getPath },
+  BrowserWindow: { fromWebContents: electronMocks.fromWebContents },
   contextBridge: {
     exposeInMainWorld: vi.fn((name: string, value: unknown) => electronMocks.exposed.set(name, value)),
   },
@@ -36,6 +43,8 @@ vi.mock('electron', () => ({
 }));
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<unknown>;
+
+type TestIpcResult<T = unknown> = { ok: true; data: T } | { ok: false; error: { code: string; message: string } };
 
 type ApiClientDouble = {
   createLoginSession: ReturnType<typeof vi.fn>;
@@ -68,6 +77,18 @@ const OLD_USER_CONTEXT: EnterpriseUserContext = {
   companyId: '302',
 };
 
+const ERROR_MESSAGES = {
+  INVALID_REQUEST: 'Enterprise API request is invalid.',
+  MISSING_CONTEXT: 'Enterprise API user context is incomplete.',
+  TIMEOUT: 'Enterprise API request timed out.',
+  AUTH_POLL_FAILED: 'Enterprise login polling failed.',
+  SESSION_RESTORE_FAILED: 'Enterprise session restoration failed.',
+  REQUEST_FAILED: 'Enterprise request failed.',
+  UNTRUSTED_SENDER: 'Enterprise IPC sender is not trusted.',
+  IPC_UNAVAILABLE: 'Enterprise IPC is unavailable.',
+  INVALID_IPC_RESPONSE: 'Enterprise IPC response is invalid.',
+} as const;
+
 const makeApiClient = (): ApiClientDouble => ({
   createLoginSession: vi.fn(),
   pollLoginSession: vi.fn(),
@@ -95,14 +116,35 @@ const initializeBridge = async (apiClient = makeApiClient(), sessionStore = make
     }),
   };
   const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
-  initEnterpriseBridge({ apiClient, ipcMain, sessionStore });
+  initEnterpriseBridge({ apiClient, ipcMain, sessionStore, senderGuard: () => true });
   return { apiClient, callOrder, handlers, ipcMain, sessionStore };
 };
 
-const invokeHandler = async (handlers: Map<string, Handler>, channel: string, ...args: unknown[]): Promise<unknown> => {
+const invokeRawHandler = async (
+  handlers: Map<string, Handler>,
+  event: unknown,
+  channel: string,
+  ...args: unknown[]
+): Promise<TestIpcResult> => {
   const handler = handlers.get(channel);
   if (!handler) throw new Error(`Missing test handler: ${channel}`);
-  return handler({}, ...args);
+  return (await handler(event, ...args)) as TestIpcResult;
+};
+
+const invokeHandler = async (handlers: Map<string, Handler>, channel: string, ...args: unknown[]): Promise<unknown> => {
+  const result = await invokeRawHandler(handlers, {}, channel, ...args);
+  if (result.ok) return result.data;
+  const error = new Error(result.error.message);
+  Object.defineProperty(error, 'code', { value: result.error.code });
+  throw error;
+};
+
+const makeTrustedEvent = (url: string) => {
+  const mainFrame = { url };
+  const sender = { isDestroyed: vi.fn(() => false), mainFrame };
+  const browserWindow = { isDestroyed: vi.fn(() => false), webContents: sender };
+  electronMocks.browserWindows.set(sender, browserWindow);
+  return { event: { sender, senderFrame: mainFrame }, sender, mainFrame, browserWindow };
 };
 
 const createDeferred = <T>() => {
@@ -122,7 +164,146 @@ const createDeferred = <T>() => {
 describe('enterprise bridge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    electronMocks.browserWindows.clear();
+    electronMocks.fromWebContents.mockImplementation((sender: object) => electronMocks.browserWindows.get(sender));
     electronMocks.exposed.clear();
+  });
+
+  it('returns strict success and sanitized failure envelopes from direct handlers', async () => {
+    const expected = {
+      loginKey: LOGIN_KEY,
+      qrDataUrl: 'data:image/png;base64,AA==',
+      expiresAt: '2026-07-14T12:00:00.000Z',
+      pollIntervalMs: 2000,
+    };
+    const apiClient = makeApiClient();
+    apiClient.createLoginSession.mockResolvedValueOnce(expected).mockRejectedValueOnce(new Error(`${OPEN_ID} leak`));
+    const { handlers } = await initializeBridge(apiClient);
+
+    await expect(invokeRawHandler(handlers, {}, ENTERPRISE_IPC_CHANNELS.AUTH_CREATE)).resolves.toEqual({
+      ok: true,
+      data: expected,
+    });
+    await expect(invokeRawHandler(handlers, {}, ENTERPRISE_IPC_CHANNELS.AUTH_CREATE)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'AUTH_CREATE_FAILED',
+        message: 'Enterprise login session creation failed.',
+      },
+    });
+  });
+
+  it('rejects every enterprise channel before parsing or side effects when the default sender guard fails', async () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', 'http://127.0.0.1:5173/app?mode=desktop');
+    const apiClient = makeApiClient();
+    const sessionStore = makeSessionStore();
+    const handlers = new Map<string, Handler>();
+    const ipcMain = {
+      removeHandler: vi.fn((channel: string) => handlers.delete(channel)),
+      handle: vi.fn((channel: string, handler: Handler) => handlers.set(channel, handler)),
+    };
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({ apiClient, ipcMain, sessionStore });
+
+    for (const channel of Object.values(ENTERPRISE_IPC_CHANNELS)) {
+      // eslint-disable-next-line no-await-in-loop -- Each fixed channel must independently prove fail-closed behavior.
+      await expect(invokeRawHandler(handlers, {}, channel, OPEN_ID)).resolves.toEqual({
+        ok: false,
+        error: { code: 'UNTRUSTED_SENDER', message: ERROR_MESSAGES.UNTRUSTED_SENDER },
+      });
+    }
+    expect(apiClient.createLoginSession).not.toHaveBeenCalled();
+    expect(apiClient.pollLoginSession).not.toHaveBeenCalled();
+    expect(apiClient.getUserContext).not.toHaveBeenCalled();
+    expect(apiClient.request).not.toHaveBeenCalled();
+    expect(sessionStore.loadOpenId).not.toHaveBeenCalled();
+    expect(sessionStore.saveOpenId).not.toHaveBeenCalled();
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+  });
+
+  it('accepts only the exact configured development URL components while allowing hash changes', async () => {
+    const configuredUrl = 'http://127.0.0.1:5173/app/index.html?mode=desktop#configured';
+    vi.stubEnv('ELECTRON_RENDERER_URL', configuredUrl);
+    const apiClient = makeApiClient();
+    apiClient.createLoginSession.mockResolvedValue({
+      loginKey: LOGIN_KEY,
+      qrDataUrl: 'data:image/png;base64,AA==',
+      expiresAt: '2026-07-14T12:00:00.000Z',
+      pollIntervalMs: 2000,
+    });
+    const sessionStore = makeSessionStore();
+    const handlers = new Map<string, Handler>();
+    const ipcMain = {
+      removeHandler: vi.fn((channel: string) => handlers.delete(channel)),
+      handle: vi.fn((channel: string, handler: Handler) => handlers.set(channel, handler)),
+    };
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({ apiClient, ipcMain, sessionStore });
+    const trusted = makeTrustedEvent('http://127.0.0.1:5173/app/index.html?mode=desktop#runtime');
+
+    await expect(invokeRawHandler(handlers, trusted.event, ENTERPRISE_IPC_CHANNELS.AUTH_CREATE)).resolves.toMatchObject(
+      { ok: true }
+    );
+
+    const invalidEvents: unknown[] = [
+      { sender: trusted.sender, senderFrame: { url: configuredUrl } },
+      { sender: { ...trusted.sender, isDestroyed: () => true }, senderFrame: trusted.mainFrame },
+      makeTrustedEvent('http://127.0.0.1:5174/app/index.html?mode=desktop').event,
+      makeTrustedEvent('http://localhost:5173/app/index.html?mode=desktop').event,
+      makeTrustedEvent('http://127.0.0.1:5173/other/index.html?mode=desktop').event,
+      makeTrustedEvent('http://127.0.0.1:5173/app/index.html?mode=other').event,
+      makeTrustedEvent('http://user@127.0.0.1:5173/app/index.html?mode=desktop').event,
+      makeTrustedEvent('not a URL').event,
+    ];
+    const missingOwner = makeTrustedEvent(configuredUrl);
+    electronMocks.browserWindows.delete(missingOwner.sender);
+    invalidEvents.push(missingOwner.event);
+    const destroyedOwner = makeTrustedEvent(configuredUrl);
+    destroyedOwner.browserWindow.isDestroyed.mockReturnValue(true);
+    invalidEvents.push(destroyedOwner.event);
+    const mismatchedOwner = makeTrustedEvent(configuredUrl);
+    Object.assign(mismatchedOwner.browserWindow, { webContents: {} });
+    invalidEvents.push(mismatchedOwner.event);
+
+    for (const event of invalidEvents) {
+      // eslint-disable-next-line no-await-in-loop -- Each URL/frame mutation is an independent trust-boundary case.
+      await expect(invokeRawHandler(handlers, event, ENTERPRISE_IPC_CHANNELS.AUTH_CREATE)).resolves.toEqual({
+        ok: false,
+        error: { code: 'UNTRUSTED_SENDER', message: ERROR_MESSAGES.UNTRUSTED_SENDER },
+      });
+    }
+  });
+
+  it('accepts only the exact production file URL when no development URL is configured', async () => {
+    vi.stubEnv('ELECTRON_RENDERER_URL', '');
+    const expectedUrl = pathToFileURL(
+      path.join(process.cwd(), 'packages/desktop/src/process/renderer/index.html')
+    ).href;
+    const trusted = makeTrustedEvent(`${expectedUrl}#route`);
+    const apiClient = makeApiClient();
+    apiClient.createLoginSession.mockResolvedValue({
+      loginKey: LOGIN_KEY,
+      qrDataUrl: 'data:image/png;base64,AA==',
+      expiresAt: '2026-07-14T12:00:00.000Z',
+      pollIntervalMs: 2000,
+    });
+    const handlers = new Map<string, Handler>();
+    const ipcMain = {
+      removeHandler: vi.fn((channel: string) => handlers.delete(channel)),
+      handle: vi.fn((channel: string, handler: Handler) => handlers.set(channel, handler)),
+    };
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({ apiClient, ipcMain, sessionStore: makeSessionStore() });
+
+    await expect(invokeRawHandler(handlers, trusted.event, ENTERPRISE_IPC_CHANNELS.AUTH_CREATE)).resolves.toMatchObject(
+      { ok: true }
+    );
+    const remote = makeTrustedEvent('https://example.com/index.html').event;
+    await expect(invokeRawHandler(handlers, remote, ENTERPRISE_IPC_CHANNELS.AUTH_CREATE)).resolves.toEqual({
+      ok: false,
+      error: { code: 'UNTRUSTED_SENDER', message: ERROR_MESSAGES.UNTRUSTED_SENDER },
+    });
   });
 
   it('removes all six handlers before registering the exact fixed channel set', async () => {
@@ -140,10 +321,25 @@ describe('enterprise bridge', () => {
     const first = await initializeBridge(apiClient, sessionStore);
     const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
 
-    initEnterpriseBridge({ apiClient, ipcMain: first.ipcMain, sessionStore });
+    initEnterpriseBridge({ apiClient, ipcMain: first.ipcMain, sessionStore, senderGuard: () => true });
 
     expect(first.ipcMain.removeHandler).toHaveBeenCalledTimes(12);
     expect(first.ipcMain.handle).toHaveBeenCalledTimes(12);
+  });
+
+  it('lazily reuses one default session store across bridge initialization', async () => {
+    const handlers = new Map<string, Handler>();
+    const ipcMain = {
+      removeHandler: vi.fn((channel: string) => handlers.delete(channel)),
+      handle: vi.fn((channel: string, handler: Handler) => handlers.set(channel, handler)),
+    };
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+
+    initEnterpriseBridge({ apiClient: makeApiClient(), ipcMain, senderGuard: () => true });
+    initEnterpriseBridge({ apiClient: makeApiClient(), ipcMain, senderGuard: () => true });
+
+    expect(electronMocks.getPath).toHaveBeenCalledOnce();
+    expect(electronMocks.getPath).toHaveBeenCalledWith('userData');
   });
 
   it('delegates login creation without renderer-provided identity', async () => {
@@ -507,9 +703,10 @@ describe('enterprise bridge', () => {
     const polling = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY);
     await vi.waitFor(() => expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OPEN_ID));
 
-    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    const clearing = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
     save.resolve();
 
+    await clearing;
     await expect(polling).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
     await expect(
       invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, { operation: 'project.dashboard', payload: {} })
@@ -539,7 +736,166 @@ describe('enterprise bridge', () => {
     oldContext.resolve(OLD_USER_CONTEXT);
 
     await expect(restoring).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE)).resolves.toBeNull();
+    await expect(
+      invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, {
+        operation: 'project.dashboard',
+        payload: {},
+      })
+    ).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    expect(sessionStore.loadOpenId).toHaveBeenCalledOnce();
     expect(sessionStore.clear).not.toHaveBeenCalled();
+  });
+
+  it('invalidates an old network poll across re-init so a new clear and commit remain authoritative', async () => {
+    const oldPoll = createDeferred<EnterpriseLoginPollResult>();
+    let persistedOpenId: string | null = OLD_OPEN_ID;
+    const operationOrder: string[] = [];
+    const sessionStore: SessionStoreDouble = {
+      loadOpenId: vi.fn(async () => persistedOpenId),
+      saveOpenId: vi.fn(async (openId: string) => {
+        operationOrder.push(`save:${openId}`);
+        persistedOpenId = openId;
+      }),
+      clear: vi.fn(async () => {
+        operationOrder.push('clear');
+        persistedOpenId = null;
+      }),
+    };
+    const oldApi = makeApiClient();
+    oldApi.pollLoginSession.mockReturnValue(oldPoll.promise);
+    const first = await initializeBridge(oldApi, sessionStore);
+    const polling = invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY);
+    await vi.waitFor(() => expect(oldApi.pollLoginSession).toHaveBeenCalledOnce());
+
+    const newApi = makeApiClient();
+    newApi.getUserContext.mockResolvedValue(USER_CONTEXT);
+    newApi.request.mockResolvedValue({ operation: 'project.dashboard', data: {} });
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({
+      apiClient: newApi,
+      ipcMain: first.ipcMain,
+      sessionStore,
+      senderGuard: () => true,
+    });
+    await invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    await invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+    oldPoll.resolve({ status: 'AUTHENTICATED', openId: OLD_OPEN_ID, userContext: OLD_USER_CONTEXT });
+
+    await expect(polling).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    expect(persistedOpenId).toBe(OPEN_ID);
+    expect(operationOrder).toEqual(['clear', `save:${OPEN_ID}`]);
+    await invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, {
+      operation: 'project.dashboard',
+      payload: {},
+    });
+    expect(newApi.request).toHaveBeenCalledWith({ operation: 'project.dashboard', payload: {} }, USER_CONTEXT);
+  });
+
+  it('orders an old in-flight save before re-init cleanup and a new restore', async () => {
+    const oldSave = createDeferred<void>();
+    let persistedOpenId: string | null = null;
+    const operationOrder: string[] = [];
+    const sessionStore: SessionStoreDouble = {
+      loadOpenId: vi.fn(async () => {
+        operationOrder.push('load');
+        return persistedOpenId;
+      }),
+      saveOpenId: vi.fn(async (openId: string) => {
+        operationOrder.push(`save:start:${openId}`);
+        await oldSave.promise;
+        persistedOpenId = openId;
+        operationOrder.push(`save:end:${openId}`);
+      }),
+      clear: vi.fn(async () => {
+        operationOrder.push('cleanup');
+        persistedOpenId = null;
+      }),
+    };
+    const oldApi = makeApiClient();
+    oldApi.pollLoginSession.mockResolvedValue({
+      status: 'AUTHENTICATED',
+      openId: OLD_OPEN_ID,
+      userContext: OLD_USER_CONTEXT,
+    });
+    const first = await initializeBridge(oldApi, sessionStore);
+    const polling = invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY);
+    await vi.waitFor(() => expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OLD_OPEN_ID));
+
+    const newApi = makeApiClient();
+    newApi.getUserContext.mockResolvedValue(USER_CONTEXT);
+    newApi.request.mockResolvedValue({ operation: 'project.dashboard', data: {} });
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({
+      apiClient: newApi,
+      ipcMain: first.ipcMain,
+      sessionStore,
+      senderGuard: () => true,
+    });
+    const restoring = invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    expect(sessionStore.loadOpenId).not.toHaveBeenCalled();
+    oldSave.resolve();
+
+    await expect(polling).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await expect(restoring).resolves.toBeNull();
+    await expect(
+      invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID)
+    ).resolves.toEqual(USER_CONTEXT);
+    await invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, {
+      operation: 'project.dashboard',
+      payload: {},
+    });
+    expect(operationOrder).toEqual([
+      `save:start:${OLD_OPEN_ID}`,
+      `save:end:${OLD_OPEN_ID}`,
+      'cleanup',
+      'load',
+      `save:start:${OPEN_ID}`,
+      `save:end:${OPEN_ID}`,
+    ]);
+    expect(persistedOpenId).toBe(OPEN_ID);
+    expect(newApi.request).toHaveBeenCalledWith({ operation: 'project.dashboard', payload: {} }, USER_CONTEXT);
+  });
+
+  it('prevents an old unregistered hydrate from clearing a new committed identity after re-init', async () => {
+    const oldContext = createDeferred<EnterpriseUserContext>();
+    let persistedOpenId: string | null = OLD_OPEN_ID;
+    const sessionStore: SessionStoreDouble = {
+      loadOpenId: vi.fn(async () => persistedOpenId),
+      saveOpenId: vi.fn(async (openId: string) => {
+        persistedOpenId = openId;
+      }),
+      clear: vi.fn(async () => {
+        persistedOpenId = null;
+      }),
+    };
+    const oldApi = makeApiClient();
+    oldApi.getUserContext.mockReturnValue(oldContext.promise);
+    const first = await initializeBridge(oldApi, sessionStore);
+    const restoring = invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    await vi.waitFor(() => expect(oldApi.getUserContext).toHaveBeenCalledWith(OLD_OPEN_ID));
+
+    const newApi = makeApiClient();
+    newApi.getUserContext.mockResolvedValue(USER_CONTEXT);
+    newApi.request.mockResolvedValue({ operation: 'project.dashboard', data: {} });
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({
+      apiClient: newApi,
+      ipcMain: first.ipcMain,
+      sessionStore,
+      senderGuard: () => true,
+    });
+    await invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+    oldContext.resolve({ registered: false, openId: OLD_OPEN_ID });
+
+    await expect(restoring).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    expect(persistedOpenId).toBe(OPEN_ID);
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    await invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, {
+      operation: 'project.dashboard',
+      payload: {},
+    });
+    expect(newApi.request).toHaveBeenCalledWith({ operation: 'project.dashboard', payload: {} }, USER_CONTEXT);
   });
 
   it('preserves stable API error codes but masks arbitrary dependency failures', async () => {
@@ -562,22 +918,34 @@ describe('enterprise bridge', () => {
     );
     expect(error).toMatchObject({ code: 'REQUEST_FAILED' });
     expect(String(error)).not.toContain(OPEN_ID);
-    const forgedError = await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request).catch(
-      (reason: unknown) => reason
-    );
-    expect(String(forgedError)).toBe('EnterpriseBridgeError: [REQUEST_FAILED] Enterprise request failed.');
+    await expect(invokeRawHandler(handlers, {}, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toEqual({
+      ok: false,
+      error: { code: 'REQUEST_FAILED', message: ERROR_MESSAGES.REQUEST_FAILED },
+    });
   });
 });
 
 describe('enterprise preload surface', () => {
-  it('exposes only the six typed enterprise methods on fixed channels', async () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    electronMocks.exposed.clear();
     electronMocks.sendSync.mockReturnValue(null);
+  });
+
+  const loadEnterprisePreloadApi = async () => {
     await import('@/preload/main');
     const electronAPI = electronMocks.exposed.get('electronAPI') as {
       enterprise: Record<string, (...args: unknown[]) => Promise<unknown>>;
     };
+    return electronAPI.enterprise;
+  };
 
-    expect(Object.keys(electronAPI.enterprise)).toEqual([
+  it('exposes only the six typed enterprise methods on fixed channels', async () => {
+    electronMocks.invoke.mockResolvedValue({ ok: true, data: null });
+    const enterprise = await loadEnterprisePreloadApi();
+
+    expect(Object.keys(enterprise)).toEqual([
       'createLoginSession',
       'pollLoginSession',
       'completeRegistration',
@@ -587,12 +955,12 @@ describe('enterprise preload surface', () => {
     ]);
 
     const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
-    electronAPI.enterprise.createLoginSession();
-    electronAPI.enterprise.pollLoginSession('login-key');
-    electronAPI.enterprise.completeRegistration(OPEN_ID);
-    electronAPI.enterprise.restoreSession();
-    electronAPI.enterprise.clearSession();
-    electronAPI.enterprise.request(request);
+    await enterprise.createLoginSession();
+    await enterprise.pollLoginSession('login-key');
+    await enterprise.completeRegistration(OPEN_ID);
+    await enterprise.restoreSession();
+    await enterprise.clearSession();
+    await enterprise.request(request);
 
     expect(electronMocks.invoke.mock.calls).toEqual([
       [ENTERPRISE_IPC_CHANNELS.AUTH_CREATE],
@@ -602,5 +970,89 @@ describe('enterprise preload surface', () => {
       [ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR],
       [ENTERPRISE_IPC_CHANNELS.REQUEST, request],
     ]);
+  });
+
+  it('round-trips a real handler failure envelope into a renderer-readable readonly error code', async () => {
+    const { EnterpriseApiError: CurrentEnterpriseApiError } =
+      await import('@/process/services/enterprise/enterpriseApiClient');
+    const apiClient = makeApiClient();
+    apiClient.createLoginSession.mockRejectedValue(
+      new CurrentEnterpriseApiError('TIMEOUT', 'raw timeout details that must not cross IPC')
+    );
+    const { handlers } = await initializeBridge(apiClient);
+    electronMocks.invoke.mockImplementation(async (channel: string, ...args: unknown[]) => {
+      const handler = handlers.get(channel);
+      if (!handler) throw new Error('unexpected channel');
+      return handler({}, ...args);
+    });
+    const enterprise = await loadEnterprisePreloadApi();
+
+    const error = await enterprise.createLoginSession().catch((reason: unknown) => reason);
+
+    expect(error).toBeInstanceOf(Error);
+    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.TIMEOUT}`);
+    expect(Object.getOwnPropertyDescriptor(error, 'code')).toEqual({
+      value: 'TIMEOUT',
+      writable: false,
+      enumerable: true,
+      configurable: false,
+    });
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['raw data', { loginKey: LOGIN_KEY }],
+    ['extra envelope key', { ok: true, data: null, extra: true }],
+    ['unknown code', { ok: false, error: { code: 'SECRET_BACKEND', message: 'secret' } }],
+    [
+      'wrong fixed message',
+      { ok: false, error: { code: 'TIMEOUT', message: `${ERROR_MESSAGES.TIMEOUT} backend detail` } },
+    ],
+    [
+      'prototype-bearing envelope',
+      Object.assign(Object.create({ injected: true }) as Record<string, unknown>, { ok: true, data: null }),
+    ],
+  ])('maps a malformed %s to a fixed INVALID_IPC_RESPONSE error', async (_label, response) => {
+    electronMocks.invoke.mockResolvedValue(response);
+    const enterprise = await loadEnterprisePreloadApi();
+
+    const error = await enterprise.restoreSession().catch((reason: unknown) => reason);
+
+    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.INVALID_IPC_RESPONSE}`);
+    expect(Object.getOwnPropertyDescriptor(error, 'code')?.value).toBe('INVALID_IPC_RESPONSE');
+    expect(String(error)).not.toContain('SECRET_BACKEND');
+  });
+
+  it('rejects accessor envelopes without executing the getter or exposing its value', async () => {
+    let getterRead = false;
+    const response = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(response, 'ok', {
+      enumerable: true,
+      get: () => {
+        getterRead = true;
+        return true;
+      },
+    });
+    Object.defineProperty(response, 'data', { enumerable: true, value: `${OPEN_ID} secret` });
+    electronMocks.invoke.mockResolvedValue(response);
+    const enterprise = await loadEnterprisePreloadApi();
+
+    const error = await enterprise.restoreSession().catch((reason: unknown) => reason);
+
+    expect(getterRead).toBe(false);
+    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.INVALID_IPC_RESPONSE}`);
+    expect(String(error)).not.toContain(OPEN_ID);
+  });
+
+  it('maps raw Electron invoke rejection to a fixed IPC_UNAVAILABLE error without echoing details', async () => {
+    electronMocks.invoke.mockRejectedValue(new Error(`${OPEN_ID} at C:/private/path`));
+    const enterprise = await loadEnterprisePreloadApi();
+
+    const error = await enterprise.restoreSession().catch((reason: unknown) => reason);
+
+    expect(String(error)).toBe(`Error: ${ERROR_MESSAGES.IPC_UNAVAILABLE}`);
+    expect(Object.getOwnPropertyDescriptor(error, 'code')?.value).toBe('IPC_UNAVAILABLE');
+    expect(String(error)).not.toContain(OPEN_ID);
+    expect(String(error)).not.toContain('C:/private/path');
   });
 });

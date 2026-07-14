@@ -11,8 +11,86 @@
 import '@sentry/electron/preload';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
-import { ENTERPRISE_IPC_CHANNELS } from '../common/enterprise/constants';
-import type { EnterpriseRequest } from '../common/enterprise/contracts';
+import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '../common/enterprise/constants';
+import type {
+  EnterpriseIpcErrorCode,
+  EnterpriseLoginPollResult,
+  EnterpriseLoginSession,
+  EnterpriseRequest,
+  EnterpriseResponse,
+  EnterpriseUserContext,
+} from '../common/enterprise/contracts';
+
+type ParsedEnterpriseIpcResult =
+  | { ok: true; data: unknown }
+  | { ok: false; error: { code: EnterpriseIpcErrorCode; message: string } };
+
+const hasExactPlainDataProperties = (value: unknown, keys: readonly string[]): value is Record<string, unknown> => {
+  if (typeof value !== 'object' || value === null || Object.getPrototypeOf(value) !== Object.prototype) return false;
+  const ownKeys = Reflect.ownKeys(value);
+  if (ownKeys.length !== keys.length || ownKeys.some((key) => typeof key !== 'string' || !keys.includes(key))) {
+    return false;
+  }
+  return keys.every((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor !== undefined && Object.prototype.hasOwnProperty.call(descriptor, 'value');
+  });
+};
+
+const getOwnDataValue = (value: Record<string, unknown>, key: string): unknown =>
+  Object.getOwnPropertyDescriptor(value, key)?.value;
+
+const isEnterpriseIpcErrorCode = (value: unknown): value is EnterpriseIpcErrorCode =>
+  typeof value === 'string' && Object.prototype.hasOwnProperty.call(ENTERPRISE_IPC_ERROR_MESSAGES, value);
+
+const parseEnterpriseIpcResult = (value: unknown): ParsedEnterpriseIpcResult | undefined => {
+  try {
+    if (!hasExactPlainDataProperties(value, ['ok', 'data']) && !hasExactPlainDataProperties(value, ['ok', 'error'])) {
+      return undefined;
+    }
+    const ok = getOwnDataValue(value, 'ok');
+    if (ok === true && hasExactPlainDataProperties(value, ['ok', 'data'])) {
+      return { ok: true, data: getOwnDataValue(value, 'data') };
+    }
+    if (ok !== false || !hasExactPlainDataProperties(value, ['ok', 'error'])) return undefined;
+
+    const error = getOwnDataValue(value, 'error');
+    if (!hasExactPlainDataProperties(error, ['code', 'message'])) return undefined;
+    const code = getOwnDataValue(error, 'code');
+    const message = getOwnDataValue(error, 'message');
+    if (!isEnterpriseIpcErrorCode(code) || message !== ENTERPRISE_IPC_ERROR_MESSAGES[code]) return undefined;
+    return { ok: false, error: { code, message } };
+  } catch {
+    return undefined;
+  }
+};
+
+const createEnterpriseRendererError = (
+  code: EnterpriseIpcErrorCode
+): Error & { readonly code: EnterpriseIpcErrorCode } => {
+  const error = new Error(ENTERPRISE_IPC_ERROR_MESSAGES[code]);
+  Object.defineProperty(error, 'code', {
+    value: code,
+    writable: false,
+    enumerable: true,
+    configurable: false,
+  });
+  return error as Error & { readonly code: EnterpriseIpcErrorCode };
+};
+
+const invokeEnterprise = async <T>(channel: string, ...args: unknown[]): Promise<T> => {
+  let untrustedResult: unknown;
+  try {
+    untrustedResult = await ipcRenderer.invoke(channel, ...args);
+  } catch {
+    throw createEnterpriseRendererError('IPC_UNAVAILABLE');
+  }
+
+  const result = parseEnterpriseIpcResult(untrustedResult);
+  if (!result) throw createEnterpriseRendererError('INVALID_IPC_RESPONSE');
+  if (result.ok === false) throw createEnterpriseRendererError(result.error.code);
+  return result.data as T;
+};
 
 /**
  * @description 注入到renderer进程中, 用于与main进程通信
@@ -51,13 +129,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   logFeedbackEvent: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) =>
     ipcRenderer.send('feedback:renderer-log', payload),
   enterprise: {
-    createLoginSession: () => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_CREATE),
-    pollLoginSession: (loginKey: string) => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_POLL, loginKey),
+    createLoginSession: () => invokeEnterprise<EnterpriseLoginSession>(ENTERPRISE_IPC_CHANNELS.AUTH_CREATE),
+    pollLoginSession: (loginKey: string) =>
+      invokeEnterprise<EnterpriseLoginPollResult>(ENTERPRISE_IPC_CHANNELS.AUTH_POLL, loginKey),
     completeRegistration: (openId: string) =>
-      ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, openId),
-    restoreSession: () => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE),
-    clearSession: () => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
-    request: (request: EnterpriseRequest) => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.REQUEST, request),
+      invokeEnterprise<EnterpriseUserContext>(ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, openId),
+    restoreSession: () => invokeEnterprise<EnterpriseUserContext | null>(ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE),
+    clearSession: () => invokeEnterprise<void>(ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
+    request: (request: EnterpriseRequest) =>
+      invokeEnterprise<EnterpriseResponse>(ENTERPRISE_IPC_CHANNELS.REQUEST, request),
   },
 });
 

@@ -1,5 +1,33 @@
 export type EnterpriseLoginStatus = 'WAITING' | 'AUTHENTICATED' | 'REGISTER_REQUIRED' | 'EXPIRED';
 
+/** Stable error codes allowed to cross the enterprise Electron IPC boundary. */
+export type EnterpriseIpcErrorCode =
+  | 'INVALID_BASE_URL'
+  | 'INVALID_REQUEST'
+  | 'MISSING_CONTEXT'
+  | 'TIMEOUT'
+  | 'NETWORK'
+  | 'HTTP'
+  | 'INVALID_JSON'
+  | 'API_FAILURE'
+  | 'INVALID_RESPONSE'
+  | 'AUTH_CREATE_FAILED'
+  | 'AUTH_POLL_FAILED'
+  | 'INVALID_AUTH_RESULT'
+  | 'REGISTRATION_INCOMPLETE'
+  | 'REGISTRATION_FAILED'
+  | 'SESSION_RESTORE_FAILED'
+  | 'SESSION_CLEAR_FAILED'
+  | 'REQUEST_FAILED'
+  | 'UNTRUSTED_SENDER'
+  | 'IPC_UNAVAILABLE'
+  | 'INVALID_IPC_RESPONSE';
+
+/** Plain structured-clone-safe result returned by every enterprise IPC handler. */
+export type EnterpriseIpcResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: { code: EnterpriseIpcErrorCode; message: string } };
+
 export type EnterpriseUserContext = {
   registered: boolean;
   openId: string;

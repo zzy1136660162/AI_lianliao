@@ -46,6 +46,21 @@ describe('EnterpriseSessionStore', () => {
     await fs.rm(userDataPath, { recursive: true, force: true });
   });
 
+  it.each(['relative/user-data', `bad\u0000path`])(
+    'rejects a non-absolute or NUL-containing userData path without exposing it: %j',
+    (invalidPath) => {
+      const error = (() => {
+        try {
+          return new EnterpriseSessionStore(invalidPath);
+        } catch (reason) {
+          return reason;
+        }
+      })();
+      expect(String(error)).toBe('EnterpriseSessionStoreError: Enterprise session storage failed.');
+      expect(String(error)).not.toContain(invalidPath);
+    }
+  );
+
   it('stores only a normalized openId in the exact versioned file', async () => {
     const store = new EnterpriseSessionStore(userDataPath);
 
@@ -88,6 +103,24 @@ describe('EnterpriseSessionStore', () => {
   });
 
   it.each([
+    'not-a-uuid',
+    '11111111-1111-4111-8111-111111111111/escape',
+    '11111111-1111-4111-8111-111111111111.tmp',
+    '11111111-1111-4111-8111-11111111111Z',
+  ])('rejects a non-canonical temporary UUID before filesystem access: %s', async (invalidUuid) => {
+    const mkdir = vi.fn(fs.mkdir);
+    const open = vi.fn(fs.open);
+    const store = new EnterpriseSessionStore(userDataPath, {
+      fileSystem: { ...fs, mkdir, open },
+      randomUUID: () => invalidUuid,
+    });
+
+    await expect(store.saveOpenId(OPEN_ID)).rejects.toThrow('Enterprise session storage failed.');
+    expect(mkdir).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it.each([
     ['', 'empty file'],
     ['not-json', 'invalid JSON'],
     ['{"version":2,"openId":"valid"}', 'wrong version'],
@@ -97,6 +130,18 @@ describe('EnterpriseSessionStore', () => {
     ['{"version":1,"openId":"has\\u0000control"}', 'control character'],
   ])('isolates a %s session as signed-out (%s)', async (contents) => {
     await fs.writeFile(path.join(userDataPath, 'enterprise-session.json'), contents);
+
+    await expect(new EnterpriseSessionStore(userDataPath).loadOpenId()).resolves.toBeNull();
+  });
+
+  it('uses fatal UTF-8 decoding so invalid byte sequences cannot become a persisted openId', async () => {
+    const prefix = Buffer.from('{"version":1,"openId":"', 'utf8');
+    const invalidUtf8 = Buffer.from([0xc3, 0x28]);
+    const suffix = Buffer.from('"}', 'utf8');
+    await fs.writeFile(
+      path.join(userDataPath, 'enterprise-session.json'),
+      Buffer.concat([prefix, invalidUtf8, suffix])
+    );
 
     await expect(new EnterpriseSessionStore(userDataPath).loadOpenId()).resolves.toBeNull();
   });
@@ -369,6 +414,62 @@ describe('EnterpriseSessionStore', () => {
     expect(String(error)).toBe('EnterpriseSessionStoreError: Enterprise session storage failed.');
     expect(await fs.readFile(sessionPath, 'utf8')).toBe('{"version":1,"openId":"old-open-id"}');
     expect(await fs.readdir(userDataPath)).toEqual(['enterprise-session.json']);
+  });
+
+  it('fsyncs the parent directory after rename and clear on POSIX', async () => {
+    const operationOrder: string[] = [];
+    const rename = vi.fn(async (oldPath: string, newPath: string) => {
+      operationOrder.push('rename');
+      await fs.rename(oldPath, newPath);
+    });
+    const unlink = vi.fn(async (filePath: string) => {
+      operationOrder.push('unlink');
+      await fs.unlink(filePath);
+    });
+    const syncDirectory = vi.fn(async (directoryPath: string) => {
+      operationOrder.push(`fsync:${directoryPath}`);
+    });
+    const store = new EnterpriseSessionStore(userDataPath, {
+      fileSystem: { ...fs, rename, unlink, syncDirectory },
+      platform: 'linux',
+    });
+
+    await store.saveOpenId(OPEN_ID);
+    await store.clear();
+
+    expect(operationOrder).toEqual(['rename', `fsync:${userDataPath}`, 'unlink', `fsync:${userDataPath}`]);
+  });
+
+  it('sanitizes a POSIX parent-directory fsync failure after rename', async () => {
+    const syncDirectory = vi.fn(async () => {
+      throw new Error(`${userDataPath}/${OPEN_ID}`);
+    });
+    const store = new EnterpriseSessionStore(userDataPath, {
+      fileSystem: { ...fs, syncDirectory },
+      platform: 'linux',
+    });
+
+    const error = await store.saveOpenId(OPEN_ID).catch((reason: unknown) => reason);
+
+    expect(String(error)).toBe('EnterpriseSessionStoreError: Enterprise session storage failed.');
+    expect(String(error)).not.toContain(userDataPath);
+    expect(String(error)).not.toContain(OPEN_ID);
+    expect(syncDirectory).toHaveBeenCalledWith(userDataPath);
+  });
+
+  it('ignores only known unsupported Windows directory-fsync errors', async () => {
+    const syncDirectory = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(Object.assign(new Error('unsupported'), { code: 'EPERM' }))
+      .mockRejectedValueOnce(Object.assign(new Error(`${OPEN_ID} denied`), { code: 'EACCES' }));
+    const store = new EnterpriseSessionStore(userDataPath, {
+      fileSystem: { ...fs, syncDirectory },
+      platform: 'win32',
+    });
+
+    await expect(store.saveOpenId('first-open-id')).resolves.toBeUndefined();
+    await expect(store.clear()).rejects.toThrow('Enterprise session storage failed.');
+    expect(syncDirectory).toHaveBeenCalledTimes(2);
   });
 
   it('clears an existing session and treats a missing file as an idempotent success', async () => {
