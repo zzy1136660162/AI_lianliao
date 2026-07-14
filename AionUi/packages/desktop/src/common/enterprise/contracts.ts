@@ -153,7 +153,8 @@ export type CompanyListQuery = {
   industry?: string;
   city?: string;
   district?: string;
-  contactState?: 'CONTACTED' | 'UNCONTACTED';
+  companyLevel?: number;
+  vip?: boolean;
   pageNum: number;
   pageSize: number;
 };

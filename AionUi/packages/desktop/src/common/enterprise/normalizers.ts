@@ -66,11 +66,34 @@ const requiredText = (operation: string, field: string, ...values: unknown[]): s
   return value;
 };
 
-const requiredNumber = (operation: string, field: string, ...values: unknown[]): number => {
-  const value = optionalNumber(...values);
-  if (value === undefined) throw operationError(operation, `missing or invalid required ${field}`);
+const numberWithRule = (
+  operation: string,
+  field: string,
+  required: boolean,
+  isValid: (value: number) => boolean,
+  ...values: unknown[]
+): number | undefined => {
+  const rawValue = firstScalar(...values);
+  if (rawValue === undefined) {
+    if (required) throw operationError(operation, `missing required ${field}`);
+    return undefined;
+  }
+  const value = optionalNumber(rawValue);
+  if (value === undefined || !isValid(value)) throw operationError(operation, `invalid ${field}`);
   return value;
 };
+
+const requiredPositiveInteger = (operation: string, field: string, ...values: unknown[]): number =>
+  numberWithRule(operation, field, true, (value) => Number.isInteger(value) && value > 0, ...values) as number;
+
+const requiredNonNegativeInteger = (operation: string, field: string, ...values: unknown[]): number =>
+  numberWithRule(operation, field, true, (value) => Number.isInteger(value) && value >= 0, ...values) as number;
+
+const optionalNonNegativeInteger = (operation: string, field: string, ...values: unknown[]): number | undefined =>
+  numberWithRule(operation, field, false, (value) => Number.isInteger(value) && value >= 0, ...values);
+
+const requiredNonNegativeNumber = (operation: string, field: string, ...values: unknown[]): number =>
+  numberWithRule(operation, field, true, (value) => value >= 0, ...values) as number;
 
 const setText = <T extends object, K extends keyof T>(target: T, key: K, ...values: unknown[]) => {
   const value = optionalText(...values);
@@ -79,6 +102,16 @@ const setText = <T extends object, K extends keyof T>(target: T, key: K, ...valu
 
 const setNumber = <T extends object, K extends keyof T>(target: T, key: K, ...values: unknown[]) => {
   const value = optionalNumber(...values);
+  if (value !== undefined) target[key] = value as T[K];
+};
+
+const setNonNegativeNumber = <T extends object, K extends keyof T>(
+  target: T,
+  key: K,
+  operation: string,
+  ...values: unknown[]
+) => {
+  const value = numberWithRule(operation, String(key), false, (candidate) => candidate >= 0, ...values);
   if (value !== undefined) target[key] = value as T[K];
 };
 
@@ -216,7 +249,15 @@ const normalizeProjectSummary = (
   );
   setText(result, 'province', raw.province, raw.PROVINCE, raw.sheng, raw.SHENG);
   setText(result, 'city', raw.city, raw.CITY, raw.region, raw.REGION);
-  setNumber(result, 'totalInvestment', raw.totalInvestment, raw.TOTAL_INVESTMENT, raw.zongtouzi, raw.ZONGTOUZI);
+  setNonNegativeNumber(
+    result,
+    'totalInvestment',
+    operation,
+    raw.totalInvestment,
+    raw.TOTAL_INVESTMENT,
+    raw.zongtouzi,
+    raw.ZONGTOUZI
+  );
   setText(result, 'constructionNature', raw.constructionNature, raw.CONSTRUCTION_NATURE, raw.xingzhi, raw.XINGZHI);
   setText(result, 'investmentType', raw.investmentType, raw.INVESTMENT_TYPE);
   setText(result, 'projectNature', raw.projectNature, raw.PROJECT_NATURE, raw.xiangmuxingzhi, raw.XIANGMUXINGZHI);
@@ -280,10 +321,10 @@ const normalizePage = <T>(
   const raw = enterprisePageRawSchema.parse(input);
   const list = raw.list ?? raw.LIST ?? raw.rows ?? raw.ROWS;
   if (!list) throw operationError(operation, 'missing required list');
-  const pageNum = requiredNumber(operation, 'pageNum', raw.pageNum, raw.PAGE_NUM);
-  const pageSize = requiredNumber(operation, 'pageSize', raw.pageSize, raw.PAGE_SIZE);
-  const total = requiredNumber(operation, 'total', raw.total, raw.TOTAL);
-  const explicitPages = optionalNumber(raw.pages, raw.PAGES);
+  const pageNum = requiredPositiveInteger(operation, 'pageNum', raw.pageNum, raw.PAGE_NUM);
+  const pageSize = requiredPositiveInteger(operation, 'pageSize', raw.pageSize, raw.PAGE_SIZE);
+  const total = requiredNonNegativeInteger(operation, 'total', raw.total, raw.TOTAL);
+  const explicitPages = optionalNonNegativeInteger(operation, 'pages', raw.pages, raw.PAGES);
   return {
     list: list.map(normalizeItem),
     pageNum,
@@ -299,7 +340,7 @@ const normalizeDistribution = (
 ): EnterpriseDashboardDistributionItem => {
   const result: EnterpriseDashboardDistributionItem = {
     label: requiredText(operation, 'distribution label', input.label, input.LABEL, input.name, input.NAME),
-    value: requiredNumber(
+    value: requiredNonNegativeInteger(
       operation,
       'distribution value',
       input.value,
@@ -309,7 +350,8 @@ const normalizeDistribution = (
     ),
   };
   setText(result, 'dimension', input.dimension, input.DIMENSION, input.budgetRange, input.BUDGET_RANGE);
-  setNumber(result, 'projectCount', input.projectCount, input.PROJECT_COUNT);
+  const projectCount = optionalNonNegativeInteger(operation, 'projectCount', input.projectCount, input.PROJECT_COUNT);
+  if (projectCount !== undefined) result.projectCount = projectCount;
   return result;
 };
 
@@ -326,7 +368,7 @@ const normalizeDashboard = (input: unknown): EnterpriseProjectDashboard => {
   if (!categoryDistribution) throw operationError(operation, 'missing required categoryDistribution');
   if (!materialTop) throw operationError(operation, 'missing required materialTop');
   const result: EnterpriseProjectDashboard = {
-    projectCount: requiredNumber(
+    projectCount: requiredNonNegativeInteger(
       operation,
       'projectCount',
       kpi?.projectCount,
@@ -334,7 +376,7 @@ const normalizeDashboard = (input: unknown): EnterpriseProjectDashboard => {
       raw.projectCount,
       raw.PROJECT_COUNT
     ),
-    categoryL1Count: requiredNumber(
+    categoryL1Count: requiredNonNegativeInteger(
       operation,
       'categoryL1Count',
       kpi?.categoryL1Count,
@@ -342,7 +384,7 @@ const normalizeDashboard = (input: unknown): EnterpriseProjectDashboard => {
       raw.categoryL1Count,
       raw.CATEGORY_L1_COUNT
     ),
-    categoryL2Count: requiredNumber(
+    categoryL2Count: requiredNonNegativeInteger(
       operation,
       'categoryL2Count',
       kpi?.categoryL2Count,
@@ -350,7 +392,7 @@ const normalizeDashboard = (input: unknown): EnterpriseProjectDashboard => {
       raw.categoryL2Count,
       raw.CATEGORY_L2_COUNT
     ),
-    materialShortNameCount: requiredNumber(
+    materialShortNameCount: requiredNonNegativeInteger(
       operation,
       'materialShortNameCount',
       kpi?.materialShortNameCount,
@@ -362,7 +404,7 @@ const normalizeDashboard = (input: unknown): EnterpriseProjectDashboard => {
       raw.shortNameCount,
       raw.SHORT_NAME_COUNT
     ),
-    materialNameCount: requiredNumber(
+    materialNameCount: requiredNonNegativeInteger(
       operation,
       'materialNameCount',
       kpi?.materialNameCount,
@@ -370,7 +412,7 @@ const normalizeDashboard = (input: unknown): EnterpriseProjectDashboard => {
       raw.materialNameCount,
       raw.MATERIAL_NAME_COUNT
     ),
-    investmentTotalYi: requiredNumber(
+    investmentTotalYi: requiredNonNegativeNumber(
       operation,
       'investmentTotalYi',
       kpi?.investmentTotalYi,
@@ -401,7 +443,8 @@ const inferDrillLevel = (
   if (optionalText(raw.materialName, raw.MATERIAL_NAME)) return 'materialName';
   if (optionalText(raw.materialShortName, raw.MATERIAL_SHORT_NAME)) return 'shortName';
   if (optionalText(raw.categoryL2, raw.CATEGORY_L2)) return 'l2';
-  return 'l1';
+  if (optionalText(raw.categoryL1, raw.CATEGORY_L1)) return 'l1';
+  throw operationError(operation, 'missing required dimension');
 };
 
 const normalizeDrillItem = (input: unknown): EnterpriseProjectDrillItem => {
@@ -425,22 +468,35 @@ const normalizeDrillItem = (input: unknown): EnterpriseProjectDrillItem => {
       raw.CATEGORY_L1
     ),
     dimension: inferDrillLevel(raw, operation),
-    projectCount: requiredNumber(operation, 'projectCount', raw.projectCount, raw.PROJECT_COUNT),
+    projectCount: requiredNonNegativeInteger(operation, 'projectCount', raw.projectCount, raw.PROJECT_COUNT),
   };
   setText(result, 'categoryL1', raw.categoryL1, raw.CATEGORY_L1);
   setText(result, 'categoryL2', raw.categoryL2, raw.CATEGORY_L2);
   setText(result, 'materialShortName', raw.materialShortName, raw.MATERIAL_SHORT_NAME);
   setText(result, 'materialName', raw.materialName, raw.MATERIAL_NAME);
-  setNumber(result, 'categoryL2Count', raw.categoryL2Count, raw.CATEGORY_L2_COUNT);
-  setNumber(
-    result,
+  const categoryL2Count = optionalNonNegativeInteger(
+    operation,
+    'categoryL2Count',
+    raw.categoryL2Count,
+    raw.CATEGORY_L2_COUNT
+  );
+  if (categoryL2Count !== undefined) result.categoryL2Count = categoryL2Count;
+  const materialShortNameCount = optionalNonNegativeInteger(
+    operation,
     'materialShortNameCount',
     raw.materialShortNameCount,
     raw.MATERIAL_SHORT_NAME_COUNT,
     raw.shortNameCount,
     raw.SHORT_NAME_COUNT
   );
-  setNumber(result, 'materialNameCount', raw.materialNameCount, raw.MATERIAL_NAME_COUNT);
+  if (materialShortNameCount !== undefined) result.materialShortNameCount = materialShortNameCount;
+  const materialNameCount = optionalNonNegativeInteger(
+    operation,
+    'materialNameCount',
+    raw.materialNameCount,
+    raw.MATERIAL_NAME_COUNT
+  );
+  if (materialNameCount !== undefined) result.materialNameCount = materialNameCount;
   return result;
 };
 

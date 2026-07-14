@@ -6,8 +6,24 @@ import {
   enterpriseLoginStatusSchema,
   enterpriseRequestSchema,
   enterpriseUserContextSchema,
+  parseCommonResult,
   parseEnterpriseResponse,
 } from '@/common/enterprise/schemas';
+
+const validDashboardPayload = {
+  kpi: {
+    projectCount: 9,
+    categoryL1Count: 2,
+    categoryL2Count: 3,
+    shortNameCount: 4,
+    materialNameCount: 5,
+    investmentTotalYi: 6,
+  },
+  regionDistribution: [],
+  budgetDistribution: [],
+  categoryDistribution: [],
+  shortNameTop: [],
+};
 
 describe('enterprise schemas', () => {
   it('rejects unsuccessful CommonResult envelopes', () => {
@@ -18,6 +34,14 @@ describe('enterprise schemas', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('rejects a successful CommonResult that omits data and names the operation', () => {
+    expect(() => parseCommonResult({ success: true }, 'company.list')).toThrow(/company\.list.*data/i);
+  });
+
+  it('accepts a CommonResult whose data property is present with null', () => {
+    expect(parseCommonResult({ success: true, data: null }, 'company.detail')).toBeNull();
   });
 
   it.each(['WAITING', 'AUTHENTICATED', 'REGISTER_REQUIRED', 'EXPIRED'])(
@@ -65,11 +89,85 @@ describe('enterprise schemas', () => {
     expect(raw.legacyRank).toBe('A');
   });
 
+  it('does not leak passthrough backend fields into the stable response model', () => {
+    expect(
+      parseEnterpriseResponse('company.detail', {
+        id: 12,
+        name: 'Acme',
+        legacyRank: 'A',
+      })
+    ).toEqual({
+      operation: 'company.detail',
+      data: { companyId: '12', name: 'Acme' },
+    });
+  });
+
   it('rejects renderer request fields outside the operation whitelist', () => {
     const result = enterpriseRequestSchema.safeParse({
       operation: 'company.detail',
       payload: { companyId: '12' },
       method: 'DELETE',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each(['url', 'URL', 'header', 'headers', 'method', 'httpMethod'])(
+    'rejects the top-level renderer request field %s',
+    (field) => {
+      expect(
+        enterpriseRequestSchema.safeParse({
+          operation: 'company.detail',
+          payload: { companyId: '12' },
+          [field]: 'forbidden',
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['url', 'URL', 'header', 'headers', 'method', 'httpMethod'])(
+    'rejects the renderer payload field %s',
+    (field) => {
+      expect(
+        enterpriseRequestSchema.safeParse({
+          operation: 'company.detail',
+          payload: { companyId: '12', [field]: 'forbidden' },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('rejects an unknown enterprise operation', () => {
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'company.delete',
+        payload: { companyId: '12' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts company level and VIP filters in company list requests', () => {
+    const result = enterpriseRequestSchema.safeParse({
+      operation: 'company.list',
+      payload: {
+        companyLevel: 1.2,
+        vip: true,
+        pageNum: 1,
+        pageSize: 20,
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects the unconfirmed contact-state company filter', () => {
+    const result = enterpriseRequestSchema.safeParse({
+      operation: 'company.list',
+      payload: {
+        contactState: 'CONTACTED',
+        pageNum: 1,
+        pageSize: 20,
+      },
     });
 
     expect(result.success).toBe(false);
@@ -109,6 +207,42 @@ describe('enterprise schemas', () => {
         total: 41,
       },
     });
+  });
+
+  it('accepts zero for empty-page totals and page counts', () => {
+    expect(
+      parseEnterpriseResponse('company.list', {
+        list: [],
+        pageNum: 1,
+        pageSize: 20,
+        pages: 0,
+        total: 0,
+      })
+    ).toMatchObject({ data: { pages: 0, total: 0 } });
+  });
+
+  it.each([
+    ['pageNum', 0],
+    ['pageSize', 0],
+    ['pageNum', -1],
+    ['pageSize', 1.5],
+    ['pages', -1],
+    ['pages', 1.5],
+    ['total', -1],
+    ['total', 1.5],
+    ['pageSize', Number.POSITIVE_INFINITY],
+    ['total', Number.NaN],
+  ])('rejects invalid pagination value %s=%s', (field, value) => {
+    expect(() =>
+      parseEnterpriseResponse('company.list', {
+        list: [],
+        pageNum: 1,
+        pageSize: 20,
+        pages: 1,
+        total: 1,
+        [field]: value,
+      })
+    ).toThrow(new RegExp(`company\\.list.*${field}`, 'i'));
   });
 
   it('requires a company identifier and names the failed operation', () => {
@@ -177,6 +311,57 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it('accepts zero counts and a decimal investment amount on the dashboard', () => {
+    expect(
+      parseEnterpriseResponse('project.dashboard', {
+        ...validDashboardPayload,
+        kpi: {
+          projectCount: 0,
+          categoryL1Count: 0,
+          categoryL2Count: 0,
+          shortNameCount: 0,
+          materialNameCount: 0,
+          investmentTotalYi: 12.5,
+        },
+      })
+    ).toMatchObject({
+      data: {
+        projectCount: 0,
+        materialNameCount: 0,
+        investmentTotalYi: 12.5,
+      },
+    });
+  });
+
+  it.each([
+    ['projectCount', -1],
+    ['categoryL1Count', 1.5],
+    ['categoryL2Count', -1],
+    ['shortNameCount', 1.5],
+    ['materialNameCount', -1],
+    ['projectCount', Number.POSITIVE_INFINITY],
+    ['materialNameCount', Number.NaN],
+  ])('rejects invalid dashboard count %s=%s', (field, value) => {
+    expect(() =>
+      parseEnterpriseResponse('project.dashboard', {
+        ...validDashboardPayload,
+        kpi: { ...validDashboardPayload.kpi, [field]: value },
+      })
+    ).toThrow(new RegExp(`project\\.dashboard.*${field}`, 'i'));
+  });
+
+  it.each([-1, Number.POSITIVE_INFINITY, Number.NaN])(
+    'rejects invalid dashboard investment amount %s',
+    (investmentTotalYi) => {
+      expect(() =>
+        parseEnterpriseResponse('project.dashboard', {
+          ...validDashboardPayload,
+          kpi: { ...validDashboardPayload.kpi, investmentTotalYi },
+        })
+      ).toThrow(/project\.dashboard.*investmentTotalYi/i);
+    }
+  );
+
   it('rejects a dashboard that omits a required distribution', () => {
     expect(() =>
       parseEnterpriseResponse('project.dashboard', {
@@ -220,6 +405,32 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it.each(['l1', 'l2', 'shortName', 'materialName'] as const)(
+    'accepts the explicit project drill dimension %s',
+    (level) => {
+      expect(parseEnterpriseResponse('project.drill', [{ name: 'Known', level, projectCount: 1 }])).toMatchObject({
+        data: [{ dimension: level }],
+      });
+    }
+  );
+
+  it.each([
+    [{ categoryL1: 'Building' }, 'l1'],
+    [{ categoryL2: 'Cement' }, 'l2'],
+    [{ materialShortName: 'Portland cement' }, 'shortName'],
+    [{ materialName: 'P.O 42.5 cement' }, 'materialName'],
+  ] as const)('infers project drill dimension %s as %s', (classification, dimension) => {
+    expect(parseEnterpriseResponse('project.drill', [{ ...classification, projectCount: 1 }])).toMatchObject({
+      data: [{ dimension }],
+    });
+  });
+
+  it('rejects a project drill item whose dimension cannot be inferred', () => {
+    expect(() => parseEnterpriseResponse('project.drill', [{ name: 'Unknown', projectCount: 1 }])).toThrow(
+      /project\.drill.*dimension/i
+    );
+  });
+
   it('accepts a list envelope from the project drill endpoint', () => {
     const response = parseEnterpriseResponse('project.drill', {
       list: [{ name: 'Cement', level: 'materialName', projectCount: 8 }],
@@ -229,6 +440,32 @@ describe('enterprise schemas', () => {
       operation: 'project.drill',
       data: [{ label: 'Cement', dimension: 'materialName', projectCount: 8 }],
     });
+  });
+
+  it('accepts zero project and material counts in drill items', () => {
+    expect(
+      parseEnterpriseResponse('project.drill', [
+        {
+          name: 'Cement',
+          level: 'materialName',
+          materialNameCount: 0,
+          projectCount: 0,
+        },
+      ])
+    ).toMatchObject({ data: [{ materialNameCount: 0, projectCount: 0 }] });
+  });
+
+  it.each([
+    ['projectCount', -1],
+    ['projectCount', 1.5],
+    ['materialNameCount', -1],
+    ['categoryL2Count', 1.5],
+  ])('rejects invalid drill count %s=%s', (field, value) => {
+    expect(() =>
+      parseEnterpriseResponse('project.drill', [
+        { name: 'Cement', level: 'materialName', projectCount: 1, [field]: value },
+      ])
+    ).toThrow(new RegExp(`project\\.drill.*${field}`, 'i'));
   });
 
   it('normalizes project list construction dates into a display period', () => {
@@ -282,4 +519,17 @@ describe('enterprise schemas', () => {
       },
     });
   });
+
+  it.each([-1, Number.POSITIVE_INFINITY, Number.NaN])(
+    'rejects invalid project investment amount %s',
+    (totalInvestment) => {
+      expect(() =>
+        parseEnterpriseResponse('project.detail', {
+          hpInfoId: 901,
+          projectName: 'Factory Project',
+          totalInvestment,
+        })
+      ).toThrow(/project\.detail.*totalInvestment/i);
+    }
+  );
 });

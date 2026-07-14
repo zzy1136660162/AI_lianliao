@@ -22,7 +22,11 @@ export const commonResultSchema = z
     message: z.string().optional(),
     code: z.union([z.string(), z.number()]).optional(),
   })
-  .passthrough();
+  .passthrough()
+  .refine((result) => Object.prototype.hasOwnProperty.call(result, 'data'), {
+    message: 'Required',
+    path: ['data'],
+  });
 
 export const enterpriseLoginStatusSchema = z.enum(ENTERPRISE_LOGIN_STATUSES);
 
@@ -413,7 +417,8 @@ const companyListQuerySchema = z
     industry: z.string().optional(),
     city: z.string().optional(),
     district: z.string().optional(),
-    contactState: z.enum(['CONTACTED', 'UNCONTACTED']).optional(),
+    companyLevel: z.number().finite().nonnegative().optional(),
+    vip: z.boolean().optional(),
     pageNum: positiveIntegerSchema,
     pageSize: positiveIntegerSchema,
   })
