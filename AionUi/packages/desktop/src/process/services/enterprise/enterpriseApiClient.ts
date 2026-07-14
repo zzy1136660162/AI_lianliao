@@ -23,10 +23,18 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const MAX_LOGIN_EXPIRY_MS = 330_000;
 const MAX_QR_BYTES = 2 * 1024 * 1024;
+const MAX_AUTH_SANITIZE_NODES = 256;
+const MAX_AUTH_SANITIZE_OWN_KEYS = 2048;
+const MAX_AUTH_SANITIZE_DEPTH = 4;
 const QR_PATHNAME = '/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433';
 const LOGIN_KEY_PATTERN = /^enterprise_desktop_[A-Za-z0-9]{18}$/;
 const PNG_MAGIC = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const FORBIDDEN_ENVELOPE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+type AuthSanitizeBudget = {
+  nodesRemaining: number;
+  ownKeysRemaining: number;
+};
 
 const loginSessionResponseSchema = z.object({
   loginKey: z.string().regex(LOGIN_KEY_PATTERN),
@@ -329,18 +337,30 @@ const sanitizeEnvelope = (input: unknown): Record<string, unknown> | undefined =
 const sanitizeAuthObject = (
   input: unknown,
   depth = 0,
-  ancestors: WeakSet<object> = new WeakSet()
+  ancestors: WeakSet<object> = new WeakSet(),
+  budget: AuthSanitizeBudget = {
+    nodesRemaining: MAX_AUTH_SANITIZE_NODES,
+    ownKeysRemaining: MAX_AUTH_SANITIZE_OWN_KEYS,
+  }
 ): Record<string, unknown> | undefined => {
-  if (depth > 4 || typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
+  if (depth > MAX_AUTH_SANITIZE_DEPTH || typeof input !== 'object' || input === null || Array.isArray(input)) {
+    return undefined;
+  }
   if (ancestors.has(input)) return undefined;
+  if (budget.nodesRemaining <= 0) return undefined;
+  budget.nodesRemaining -= 1;
   ancestors.add(input);
 
   try {
     const prototype = Object.getPrototypeOf(input);
     if (prototype !== Object.prototype && prototype !== null) return undefined;
 
+    const ownKeys = Reflect.ownKeys(input);
+    if (ownKeys.length > budget.ownKeysRemaining) return undefined;
+    budget.ownKeysRemaining -= ownKeys.length;
+
     const sanitized = Object.create(null) as Record<string, unknown>;
-    for (const key of Reflect.ownKeys(input)) {
+    for (const key of ownKeys) {
       if (typeof key !== 'string' || FORBIDDEN_ENVELOPE_KEYS.has(key)) return undefined;
 
       const descriptor = Object.getOwnPropertyDescriptor(input, key);
@@ -349,7 +369,7 @@ const sanitizeAuthObject = (
 
       let value = descriptor.value;
       if (typeof value === 'object' && value !== null) {
-        value = sanitizeAuthObject(value, depth + 1, ancestors);
+        value = sanitizeAuthObject(value, depth + 1, ancestors, budget);
         if (!value) return undefined;
       }
       Object.defineProperty(sanitized, key, {
@@ -427,6 +447,86 @@ const parseQrUrl = (qrPath: string, baseUrl: string, loginKey: string): string =
 const isPng = (bytes: Uint8Array): boolean =>
   bytes.length >= PNG_MAGIC.length && PNG_MAGIC.every((byte, index) => bytes[index] === byte);
 
+const parseQrContentLength = (value: string | null): number | undefined => {
+  if (value === null) return undefined;
+  if (!/^(0|[1-9][0-9]*)$/.test(value)) throw apiError('INVALID_RESPONSE');
+
+  const length = Number(value);
+  if (!Number.isSafeInteger(length) || length < 0 || length > MAX_QR_BYTES) {
+    throw apiError('INVALID_RESPONSE');
+  }
+  return length;
+};
+
+const cancelReaderWithoutWaiting = (reader: ReadableStreamDefaultReader<Uint8Array>): void => {
+  try {
+    void Promise.resolve(reader.cancel()).catch((): undefined => undefined);
+  } catch {
+    // Cancellation is best-effort; the public request must settle independently.
+  }
+};
+
+const readBoundedQrBody = async (response: Response, signal: AbortSignal): Promise<Uint8Array> => {
+  if (!response.body) throw apiError('INVALID_RESPONSE');
+
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = response.body.getReader();
+  } catch {
+    throw apiError('INVALID_RESPONSE');
+  }
+
+  let activeRead: Promise<ReadableStreamReadResult<Uint8Array>> | undefined;
+  let released = false;
+  const releaseReader = (): void => {
+    if (released) return;
+    try {
+      reader.releaseLock();
+      released = true;
+    } catch {
+      // A native reader can remain locked until its cancelled read settles.
+    }
+  };
+  let handleAbort: (() => void) | undefined;
+  const abortPromise = new Promise<never>((_resolve, reject) => {
+    handleAbort = () => {
+      cancelReaderWithoutWaiting(reader);
+      reject(apiError('TIMEOUT'));
+    };
+    if (signal.aborted) handleAbort();
+    else signal.addEventListener('abort', handleAbort, { once: true });
+  });
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      activeRead = Promise.resolve().then(() => reader.read());
+      // eslint-disable-next-line no-await-in-loop -- Stream chunks must be read sequentially to enforce the byte limit.
+      const result = await Promise.race([activeRead, abortPromise]);
+      activeRead = undefined;
+      if (result.done) break;
+      if (!(result.value instanceof Uint8Array)) throw apiError('INVALID_RESPONSE');
+      if (result.value.byteLength > MAX_QR_BYTES - totalBytes) {
+        cancelReaderWithoutWaiting(reader);
+        throw apiError('INVALID_RESPONSE');
+      }
+      if (result.value.byteLength === 0) continue;
+
+      totalBytes += result.value.byteLength;
+      chunks.push(Buffer.from(result.value));
+    }
+    if (totalBytes === 0) throw apiError('INVALID_RESPONSE');
+    return Buffer.concat(chunks, totalBytes);
+  } finally {
+    if (handleAbort) signal.removeEventListener('abort', handleAbort);
+    releaseReader();
+    if (!released && activeRead) {
+      void activeRead.then(releaseReader, releaseReader).catch((): undefined => undefined);
+    }
+  }
+};
+
 /** Main-process client for the fixed Chain Liaoning enterprise API surface. */
 export class EnterpriseApiClient {
   private readonly baseUrl: string;
@@ -483,6 +583,7 @@ export class EnterpriseApiClient {
 
     const qrUrl = parseQrUrl(parsed.data.qrPath, this.baseUrl, parsed.data.loginKey);
     const bytes = await this.downloadQr(qrUrl);
+    if (expiresAtMs <= Date.now()) throw apiError('INVALID_RESPONSE');
     return {
       loginKey: parsed.data.loginKey,
       qrDataUrl: `data:image/png;base64,${Buffer.from(bytes).toString('base64')}`,
@@ -573,12 +674,9 @@ export class EnterpriseApiClient {
       if (!response.ok) throw apiError('HTTP');
       if (response.url !== url) throw apiError('INVALID_RESPONSE');
 
-      const declaredLength = response.headers.get('Content-Length');
-      if (declaredLength !== null && /^\d+$/.test(declaredLength) && BigInt(declaredLength) > BigInt(MAX_QR_BYTES)) {
-        throw apiError('INVALID_RESPONSE');
-      }
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.length === 0 || bytes.length > MAX_QR_BYTES || !isPng(bytes)) throw apiError('INVALID_RESPONSE');
+      parseQrContentLength(response.headers.get('Content-Length'));
+      const bytes = await readBoundedQrBody(response, signal);
+      if (!isPng(bytes)) throw apiError('INVALID_RESPONSE');
       return bytes;
     });
   }

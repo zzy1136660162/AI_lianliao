@@ -961,6 +961,7 @@ describe('EnterpriseApiClient.getUserContext', () => {
 });
 
 describe('EnterpriseApiClient QR authentication', () => {
+  const qrByteLimit = 2 * 1024 * 1024;
   const loginKey = 'enterprise_desktop_Ab3Def456Gh7Jk8Lm9';
   const qrPath = `/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=${loginKey}`;
   const qrUrl = `https://cloud.lslnii.com${qrPath}`;
@@ -976,6 +977,38 @@ describe('EnterpriseApiClient QR authentication', () => {
 
   const createResponse = (overrides: Record<string, unknown> = {}): Response =>
     jsonResponse({ success: true, data: createResponseData(overrides) });
+
+  const controlledQrResponse = (chunks: Uint8Array[], contentLength?: string) => {
+    let index = 0;
+    const read = vi.fn(async () => {
+      const value = chunks[index];
+      index += 1;
+      return value === undefined ? { done: true, value: undefined } : { done: false, value };
+    });
+    const cancel = vi.fn(async () => undefined);
+    const releaseLock = vi.fn();
+    const getReader = vi.fn(() => ({ read, cancel, releaseLock }));
+    const combined = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+    const arrayBuffer = vi.fn(async () =>
+      combined.buffer.slice(combined.byteOffset, combined.byteOffset + combined.byteLength)
+    );
+    const response = responseWithFinalUrl(pngBytes, qrUrl, {
+      headers: contentLength === undefined ? undefined : { 'Content-Length': contentLength },
+    });
+    Object.defineProperty(response, 'body', {
+      value: { getReader },
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+    Object.defineProperty(response, 'arrayBuffer', {
+      value: arrayBuffer,
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+    return { response, read, cancel, releaseLock, getReader, arrayBuffer };
+  };
 
   afterEach(() => {
     vi.useRealTimers();
@@ -1025,16 +1058,28 @@ describe('EnterpriseApiClient QR authentication', () => {
   });
 
   it('rejects an oversized declared QR body before reading it', async () => {
-    let bodyReads = 0;
-    const qrResponse = responseWithFinalUrl(pngBytes, qrUrl, {
-      status: 200,
-      headers: { 'Content-Length': String(2 * 1024 * 1024 + 1) },
-    });
-    Object.defineProperty(qrResponse, 'arrayBuffer', {
-      value: async () => {
-        bodyReads += 1;
-        return pngBytes.buffer;
+    const controlled = controlledQrResponse([pngBytes], String(qrByteLimit + 1));
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : controlled.response;
       },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(controlled.getReader).not.toHaveBeenCalled();
+    expect(controlled.arrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('rejects a QR response without a readable body', async () => {
+    const qrResponse = responseWithFinalUrl(pngBytes, qrUrl);
+    Object.defineProperty(qrResponse, 'body', {
+      value: null,
+      writable: false,
+      enumerable: false,
+      configurable: true,
     });
     let calls = 0;
     const client = new EnterpriseApiClient({
@@ -1045,8 +1090,91 @@ describe('EnterpriseApiClient QR authentication', () => {
     });
 
     await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+  });
 
-    expect(bodyReads).toBe(0);
+  it.each(['', ' ', '+1', '-1', '1.5', '1e3', '1,2', '01', '9007199254740992'])(
+    'rejects malformed Content-Length %j before accessing the QR body',
+    async (contentLength) => {
+      const controlled = controlledQrResponse([pngBytes]);
+      Object.defineProperty(controlled.response, 'headers', {
+        value: { get: () => contentLength },
+        writable: false,
+        enumerable: false,
+        configurable: true,
+      });
+      let calls = 0;
+      const client = new EnterpriseApiClient({
+        transport: async () => {
+          calls += 1;
+          return calls === 1 ? createResponse() : controlled.response;
+        },
+      });
+
+      await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+      expect(controlled.getReader).not.toHaveBeenCalled();
+      expect(controlled.arrayBuffer).not.toHaveBeenCalled();
+    }
+  );
+
+  it('accepts a multi-chunk PNG whose total size is exactly 2MiB', async () => {
+    const chunks = Array.from({ length: 4 }, () => new Uint8Array(qrByteLimit / 4));
+    chunks[0]?.set(pngBytes.subarray(0, 8));
+    const controlled = controlledQrResponse(chunks, String(qrByteLimit));
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : controlled.response;
+      },
+    });
+
+    const result = await client.createLoginSession();
+
+    expect(result.qrDataUrl.startsWith('data:image/png;base64,')).toBe(true);
+    expect(controlled.cancel).not.toHaveBeenCalled();
+    expect(controlled.releaseLock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['without Content-Length', undefined],
+    ['with a forged smaller Content-Length', '1'],
+  ])('cancels a multi-chunk QR stream that exceeds 2MiB %s', async (_label, contentLength) => {
+    const chunks = Array.from({ length: 4 }, () => new Uint8Array(qrByteLimit / 4));
+    chunks[0]?.set(pngBytes.subarray(0, 8));
+    chunks.push(Uint8Array.of(1));
+    const controlled = controlledQrResponse(chunks, contentLength);
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : controlled.response;
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(controlled.cancel).toHaveBeenCalledOnce();
+    expect(controlled.releaseLock).toHaveBeenCalledOnce();
+  });
+
+  it('does not wait for a hanging reader cancellation after the QR limit is exceeded', async () => {
+    const chunks = [new Uint8Array(qrByteLimit), Uint8Array.of(1)];
+    chunks[0]?.set(pngBytes.subarray(0, 8));
+    const controlled = controlledQrResponse(chunks);
+    controlled.cancel.mockImplementation(() => new Promise<void>(() => undefined));
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : controlled.response;
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(controlled.cancel).toHaveBeenCalledOnce();
+    expect(controlled.releaseLock).toHaveBeenCalledOnce();
   });
 
   it('rejects a QR response whose final URL indicates an ignored redirect', async () => {
@@ -1136,6 +1264,65 @@ describe('EnterpriseApiClient QR authentication', () => {
     ],
     ['a dangerous prototype key', () => ({ ...createResponseData(), prototype: 'sensitive' }) as unknown],
   ])('rejects create data with %s', async (_label, makeData) => {
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue({ success: true, data: makeData() }),
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+  });
+
+  it('rejects an auth object wider than the shared own-key budget before QR download', async () => {
+    const data = createResponseData();
+    for (let index = 0; index < 2049; index += 1) data[`extra${index}`] = index;
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? responseWithJsonValue({ success: true, data }) : responseWithFinalUrl(pngBytes, qrUrl);
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(calls).toBe(1);
+  });
+
+  it('shares the auth node budget across sibling objects before QR download', async () => {
+    const siblings: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+    for (let index = 0; index < 256; index += 1) siblings[`node${index}`] = { value: index };
+    const data = { ...createResponseData(), extra: siblings };
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? responseWithJsonValue({ success: true, data }) : responseWithFinalUrl(pngBytes, qrUrl);
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(calls).toBe(1);
+  });
+
+  it.each([
+    [
+      'cycle',
+      () => {
+        const data = createResponseData();
+        data.extra = data;
+        return data;
+      },
+    ],
+    [
+      'excessive depth',
+      () => {
+        const data = createResponseData();
+        const level5 = { value: true };
+        data.extra = { next: { next: { next: { next: level5 } } } };
+        return data;
+      },
+    ],
+  ])('keeps rejecting auth objects with a %s', async (_label, makeData) => {
     const client = new EnterpriseApiClient({
       transport: async () => responseWithJsonValue({ success: true, data: makeData() }),
     });
@@ -1266,6 +1453,16 @@ describe('EnterpriseApiClient QR authentication', () => {
     vi.useFakeTimers();
     let signal: AbortSignal | null = null;
     const qrResponse = responseWithFinalUrl(pngBytes, qrUrl);
+    const read = vi.fn(() => new Promise<ReadableStreamReadResult<Uint8Array>>(() => undefined));
+    const cancel = vi.fn(() => new Promise<void>(() => undefined));
+    const releaseLock = vi.fn();
+    const getReader = vi.fn(() => ({ read, cancel, releaseLock }));
+    Object.defineProperty(qrResponse, 'body', {
+      value: { getReader },
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
     Object.defineProperty(qrResponse, 'arrayBuffer', {
       value: () => new Promise<ArrayBuffer>(() => undefined),
     });
@@ -1284,6 +1481,62 @@ describe('EnterpriseApiClient QR authentication', () => {
     await outcome;
 
     expect(signal?.aborted).toBe(true);
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(releaseLock).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('rejects a login session that expires while its QR stream is being read', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-14T00:00:00.000Z'));
+    let markDownloadStarted: (() => void) | undefined;
+    const downloadStarted = new Promise<void>((resolve) => {
+      markDownloadStarted = resolve;
+    });
+    let completeDownload: (() => void) | undefined;
+    let readCalls = 0;
+    const read = vi.fn((): Promise<ReadableStreamReadResult<Uint8Array>> => {
+      readCalls += 1;
+      if (readCalls > 1) return Promise.resolve({ done: true, value: undefined });
+      markDownloadStarted?.();
+      return new Promise((resolve) => {
+        completeDownload = () => resolve({ done: false, value: pngBytes });
+      });
+    });
+    const cancel = vi.fn(async () => undefined);
+    const releaseLock = vi.fn();
+    const qrResponse = responseWithFinalUrl(pngBytes, qrUrl);
+    Object.defineProperty(qrResponse, 'body', {
+      value: { getReader: () => ({ read, cancel, releaseLock }) },
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+    Object.defineProperty(qrResponse, 'arrayBuffer', {
+      value: () => {
+        markDownloadStarted?.();
+        return new Promise<ArrayBuffer>((resolve) => {
+          completeDownload = () => resolve(pngBytes.buffer);
+        });
+      },
+    });
+    const expiresAt = new Date(Date.now() + 100).toISOString();
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      timeoutMs: 1000,
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse({ expiresAt }) : qrResponse;
+      },
+    });
+
+    const outcome = expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+    await downloadStarted;
+    await vi.advanceTimersByTimeAsync(200);
+    completeDownload?.();
+    await outcome;
+
+    expect(releaseLock).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
 
