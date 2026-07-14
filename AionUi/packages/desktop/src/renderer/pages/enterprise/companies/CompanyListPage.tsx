@@ -111,6 +111,11 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
     catalog.applyFilters(draftFilters);
   };
 
+  const changePage = (pageNum: number, pageSize?: number) => {
+    setSelectedCompany(null);
+    catalog.changePage(pageNum, pageSize);
+  };
+
   const renderContent = () => {
     if (catalog.errorCode) {
       return (
@@ -170,7 +175,7 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
               showTotal
               sizeCanChange
               sizeOptions={[10, 20, 50]}
-              onChange={catalog.changePage}
+              onChange={changePage}
             />
           </div>
         </div>

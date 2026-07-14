@@ -326,6 +326,31 @@ describe('company list interactions', () => {
       screen.queryByRole('complementary', { name: 'enterprise.companies.quickView.label' })
     ).not.toBeInTheDocument();
   });
+
+  it('clears the selected quick view synchronously when pagination changes', async () => {
+    const nextPage = deferred<EnterpriseResponse>();
+    const request = vi
+      .fn<EnterpriseClient['request']>()
+      .mockResolvedValueOnce(companyPage('Alpha Hydraulics', '42', 1, 45))
+      .mockReturnValueOnce(nextPage.promise);
+    const { container } = renderList(createClient(request));
+
+    const row = (await screen.findByText('Alpha Hydraulics')).closest('tr');
+    fireEvent.click(row as HTMLElement);
+    expect(screen.getByRole('complementary', { name: 'enterprise.companies.quickView.label' })).toBeVisible();
+    const pageTwo = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
+      (item) => item.textContent === '2'
+    );
+    expect(pageTwo).toBeDefined();
+    fireEvent.click(pageTwo as HTMLElement);
+
+    expect(
+      screen.queryByRole('complementary', { name: 'enterprise.companies.quickView.label' })
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    nextPage.resolve(companyPage('Page Two Company', '43', 2, 45));
+    expect(await screen.findByText('Page Two Company')).toBeVisible();
+  });
 });
 
 describe('company detail', () => {

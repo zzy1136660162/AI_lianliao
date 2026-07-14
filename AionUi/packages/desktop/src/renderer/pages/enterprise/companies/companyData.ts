@@ -48,6 +48,7 @@ export type CompanyDetailState = {
 
 const QUERY_FILTER_KEYS = ['keyword', 'industry', 'province', 'city', 'district', 'companyLevel', 'vip'] as const;
 const COMPANY_ID_PATTERN = /^[1-9]\d{0,30}$/;
+const COMPANY_IMAGE_HOSTS = new Set(['cloud.lslnii.com', 'sjbang.lslnii.com', 'www.lslnii.com']);
 
 /** H5-backed membership choices, including decimal and upper-tier values observed in production. */
 export const COMPANY_LEVEL_FILTERS = [1, 1.1, 1.2, 2, 3, 3.1, 4, 5, 6, 7, 8, 9, 10] as const;
@@ -160,34 +161,169 @@ const isNonNegativeInteger = (value: unknown): value is number =>
 
 const isPositiveInteger = (value: unknown): value is number => isNonNegativeInteger(value) && value > 0;
 
-const validateCompany = (value: unknown): value is EnterpriseCompanySummary => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const candidate = value as Partial<EnterpriseCompanySummary>;
-  return typeof candidate.companyId === 'string' && candidate.companyId !== '' && typeof candidate.name === 'string';
+type DataFieldKind = 'string' | 'finiteNumber' | 'boolean';
+type DataFieldRule = readonly [key: string, kind: DataFieldKind, required?: true, nonEmpty?: true];
+
+const COMPANY_SUMMARY_FIELD_RULES = [
+  ['companyId', 'string', true, true],
+  ['name', 'string', true],
+  ['shortName', 'string'],
+  ['industry', 'string'],
+  ['province', 'string'],
+  ['city', 'string'],
+  ['district', 'string'],
+  ['address', 'string'],
+  ['businessSummary', 'string'],
+  ['updatedAt', 'string'],
+  ['legalRepresentative', 'string'],
+  ['companyType', 'string'],
+  ['companyLevel', 'finiteNumber'],
+  ['vip', 'boolean'],
+  ['establishedAt', 'string'],
+  ['collected', 'boolean'],
+] as const satisfies readonly DataFieldRule[];
+
+const COMPANY_DETAIL_FIELD_RULES = [
+  ...COMPANY_SUMMARY_FIELD_RULES,
+  ['logoUrl', 'string'],
+  ['description', 'string'],
+  ['unifiedSocialCreditCode', 'string'],
+  ['contactName', 'string'],
+  ['contactTitle', 'string'],
+  ['phone', 'string'],
+] as const satisfies readonly DataFieldRule[];
+
+const PRODUCT_FIELD_RULES = [
+  ['productId', 'string', true, true],
+  ['name', 'string', true],
+  ['companyId', 'string', true, true],
+  ['imageUrl', 'string'],
+  ['summary', 'string'],
+  ['industry', 'string'],
+  ['companyName', 'string'],
+  ['companyIndustry', 'string'],
+  ['city', 'string'],
+  ['district', 'string'],
+  ['address', 'string'],
+  ['contactName', 'string'],
+  ['phone', 'string'],
+  ['collected', 'boolean'],
+] as const satisfies readonly DataFieldRule[];
+
+/** Reads plain own data descriptors only; accessors and custom prototypes fail closed without property access. */
+const getPlainDataFields = (value: unknown): Map<string, unknown> | null => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  try {
+    if (Object.getPrototypeOf(value) !== Object.prototype) return null;
+    const fields = new Map<string, unknown>();
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== 'string') return null;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        return null;
+      }
+      fields.set(key, descriptor.value);
+    }
+    return fields;
+  } catch {
+    return null;
+  }
 };
 
-const validateProduct = (value: unknown): value is EnterpriseProductSummary => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const candidate = value as Partial<EnterpriseProductSummary>;
-  return (
-    typeof candidate.productId === 'string' &&
-    candidate.productId !== '' &&
-    typeof candidate.companyId === 'string' &&
-    typeof candidate.name === 'string'
-  );
+const matchesFieldKind = (value: unknown, kind: DataFieldKind): boolean => {
+  if (kind === 'finiteNumber') return typeof value === 'number' && Number.isFinite(value);
+  return typeof value === kind;
 };
 
-const validatePage = <T>(value: unknown, validateItem: (item: unknown) => item is T): value is EnterprisePage<T> => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const candidate = value as Partial<EnterprisePage<unknown>>;
-  return (
-    Array.isArray(candidate.list) &&
-    candidate.list.every(validateItem) &&
-    isPositiveInteger(candidate.pageNum) &&
-    isPositiveInteger(candidate.pageSize) &&
-    isNonNegativeInteger(candidate.pages) &&
-    isNonNegativeInteger(candidate.total)
-  );
+/** Creates a reusable pure semantic parser that returns a fresh clone-safe record. */
+const createPlainRecordParser = <T extends object>(rules: readonly DataFieldRule[]) => {
+  const rulesByKey = new Map(rules.map((rule) => [rule[0], rule] as const));
+  return (value: unknown): T | null => {
+    const fields = getPlainDataFields(value);
+    if (!fields) return null;
+    const result: Record<string, unknown> = {};
+
+    for (const [key, fieldValue] of fields) {
+      const rule = rulesByKey.get(key);
+      if (!rule) return null;
+      if (fieldValue !== undefined && !matchesFieldKind(fieldValue, rule[1])) return null;
+      if (rule[3] === true && fieldValue === '') return null;
+      result[key] = fieldValue;
+    }
+    for (const [key, , required] of rules) {
+      if (required === true && (!fields.has(key) || fields.get(key) === undefined)) return null;
+    }
+    return result as T;
+  };
+};
+
+const parseCompanySummary = createPlainRecordParser<EnterpriseCompanySummary>(COMPANY_SUMMARY_FIELD_RULES);
+const parseCompanyDetail = createPlainRecordParser<EnterpriseCompanyDetail>(COMPANY_DETAIL_FIELD_RULES);
+const parseProduct = createPlainRecordParser<EnterpriseProductSummary>(PRODUCT_FIELD_RULES);
+
+const parsePlainDataArray = <T>(value: unknown, parseItem: (item: unknown) => T | null): T[] | null => {
+  if (!Array.isArray(value)) return null;
+  try {
+    if (Object.getPrototypeOf(value) !== Array.prototype) return null;
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+    const length = lengthDescriptor?.value;
+    if (!isNonNegativeInteger(length) || Reflect.ownKeys(value).length !== length + 1) return null;
+
+    const result: T[] = [];
+    for (let index = 0; index < length; index += 1) {
+      const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+      if (!descriptor || !descriptor.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        return null;
+      }
+      const item = parseItem(descriptor.value);
+      if (!item) return null;
+      result.push(item);
+    }
+    return result;
+  } catch {
+    return null;
+  }
+};
+
+const parsePage = <T>(
+  value: unknown,
+  parseItem: (item: unknown) => T | null,
+  expectedPageNum: number,
+  expectedPageSize: number
+): EnterprisePage<T> | null => {
+  const fields = getPlainDataFields(value);
+  if (
+    !fields ||
+    fields.size !== 5 ||
+    !['list', 'pageNum', 'pageSize', 'pages', 'total'].every((key) => fields.has(key))
+  ) {
+    return null;
+  }
+  const list = parsePlainDataArray(fields.get('list'), parseItem);
+  const pageNum = fields.get('pageNum');
+  const pageSize = fields.get('pageSize');
+  const pages = fields.get('pages');
+  const total = fields.get('total');
+  if (
+    !list ||
+    pageNum !== expectedPageNum ||
+    pageSize !== expectedPageSize ||
+    !isPositiveInteger(pageNum) ||
+    !isPositiveInteger(pageSize) ||
+    !isNonNegativeInteger(pages) ||
+    !isNonNegativeInteger(total)
+  ) {
+    return null;
+  }
+  return { list, pageNum, pageSize, pages, total };
+};
+
+const parseOperationData = (value: unknown, expectedOperation: string): unknown => {
+  const fields = getPlainDataFields(value);
+  if (!fields || fields.size !== 2 || fields.get('operation') !== expectedOperation || !fields.has('data')) {
+    return undefined;
+  }
+  return fields.get('data');
 };
 
 /** Fetches and validates a real company page; malformed pages fail closed. */
@@ -200,10 +336,14 @@ export const loadCompanyList = async (
   throwIfAborted(signal);
   const response = await client.request({ operation: 'company.list', payload: query });
   throwIfAborted(signal);
-  if (response.operation !== 'company.list' || !validatePage(response.data, validateCompany)) {
-    throw new CompanyDataError('INVALID_RESPONSE');
-  }
-  return response.data;
+  const page = parsePage(
+    parseOperationData(response, 'company.list'),
+    parseCompanySummary,
+    query.pageNum,
+    query.pageSize
+  );
+  if (!page) throw new CompanyDataError('INVALID_RESPONSE');
+  return page;
 };
 
 /** Parses the numeric Oracle company identity accepted by the current backend route. */
@@ -213,9 +353,10 @@ export const parseCompanyId = (value: string | undefined): string => {
 };
 
 /**
- * Accepts only remote HTTP(S) image sources before handing them to Chromium.
- * Protocol-relative links from the legacy API are upgraded to HTTPS; embedded,
- * local-file and credential-bearing URLs fail closed.
+ * Hands Chromium only HTTPS URLs on the exact trusted business-host allowlist.
+ * Protocol-relative legacy links are upgraded to HTTPS. Redirect behavior and
+ * response size remain responsibilities of those trusted remote hosts; this
+ * intentionally does not trust arbitrary `*.lslnii.com` subdomains.
  */
 export const parseSafeCompanyImageUrl = (value: string | undefined): string | null => {
   const trimmedValue = value?.trim();
@@ -223,7 +364,15 @@ export const parseSafeCompanyImageUrl = (value: string | undefined): string | nu
 
   try {
     const parsedUrl = new URL(trimmedValue.startsWith('//') ? `https:${trimmedValue}` : trimmedValue);
-    if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) return null;
+    if (
+      parsedUrl.protocol !== 'https:' ||
+      parsedUrl.port !== '' ||
+      parsedUrl.username !== '' ||
+      parsedUrl.password !== '' ||
+      !COMPANY_IMAGE_HOSTS.has(parsedUrl.hostname)
+    ) {
+      return null;
+    }
     return parsedUrl.toString();
   } catch {
     return null;
@@ -243,9 +392,8 @@ export const loadCompanyDetailBundle = async (
     payload: { companyId: validCompanyId },
   });
   throwIfAborted(signal);
-  if (detailResponse.operation !== 'company.detail' || !validateCompany(detailResponse.data)) {
-    throw new CompanyDataError('INVALID_RESPONSE');
-  }
+  const company = parseCompanyDetail(parseOperationData(detailResponse, 'company.detail'));
+  if (!company || company.companyId !== validCompanyId) throw new CompanyDataError('INVALID_RESPONSE');
 
   // Check again immediately before the dependent request so an aborted detail never starts product.list.
   throwIfAborted(signal);
@@ -254,10 +402,17 @@ export const loadCompanyDetailBundle = async (
     payload: { companyId: validCompanyId, pageNum: 1, pageSize: 12 },
   });
   throwIfAborted(signal);
-  if (productResponse.operation !== 'product.list' || !validatePage(productResponse.data, validateProduct)) {
-    throw new CompanyDataError('INVALID_RESPONSE');
-  }
-  return { company: detailResponse.data, products: productResponse.data };
+  const products = parsePage(
+    parseOperationData(productResponse, 'product.list'),
+    (value) => {
+      const product = parseProduct(value);
+      return product?.companyId === validCompanyId ? product : null;
+    },
+    1,
+    12
+  );
+  if (!products) throw new CompanyDataError('INVALID_RESPONSE');
+  return { company, products };
 };
 
 /** Controlled company-list loader with stale-response protection and pagination-only data retention. */
