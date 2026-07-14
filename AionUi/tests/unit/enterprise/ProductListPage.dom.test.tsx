@@ -47,6 +47,7 @@ const page = (name: string, productId = '9', pageNum = 1, total = 1): Enterprise
         name,
         companyName: 'Alpha Hydraulics',
         industry: 'Equipment',
+        companyIndustry: 'Machinery',
         province: 'Liaoning',
         city: 'Shenyang',
         district: 'Hunnan',
@@ -138,8 +139,8 @@ describe('product catalog interactions', () => {
       .mockReturnValueOnce(pageTwo.promise);
     const { container } = renderList(createClient(request));
 
-    const card = (await screen.findByRole('heading', { name: 'Page one pump' })).closest('article');
-    fireEvent.click(card as HTMLElement);
+    const card = (await screen.findByRole('heading', { name: 'Page one pump' })).closest('article') as HTMLElement;
+    fireEvent.click(within(card).getByRole('button', { name: 'enterprise.products.actions.quickPreview' }));
     expect(screen.getByRole('complementary', { name: 'enterprise.products.quickView.label' })).toBeVisible();
     const pageTwoButton = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
       (item) => item.textContent === '2'
@@ -160,23 +161,36 @@ describe('product catalog interactions', () => {
     expect(screen.queryByText('Stale page pump')).toBeNull();
   });
 
-  it('opens quick view by pointer or keyboard and follows product and company actions', async () => {
+  it('keeps the article noninteractive and exposes separate keyboard-operable preview and detail actions', async () => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(page('Industrial pump'));
     const user = userEvent.setup();
     const { unmount } = renderList(createClient(request));
 
-    const card = (await screen.findByRole('heading', { name: 'Industrial pump' })).closest('article');
-    expect(card).toHaveAttribute('tabindex', '0');
-    fireEvent.keyDown(card as HTMLElement, { key: 'Enter' });
+    const card = (await screen.findByRole('heading', { name: 'Industrial pump' })).closest('article') as HTMLElement;
+    expect(card).not.toHaveAttribute('tabindex');
+    fireEvent.click(card);
+    fireEvent.keyDown(card, { key: 'Enter' });
+    expect(screen.queryByRole('complementary', { name: 'enterprise.products.quickView.label' })).toBeNull();
+
+    const previewButton = within(card).getByRole('button', {
+      name: 'enterprise.products.actions.quickPreview',
+    });
+    expect(within(card).getByRole('button', { name: 'enterprise.products.actions.viewDetails' })).toBeVisible();
+    previewButton.focus();
+    await user.keyboard('{Enter}');
     const quickView = screen.getByRole('complementary', { name: 'enterprise.products.quickView.label' });
     expect(within(quickView).getByText('Alpha Hydraulics')).toBeVisible();
+    expect(within(card).getByText('Equipment')).toBeVisible();
+    expect(within(card).queryByText('Machinery')).toBeNull();
     await user.click(within(quickView).getByRole('link', { name: 'enterprise.products.actions.viewCompany' }));
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/42');
 
     unmount();
     renderList(createClient(request));
-    const secondCard = (await screen.findByRole('heading', { name: 'Industrial pump' })).closest('article');
-    fireEvent.doubleClick(secondCard as HTMLElement);
+    const secondCard = (await screen.findByRole('heading', { name: 'Industrial pump' })).closest(
+      'article'
+    ) as HTMLElement;
+    await user.click(within(secondCard).getByRole('button', { name: 'enterprise.products.actions.viewDetails' }));
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/products/9');
   });
 
@@ -243,6 +257,8 @@ describe('product detail', () => {
     const { container } = renderDetail(createClient(request));
 
     expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
+    expect(screen.getByText('enterprise.products.fields.companyIndustry')).toBeVisible();
+    expect(screen.getByText('Machinery')).toBeVisible();
     expect(screen.getByText('1380000****')).toBeVisible();
     expect(screen.getByText('<script>window.stolen=true</script>High pressure')).toBeVisible();
     expect(container.querySelector('script')).toBeNull();

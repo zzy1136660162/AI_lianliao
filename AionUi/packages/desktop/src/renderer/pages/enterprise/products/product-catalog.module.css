@@ -124,7 +124,6 @@
   overflow: hidden;
   border: 1px solid var(--border-light);
   background: color-mix(in srgb, var(--bg-2) 82%, transparent);
-  cursor: pointer;
   transition:
     border-color 150ms ease,
     transform 150ms ease,
@@ -135,11 +134,6 @@
   border-color: color-mix(in srgb, var(--primary) 48%, var(--border-base));
   background: var(--bg-hover);
   transform: translateY(-2px);
-}
-
-.productCard:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
 }
 
 .cardImage {
@@ -219,8 +213,13 @@
   -webkit-line-clamp: 2;
 }
 
-.cardAction {
-  margin-left: -8px;
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin: 0 -8px;
 }
 
 .paginationBar {

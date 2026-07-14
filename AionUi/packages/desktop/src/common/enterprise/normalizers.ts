@@ -310,16 +310,7 @@ const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.d
   };
   setText(result, 'imageUrl', raw.imageUrl, raw.IMAGE_URL, raw.tempPic, raw.TEMP_PIC);
   setText(result, 'summary', raw.summary, raw.SUMMARY, raw.productAbs, raw.PRODUCT_ABS);
-  setText(
-    result,
-    'industry',
-    raw.compIndustry,
-    raw.COMP_INDUSTRY,
-    raw.industry1,
-    raw.INDUSTRY1,
-    raw.industry,
-    raw.INDUSTRY
-  );
+  setText(result, 'industry', raw.industry, raw.INDUSTRY);
   setText(result, 'companyName', raw.companyName, raw.COMPANY_NAME);
   if (result.companyName === undefined && hasDedicatedProductName) setText(result, 'companyName', raw.name, raw.NAME);
   setText(result, 'companyIndustry', raw.compIndustry, raw.COMP_INDUSTRY, raw.industry1, raw.INDUSTRY1);

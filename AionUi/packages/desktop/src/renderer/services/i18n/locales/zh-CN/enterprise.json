@@ -281,13 +281,15 @@
     "actions": {
       "search": "查询产品",
       "reset": "重置筛选",
+      "quickPreview": "快速预览",
       "viewDetails": "查看产品详情",
       "viewCompany": "查看关联企业",
       "closeQuickView": "关闭产品预览"
     },
     "fields": {
       "company": "所属企业",
-      "industry": "所属行业",
+      "industry": "产品行业",
+      "companyIndustry": "企业行业",
       "region": "所在地区",
       "summary": "产品简介",
       "address": "联系地址",

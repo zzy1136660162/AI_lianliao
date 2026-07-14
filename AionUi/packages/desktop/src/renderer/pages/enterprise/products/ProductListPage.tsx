@@ -45,20 +45,9 @@ const ProductCard: React.FC<{
   const { t } = useTranslation();
   const missing = t('enterprise.products.missing');
   const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
+  const displayIndustry = product.industry || product.companyIndustry;
   return (
-    <article
-      className={styles.productCard}
-      tabIndex={0}
-      aria-label={t('enterprise.products.cardLabel', { name: product.name })}
-      onClick={() => onSelect(product)}
-      onDoubleClick={() => onViewDetails(product)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          onSelect(product);
-        }
-      }}
-    >
+    <article className={styles.productCard} aria-label={t('enterprise.products.cardLabel', { name: product.name })}>
       <ProductImage product={product} />
       <div className={styles.cardBody}>
         <div className={styles.cardHeading}>
@@ -66,24 +55,18 @@ const ProductCard: React.FC<{
           <h2>{product.name}</h2>
         </div>
         <div className={styles.cardTags}>
-          {product.industry || product.companyIndustry ? (
-            <Tag>{product.industry || product.companyIndustry}</Tag>
-          ) : null}
+          {displayIndustry ? <Tag>{displayIndustry}</Tag> : null}
           <Tag>{region}</Tag>
         </div>
         <p>{product.summary || missing}</p>
-        <Button
-          className={styles.cardAction}
-          type='text'
-          size='small'
-          icon={<ArrowRight />}
-          onClick={(event) => {
-            event.stopPropagation();
-            onViewDetails(product);
-          }}
-        >
-          {t('enterprise.products.actions.viewDetails')}
-        </Button>
+        <div className={styles.cardActions}>
+          <Button type='text' size='small' onClick={() => onSelect(product)}>
+            {t('enterprise.products.actions.quickPreview')}
+          </Button>
+          <Button type='text' size='small' icon={<ArrowRight />} onClick={() => onViewDetails(product)}>
+            {t('enterprise.products.actions.viewDetails')}
+          </Button>
+        </div>
       </div>
     </article>
   );

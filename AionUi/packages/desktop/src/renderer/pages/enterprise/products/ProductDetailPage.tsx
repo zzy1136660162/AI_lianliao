@@ -69,6 +69,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
 
     const product = detail.data;
     const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
+    const displayIndustry = product.industry || product.companyIndustry;
+    const showCompanyIndustry = Boolean(product.companyIndustry) && product.companyIndustry !== displayIndustry;
     return (
       <div className={styles.detailBody}>
         <section className={styles.detailHero} aria-labelledby='product-name'>
@@ -77,9 +79,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
             <span className={styles.eyebrow}>{t('enterprise.productDetail.profileEyebrow')}</span>
             <h2 id='product-name'>{product.name}</h2>
             <div className={styles.detailTags}>
-              {product.industry || product.companyIndustry ? (
-                <Tag>{product.industry || product.companyIndustry}</Tag>
-              ) : null}
+              {displayIndustry ? <Tag>{displayIndustry}</Tag> : null}
               <Tag>{region}</Tag>
             </div>
             <Link className={styles.detailCompanyLink} to={`/enterprise/companies/${product.companyId}`}>
@@ -97,8 +97,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
               </div>
               <div>
                 <dt>{t('enterprise.products.fields.industry')}</dt>
-                <dd>{product.industry || product.companyIndustry || missing}</dd>
+                <dd>{displayIndustry || missing}</dd>
               </div>
+              {showCompanyIndustry ? (
+                <div>
+                  <dt>{t('enterprise.products.fields.companyIndustry')}</dt>
+                  <dd>{product.companyIndustry}</dd>
+                </div>
+              ) : null}
               <div>
                 <dt>{t('enterprise.products.fields.region')}</dt>
                 <dd>{region}</dd>

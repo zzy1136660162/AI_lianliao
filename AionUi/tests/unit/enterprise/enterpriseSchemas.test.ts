@@ -606,6 +606,48 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it('keeps product and company names and industries separate for product list and detail records', () => {
+    const rawProduct = {
+      id: 51,
+      productsName: 'Product catalog name',
+      name: 'Enterprise projection name',
+      companyName: 'Dedicated enterprise name',
+      companyId: 12,
+      industry: 'Product industry',
+      compIndustry: 'Enterprise industry',
+      industry1: 'Legacy enterprise industry',
+    };
+    const list = parseEnterpriseResponse('product.list', {
+      list: [rawProduct],
+      pageNum: 1,
+      pageSize: 20,
+      pages: 1,
+      total: 1,
+    });
+    const detail = parseEnterpriseResponse('product.detail', rawProduct);
+
+    expect(list).toMatchObject({
+      data: {
+        list: [
+          {
+            name: 'Product catalog name',
+            companyName: 'Dedicated enterprise name',
+            industry: 'Product industry',
+            companyIndustry: 'Enterprise industry',
+          },
+        ],
+      },
+    });
+    expect(detail).toMatchObject({
+      data: {
+        name: 'Product catalog name',
+        companyName: 'Dedicated enterprise name',
+        industry: 'Product industry',
+        companyIndustry: 'Enterprise industry',
+      },
+    });
+  });
+
   it('normalizes product-list company aliases and masks product phones for list and detail', () => {
     const list = parseEnterpriseResponse('product.list', {
       list: [
@@ -647,7 +689,7 @@ describe('enterprise schemas', () => {
         list: [
           {
             companyName: '辽宁装备企业',
-            industry: '装备制造',
+            industry: '产品自填行业',
             companyIndustry: '装备制造',
             province: '辽宁省',
             city: '沈阳市',

@@ -18,6 +18,8 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
   const { t } = useTranslation();
   const missing = t('enterprise.products.missing');
   const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
+  const displayIndustry = product.industry || product.companyIndustry;
+  const showCompanyIndustry = Boolean(product.companyIndustry) && product.companyIndustry !== displayIndustry;
 
   return (
     <aside className={styles.quickView} role='complementary' aria-label={t('enterprise.products.quickView.label')}>
@@ -35,7 +37,7 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
       <div className={styles.quickViewHeading}>
         <span>{t('enterprise.products.quickView.title')}</span>
         <h2>{product.name}</h2>
-        {product.industry || product.companyIndustry ? <Tag>{product.industry || product.companyIndustry}</Tag> : null}
+        {displayIndustry ? <Tag>{displayIndustry}</Tag> : null}
       </div>
 
       <dl className={styles.quickViewFacts}>
@@ -43,6 +45,12 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
           <dt>{t('enterprise.products.fields.company')}</dt>
           <dd>{product.companyName || missing}</dd>
         </div>
+        {showCompanyIndustry ? (
+          <div>
+            <dt>{t('enterprise.products.fields.companyIndustry')}</dt>
+            <dd>{product.companyIndustry}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>{t('enterprise.products.fields.region')}</dt>
           <dd>{region}</dd>
