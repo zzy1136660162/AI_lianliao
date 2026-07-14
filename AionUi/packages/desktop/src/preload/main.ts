@@ -11,12 +11,14 @@
 import '@sentry/electron/preload';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
+import { ENTERPRISE_IPC_CHANNELS } from '../common/enterprise/constants';
+import type { EnterpriseRequest } from '../common/enterprise/contracts';
 
 /**
  * @description 注入到renderer进程中, 用于与main进程通信
  * */
 contextBridge.exposeInMainWorld('electronAPI', {
-  emit: (name: string, data: any) => {
+  emit: (name: string, data: unknown) => {
     return ipcRenderer
       .invoke(
         ADAPTER_BRIDGE_EVENT_KEY,
@@ -30,8 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         throw error;
       });
   },
-  on: (callback: any) => {
-    const handler = (event: any, value: any) => {
+  on: (callback: (payload: { event: unknown; value: unknown }) => void) => {
+    const handler = (event: unknown, value: unknown) => {
       callback({ event, value });
     };
     ipcRenderer.on(ADAPTER_BRIDGE_EVENT_KEY, handler);
@@ -48,6 +50,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Feedback: forward diagnostics logs to the main process console
   logFeedbackEvent: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) =>
     ipcRenderer.send('feedback:renderer-log', payload),
+  enterprise: {
+    createLoginSession: () => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_CREATE),
+    pollLoginSession: (loginKey: string) => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_POLL, loginKey),
+    completeRegistration: (openId: string) =>
+      ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, openId),
+    restoreSession: () => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE),
+    clearSession: () => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
+    request: (request: EnterpriseRequest) => ipcRenderer.invoke(ENTERPRISE_IPC_CHANNELS.REQUEST, request),
+  },
 });
 
 // Synchronously fetch the aioncore port and expose it to the renderer

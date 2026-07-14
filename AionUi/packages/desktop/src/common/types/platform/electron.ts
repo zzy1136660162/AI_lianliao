@@ -1,3 +1,11 @@
+import type {
+  EnterpriseLoginPollResult,
+  EnterpriseLoginSession,
+  EnterpriseRequest,
+  EnterpriseResponse,
+  EnterpriseUserContext,
+} from '../../enterprise/contracts';
+
 // WebUI 状态接口 / WebUI status interface
 export interface WebUIStatus {
   running: boolean;
@@ -21,6 +29,14 @@ export interface ElectronBridgeAPI {
   captureFeedbackScreenshot?: () => Promise<{ filename: string; data: number[] } | null>;
   // Forward feedback diagnostics logs to the main process console / 转发反馈诊断日志到主进程控制台
   logFeedbackEvent?: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) => void;
+  enterprise?: {
+    createLoginSession: () => Promise<EnterpriseLoginSession>;
+    pollLoginSession: (loginKey: string) => Promise<EnterpriseLoginPollResult>;
+    completeRegistration: (openId: string) => Promise<EnterpriseUserContext>;
+    restoreSession: () => Promise<EnterpriseUserContext | null>;
+    clearSession: () => Promise<void>;
+    request: (request: EnterpriseRequest) => Promise<EnterpriseResponse>;
+  };
 }
 
 export type BackendStartupFailureReason =
