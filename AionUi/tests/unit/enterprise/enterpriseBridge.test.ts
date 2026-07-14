@@ -792,6 +792,65 @@ describe('enterprise bridge', () => {
     expect(newApi.request).toHaveBeenCalledWith({ operation: 'project.dashboard', payload: {} }, USER_CONTEXT);
   });
 
+  it('waits for an old pending load across re-init without clearing the persisted session', async () => {
+    const oldLoad = createDeferred<string | null>();
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockReturnValueOnce(oldLoad.promise).mockResolvedValue(OLD_OPEN_ID);
+    const oldApi = makeApiClient();
+    const first = await initializeBridge(oldApi, sessionStore);
+    const oldRestore = invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    await vi.waitFor(() => expect(sessionStore.loadOpenId).toHaveBeenCalledOnce());
+
+    const newApi = makeApiClient();
+    newApi.getUserContext.mockResolvedValue(OLD_USER_CONTEXT);
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({
+      apiClient: newApi,
+      ipcMain: first.ipcMain,
+      sessionStore,
+      senderGuard: () => true,
+    });
+    const newRestore = invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    expect(sessionStore.loadOpenId).toHaveBeenCalledOnce();
+    oldLoad.resolve(OLD_OPEN_ID);
+
+    await expect(oldRestore).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await expect(newRestore).resolves.toEqual(OLD_USER_CONTEXT);
+    expect(sessionStore.loadOpenId).toHaveBeenCalledTimes(2);
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    expect(oldApi.getUserContext).not.toHaveBeenCalled();
+    expect(newApi.getUserContext).toHaveBeenCalledWith(OLD_OPEN_ID);
+  });
+
+  it('does not clear a session when re-init occurs during old network hydration after load', async () => {
+    const oldContext = createDeferred<EnterpriseUserContext>();
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockResolvedValue(OLD_OPEN_ID);
+    const oldApi = makeApiClient();
+    oldApi.getUserContext.mockReturnValue(oldContext.promise);
+    const first = await initializeBridge(oldApi, sessionStore);
+    const oldRestore = invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE);
+    await vi.waitFor(() => expect(oldApi.getUserContext).toHaveBeenCalledWith(OLD_OPEN_ID));
+
+    const newApi = makeApiClient();
+    newApi.getUserContext.mockResolvedValue(OLD_USER_CONTEXT);
+    const { initEnterpriseBridge } = await import('@/process/bridge/enterpriseBridge');
+    initEnterpriseBridge({
+      apiClient: newApi,
+      ipcMain: first.ipcMain,
+      sessionStore,
+      senderGuard: () => true,
+    });
+
+    await expect(invokeHandler(first.handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE)).resolves.toEqual(
+      OLD_USER_CONTEXT
+    );
+    oldContext.resolve(OLD_USER_CONTEXT);
+    await expect(oldRestore).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    expect(sessionStore.clear).not.toHaveBeenCalled();
+    expect(newApi.getUserContext).toHaveBeenCalledWith(OLD_OPEN_ID);
+  });
+
   it('orders an old in-flight save before re-init cleanup and a new restore', async () => {
     const oldSave = createDeferred<void>();
     let persistedOpenId: string | null = null;

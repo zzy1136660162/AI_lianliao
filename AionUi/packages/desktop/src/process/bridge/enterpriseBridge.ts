@@ -175,22 +175,24 @@ export const isTrustedEnterpriseSender: EnterpriseSenderGuard = (event) => {
 let lifecycleEpoch = 0;
 let defaultSessionStore: EnterpriseSessionStoreDependency | undefined;
 let sessionMutationQueue: Promise<void> = Promise.resolve();
-let pendingSessionMutations = 0;
+let pendingSessionWrites = 0;
+
+type EnterpriseSessionOperationKind = 'read' | 'write';
 
 const getDefaultSessionStore = (): EnterpriseSessionStoreDependency => {
   defaultSessionStore ??= new EnterpriseSessionStore(app.getPath('userData'));
   return defaultSessionStore;
 };
 
-const enqueueSessionMutation = <T>(operation: () => Promise<T>): Promise<T> => {
-  pendingSessionMutations += 1;
+const enqueueSessionMutation = <T>(kind: EnterpriseSessionOperationKind, operation: () => Promise<T>): Promise<T> => {
+  if (kind === 'write') pendingSessionWrites += 1;
   const current = sessionMutationQueue.then(operation, operation);
   sessionMutationQueue = current.then(
     (): undefined => undefined,
     (): undefined => undefined
   );
   return current.finally(() => {
-    pendingSessionMutations -= 1;
+    if (kind === 'write') pendingSessionWrites -= 1;
   });
 };
 
@@ -202,9 +204,9 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
   const sessionStore = dependencies.sessionStore ?? getDefaultSessionStore();
   const ipcMain = dependencies.ipcMain ?? (electronIpcMain as EnterpriseIpcMain);
   const senderGuard = dependencies.senderGuard ?? isTrustedEnterpriseSender;
-  const needsReinitializationCleanup = pendingSessionMutations > 0;
+  const needsReinitializationCleanup = pendingSessionWrites > 0;
   const lifecycleReady = needsReinitializationCleanup
-    ? enqueueSessionMutation(() => sessionStore.clear())
+    ? enqueueSessionMutation('write', () => sessionStore.clear())
     : Promise.resolve();
   void lifecycleReady.catch((): undefined => undefined);
 
@@ -217,9 +219,12 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     if (lifecycleEpoch !== epoch) throw bridgeError('MISSING_CONTEXT');
   };
 
-  const runSessionMutation = async <T>(operation: () => Promise<T>): Promise<T> => {
+  const runSessionMutation = async <T>(
+    kind: EnterpriseSessionOperationKind,
+    operation: () => Promise<T>
+  ): Promise<T> => {
     assertCurrentLifecycle();
-    const result = await enqueueSessionMutation(async () => {
+    const result = await enqueueSessionMutation(kind, async () => {
       assertCurrentLifecycle();
       return operation();
     });
@@ -232,7 +237,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     sessionGeneration += 1;
     activeContext = null;
     automaticHydrationBlocked = true;
-    await runSessionMutation(() => sessionStore.clear());
+    await runSessionMutation('write', () => sessionStore.clear());
     assertCurrentLifecycle();
     automaticHydrationBlocked = false;
   };
@@ -245,7 +250,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
 
     const generationAtStart = sessionGeneration;
     const hydration = (async (): Promise<EnterpriseUserContext | null> => {
-      const openId = await runSessionMutation(() => sessionStore.loadOpenId());
+      const openId = await runSessionMutation('read', () => sessionStore.loadOpenId());
       assertCurrentLifecycle();
       if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
       if (openId === null) return null;
@@ -292,7 +297,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     activeContext = null;
     automaticHydrationBlocked = true;
 
-    await runSessionMutation(() => sessionStore.saveOpenId(openId));
+    await runSessionMutation('write', () => sessionStore.saveOpenId(openId));
     assertCurrentLifecycle();
     if (sessionGeneration !== commitGeneration) throw bridgeError('MISSING_CONTEXT');
     activeContext = context;
