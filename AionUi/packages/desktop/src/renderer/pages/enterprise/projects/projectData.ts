@@ -308,7 +308,15 @@ const parseProjectSummary = (value: unknown): EnterpriseProjectSummary | null =>
   return project;
 };
 
-const isMaskedPhone = (value: string): boolean => /^\*{1,}$/.test(value) || value.endsWith('****');
+const MASKED_PHONE_CHARACTERS = /^[\p{L}\p{N}\s+()\-\u2013\u2014/,.\uff0c\u3001\uff1b;:*#]+$/u;
+const COMPLETE_PHONE_CANDIDATE = /\d(?:[\s().\-\u2013\u2014]*\d){6,19}/u;
+
+const isMaskedPhone = (value: string): boolean =>
+  value.length <= 256 &&
+  value.includes('*') &&
+  !/\p{C}/u.test(value) &&
+  !COMPLETE_PHONE_CANDIDATE.test(value) &&
+  MASKED_PHONE_CHARACTERS.test(value);
 
 const parseProjectDetailRecord = (value: unknown): EnterpriseProjectDetail | null => {
   const project = parseDetailRecord(value);

@@ -223,6 +223,28 @@ describe('project dashboard and catalog', () => {
     );
   });
 
+  it('bounds project filter controls before they can reach IPC', async () => {
+    renderProjects(createClient(createRequest()));
+    await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
+
+    expect(screen.getByPlaceholderText('enterprise.projects.filters.keywordPlaceholder')).toHaveAttribute(
+      'maxlength',
+      '100'
+    );
+    expect(screen.getByPlaceholderText('enterprise.projects.filters.categoryL1Placeholder')).toHaveAttribute(
+      'maxlength',
+      '200'
+    );
+    expect(screen.getByPlaceholderText('enterprise.projects.filters.provincePlaceholder')).toHaveAttribute(
+      'maxlength',
+      '100'
+    );
+    expect(screen.getByPlaceholderText('enterprise.projects.filters.minInvestmentPlaceholder')).toHaveAttribute(
+      'aria-valuemax',
+      '1000000000000'
+    );
+  });
+
   it('keeps old rows while paging, clears preview and ignores stale responses', async () => {
     const pageTwo = deferred<EnterpriseResponse>();
     const pageThree = deferred<EnterpriseResponse>();
@@ -269,6 +291,60 @@ describe('project dashboard and catalog', () => {
     expect(within(quickView).getByRole('button', { name: 'enterprise.projects.actions.viewDetails' })).toBeVisible();
   });
 
+  it.each([
+    ['desktop close button', false, 'button'],
+    ['compact Escape', true, 'escape'],
+  ] as const)('restores row focus after %s closes the quick view', async (_label, compact, closeMethod) => {
+    window.matchMedia = createMatchMedia(compact, true);
+    const user = userEvent.setup();
+    renderProjects(createClient(createRequest()));
+
+    const row = (await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).closest(
+      'tr'
+    ) as HTMLElement;
+    row.focus();
+    await user.keyboard('{Enter}');
+    const quickView = screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' });
+    await waitFor(() => expect(quickView).toHaveFocus());
+    if (closeMethod === 'escape') {
+      await user.keyboard('{Escape}');
+    } else {
+      await user.click(within(quickView).getByRole('button', { name: 'enterprise.projects.actions.closeQuickView' }));
+    }
+
+    await waitFor(() => expect(row).toHaveFocus());
+    expect(screen.queryByRole('complementary', { name: 'enterprise.projects.quickView.label' })).toBeNull();
+  });
+
+  it('moves focus to the stable catalog region when paging clears a preview row', async () => {
+    const user = userEvent.setup();
+    const request = vi.fn<EnterpriseClient['request']>((operation) => {
+      if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
+      if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
+      return Promise.resolve(
+        listResponse('Paged project', operation.payload.pageNum === 2 ? '902' : '901', operation.payload.pageNum, 21)
+      );
+    });
+    const { container } = renderProjects(createClient(request));
+
+    const row = (await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).closest(
+      'tr'
+    ) as HTMLElement;
+    row.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() =>
+      expect(screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' })).toHaveFocus()
+    );
+    const pageTwo = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
+      (item) => item.textContent === '2'
+    ) as HTMLElement;
+    await user.click(pageTwo);
+
+    const catalog = screen.getByRole('region', { name: 'enterprise.projects.catalog.title' });
+    await waitFor(() => expect(catalog).toHaveFocus());
+    expect(document.body).not.toHaveFocus();
+  });
+
   it('shows a safe retryable error with an empty list and never injects H5 mock projects', async () => {
     const request = vi.fn<EnterpriseClient['request']>().mockRejectedValue(new Error('raw-openid-secret'));
     const { container } = renderProjects(createClient(request));
@@ -302,7 +378,7 @@ describe('project detail permission display', () => {
         projectName: 'Factory expansion',
         constructionUnit: 'Secret owner',
         contactName: 'Secret contact',
-        phone: '1380000****',
+        phone: '138********',
         address: 'Secret address',
         constructionNature: 'New build',
         totalInvestment: 5000,

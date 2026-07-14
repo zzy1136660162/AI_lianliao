@@ -37,6 +37,12 @@ const ProjectQuickView: React.FC<ProjectQuickViewProps> = ({ project, onClose, o
       role='complementary'
       tabIndex={-1}
       aria-label={t('enterprise.projects.quickView.label')}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
     >
       <div className={styles.quickViewIndex}>
         {t('enterprise.projects.quickView.index', { index: project.hpInfoId.slice(-4).padStart(4, '0') })}

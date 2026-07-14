@@ -1,6 +1,6 @@
 import { Button, Form, Input, InputNumber } from '@arco-design/web-react';
 import { Refresh, Search } from '@icon-park/react';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,21 +25,33 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
   const catalog = useProjectCatalog(client);
   const [draftFilters, setDraftFilters] = useState<ProjectFilters>({});
   const [selectedProject, setSelectedProject] = useState<EnterpriseProjectSummary | null>(null);
+  const selectionTriggerRef = useRef<HTMLTableRowElement | null>(null);
+  const catalogSectionRef = useRef<HTMLElement | null>(null);
+
+  const clearPreviewAndFocus = (preferredTarget?: HTMLElement | null) => {
+    const hadSelection = selectedProject !== null;
+    setSelectedProject(null);
+    if (!hadSelection) return;
+    window.requestAnimationFrame(() => {
+      const target = preferredTarget?.isConnected ? preferredTarget : catalogSectionRef.current;
+      target?.focus({ preventScroll: true });
+    });
+  };
 
   const viewDetails = (project: EnterpriseProjectSummary) => {
     navigate(`/enterprise/projects/${encodeURIComponent(project.hpInfoId)}`);
   };
   const applyFilters = () => {
-    setSelectedProject(null);
+    clearPreviewAndFocus(catalogSectionRef.current);
     catalog.applyFilters(draftFilters);
   };
   const resetFilters = () => {
     setDraftFilters({});
-    setSelectedProject(null);
+    clearPreviewAndFocus(catalogSectionRef.current);
     catalog.applyFilters({});
   };
   const changePage = (pageNum: number, pageSize?: number) => {
-    setSelectedProject(null);
+    clearPreviewAndFocus(catalogSectionRef.current);
     catalog.changePage(pageNum, pageSize);
   };
   const retry = () => {
@@ -73,7 +85,12 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
     return (
       <>
         <ProjectDashboard data={overview.data} />
-        <section className={styles.catalogSection} aria-labelledby='project-catalog-title'>
+        <section
+          ref={catalogSectionRef}
+          className={styles.catalogSection}
+          aria-labelledby='project-catalog-title'
+          tabIndex={-1}
+        >
           <div className={styles.sectionHeading}>
             <div>
               <span>{t('enterprise.projects.catalog.eyebrow')}</span>
@@ -93,14 +110,17 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
                 page={catalog.data}
                 loading={catalog.isLoading && catalog.isRetainingData}
                 selected={selectedProject}
-                onSelect={setSelectedProject}
+                onSelect={(project, trigger) => {
+                  selectionTriggerRef.current = trigger;
+                  setSelectedProject(project);
+                }}
                 onViewDetails={viewDetails}
                 onPageChange={changePage}
               />
               {selectedProject ? (
                 <ProjectQuickView
                   project={selectedProject}
-                  onClose={() => setSelectedProject(null)}
+                  onClose={() => clearPreviewAndFocus(selectionTriggerRef.current)}
                   onViewDetails={viewDetails}
                 />
               ) : null}
@@ -120,6 +140,15 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
     'province',
     'city',
   ] as const;
+  const textFieldLimits: Record<(typeof textFields)[number], number> = {
+    keyword: 100,
+    categoryL1: 200,
+    categoryL2: 200,
+    materialShortName: 200,
+    materialName: 200,
+    province: 100,
+    city: 100,
+  };
 
   return (
     <section className={styles.page} aria-labelledby='project-page-title'>
@@ -137,6 +166,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
           <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
             <Input
               value={draftFilters[field]}
+              maxLength={textFieldLimits[field]}
               allowClear
               placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
               onChange={(value) => setDraftFilters((current) => ({ ...current, [field]: value }))}
@@ -148,6 +178,8 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
             <InputNumber
               value={draftFilters[field]}
               min={0}
+              max={1_000_000_000_000}
+              aria-valuemax={1_000_000_000_000}
               precision={2}
               placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
               onChange={(value) =>

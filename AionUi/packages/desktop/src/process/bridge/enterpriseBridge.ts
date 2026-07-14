@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { types as nodeTypes } from 'node:util';
 
 import { app, BrowserWindow, ipcMain as electronIpcMain } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
@@ -73,8 +74,107 @@ const parseStrictEnterpriseRequest = (value: unknown): EnterpriseRequest | undef
   return parsed.data;
 };
 
-/** Defense in depth for injected API clients: raw contact phones must not cross Electron IPC. */
-const protectEnterprisePhones = (response: EnterpriseResponse): EnterpriseResponse => {
+const DANGEROUS_RESPONSE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const MAX_RESPONSE_CLONE_DEPTH = 8;
+const MAX_RESPONSE_CLONE_NODES = 4096;
+const MAX_RESPONSE_CLONE_OWN_KEYS = 8192;
+const MAX_RESPONSE_ARRAY_LENGTH = 1000;
+
+type EnterpriseResponseCloneBudget = {
+  nodesRemaining: number;
+  ownKeysRemaining: number;
+};
+
+/** Copies only plain clone data without touching accessors or accepting Proxy-backed values. */
+const cloneEnterpriseResponseData = (
+  value: unknown,
+  ancestors: WeakSet<object> = new WeakSet<object>(),
+  depth = 0,
+  budget: EnterpriseResponseCloneBudget = {
+    nodesRemaining: MAX_RESPONSE_CLONE_NODES,
+    ownKeysRemaining: MAX_RESPONSE_CLONE_OWN_KEYS,
+  }
+): unknown => {
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
+    return value;
+  }
+  if (
+    typeof value !== 'object' ||
+    depth > MAX_RESPONSE_CLONE_DEPTH ||
+    nodeTypes.isProxy(value) ||
+    ancestors.has(value) ||
+    budget.nodesRemaining <= 0
+  ) {
+    throw bridgeError('REQUEST_FAILED');
+  }
+
+  budget.nodesRemaining -= 1;
+  ancestors.add(value);
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    const ownKeys = Reflect.ownKeys(value);
+    if (ownKeys.length > budget.ownKeysRemaining) throw bridgeError('REQUEST_FAILED');
+    budget.ownKeysRemaining -= ownKeys.length;
+    if (Array.isArray(value)) {
+      if (prototype !== Array.prototype) throw bridgeError('REQUEST_FAILED');
+      const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+      const length = lengthDescriptor?.value;
+      if (
+        !Number.isSafeInteger(length) ||
+        length < 0 ||
+        length > MAX_RESPONSE_ARRAY_LENGTH ||
+        ownKeys.length !== length + 1
+      ) {
+        throw bridgeError('REQUEST_FAILED');
+      }
+      const result: unknown[] = [];
+      for (let index = 0; index < length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+          throw bridgeError('REQUEST_FAILED');
+        }
+        result.push(cloneEnterpriseResponseData(descriptor.value, ancestors, depth + 1, budget));
+      }
+      return result;
+    }
+
+    if (prototype !== Object.prototype && prototype !== null) throw bridgeError('REQUEST_FAILED');
+    const result: Record<string, unknown> = {};
+    for (const key of ownKeys) {
+      if (typeof key !== 'string' || DANGEROUS_RESPONSE_KEYS.has(key)) throw bridgeError('REQUEST_FAILED');
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (!descriptor?.enumerable || !Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        throw bridgeError('REQUEST_FAILED');
+      }
+      result[key] = cloneEnterpriseResponseData(descriptor.value, ancestors, depth + 1, budget);
+    }
+    return result;
+  } catch (error) {
+    if (error instanceof EnterpriseBridgeError) throw error;
+    throw bridgeError('REQUEST_FAILED');
+  } finally {
+    ancestors.delete(value);
+  }
+};
+
+/** Defense in depth for injected API clients: validate a plain response before applying phone policy. */
+const protectEnterpriseResponse = (untrustedResponse: unknown, expectedOperation: EnterpriseRequest['operation']) => {
+  const cloned = cloneEnterpriseResponseData(untrustedResponse);
+  if (typeof cloned !== 'object' || cloned === null || Array.isArray(cloned)) throw bridgeError('REQUEST_FAILED');
+  const fields = Object.keys(cloned);
+  if (fields.length !== 2 || !fields.includes('operation') || !fields.includes('data')) {
+    throw bridgeError('REQUEST_FAILED');
+  }
+  const envelope = cloned as Record<string, unknown>;
+  if (envelope.operation !== expectedOperation) throw bridgeError('REQUEST_FAILED');
+  const response = envelope as unknown as EnterpriseResponse;
+
   if (response.operation === 'company.detail' && response.data.phone !== undefined) {
     return {
       operation: 'company.detail',
@@ -480,7 +580,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
         const response = await apiClient.request(parsedRequest, context);
         assertCurrentLifecycle();
         if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
-        return protectEnterprisePhones(response);
+        return protectEnterpriseResponse(response, parsedRequest.operation);
       }),
     ],
   ];

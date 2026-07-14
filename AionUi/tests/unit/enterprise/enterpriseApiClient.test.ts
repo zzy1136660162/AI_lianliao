@@ -572,7 +572,7 @@ describe('EnterpriseApiClient serialization and context injection', () => {
     expect(response).toMatchObject({
       operation: 'company.detail',
       data: {
-        phone: '1380000****',
+        phone: '138********',
         description: 'Detailed introduction',
         businessSummary: 'Business summary',
       },

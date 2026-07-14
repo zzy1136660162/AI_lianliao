@@ -833,7 +833,7 @@ describe('enterprise bridge', () => {
 
     const response = await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
 
-    expect(response).toMatchObject({ data: { phone: '1380000****' } });
+    expect(response).toMatchObject({ data: { phone: '138********' } });
     expect(JSON.stringify(response)).not.toContain(rawPhone);
   });
 
@@ -868,8 +868,8 @@ describe('enterprise bridge', () => {
 
       expect(response).toMatchObject(
         operation === 'product.list'
-          ? { data: { list: [{ phone: '1380000****' }] } }
-          : { data: { phone: '1380000****' } }
+          ? { data: { list: [{ phone: '138********' }] } }
+          : { data: { phone: '138********' } }
       );
       expect(JSON.stringify(response)).not.toContain(rawPhone);
     }
@@ -894,11 +894,125 @@ describe('enterprise bridge', () => {
 
       const response = await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
 
-      expect(response).toMatchObject({ data: { phone: '1380000****' } });
+      expect(response).toMatchObject({ data: { phone: '138********' } });
       if (purchased === false) expect(response).toMatchObject({ data: { purchased: false } });
       expect(JSON.stringify(response)).not.toContain(rawPhone);
     }
   );
+
+  it.each([
+    ['13800000000转8012', '138********转8012'],
+    ['138 0000 0000转8012', '138********转8012'],
+    ['138.0000.0000转8012', '138********转8012'],
+    ['(138) 0000-0000', '(138********'],
+    ['13800000000****', '138************'],
+    ['13800000000 / 02412345678', '138******** / 024********'],
+  ])('masks every phone-like digit run at the final IPC boundary: %s', async (rawPhone, expectedPhone) => {
+    const request: EnterpriseRequest = { operation: 'project.detail', payload: { hpInfoId: '901' } };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockResolvedValue({
+      operation: 'project.detail',
+      data: { hpInfoId: '901', projectName: 'Factory', phone: rawPhone, purchased: false },
+    });
+    const { handlers } = await initializeBridge(apiClient);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    const response = (await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)) as {
+      data: { phone: string };
+    };
+
+    expect(response.data.phone).toBe(expectedPhone);
+    expect(response.data.phone).not.toMatch(/\d{7,}/u);
+  });
+
+  it.each(['operation', 'data', 'phone', 'purchased'] as const)(
+    'rejects an injected business response with a %s accessor without invoking it',
+    async (accessorField) => {
+      let getterCalls = 0;
+      const response: Record<string, unknown> = {
+        operation: 'project.detail',
+        data: { hpInfoId: '901', projectName: 'Factory', phone: '13800000000', purchased: false },
+      };
+      const accessorOwner = accessorField === 'operation' || accessorField === 'data' ? response : response.data;
+      Object.defineProperty(accessorOwner, accessorField, {
+        enumerable: true,
+        get: () => {
+          getterCalls += 1;
+          return accessorField === 'purchased' ? false : '13800000000';
+        },
+      });
+      const request: EnterpriseRequest = { operation: 'project.detail', payload: { hpInfoId: '901' } };
+      const apiClient = makeApiClient();
+      apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+      apiClient.request.mockResolvedValue(response);
+      const { handlers } = await initializeBridge(apiClient);
+      await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+      await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).rejects.toMatchObject({
+        code: 'REQUEST_FAILED',
+      });
+      expect(getterCalls).toBe(0);
+    }
+  );
+
+  it('rejects an injected Proxy response before reading its operation or data', async () => {
+    let sensitiveReads = 0;
+    const response = new Proxy(
+      {
+        operation: 'project.detail',
+        data: { hpInfoId: '901', projectName: 'Factory', phone: '13800000000', purchased: false },
+      },
+      {
+        get: (target, key, receiver) => {
+          if (key === 'operation' || key === 'data') sensitiveReads += 1;
+          return Reflect.get(target, key, receiver);
+        },
+      }
+    );
+    const request: EnterpriseRequest = { operation: 'project.detail', payload: { hpInfoId: '901' } };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockResolvedValue(response);
+    const { handlers } = await initializeBridge(apiClient);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).rejects.toMatchObject({
+      code: 'REQUEST_FAILED',
+    });
+    expect(sensitiveReads).toBe(0);
+  });
+
+  it.each([
+    [
+      'excessive depth',
+      () => {
+        const data: Record<string, unknown> = { hpInfoId: '901', projectName: 'Factory' };
+        let cursor = data;
+        for (let depth = 0; depth < 10; depth += 1) {
+          const next: Record<string, unknown> = {};
+          cursor.extra = next;
+          cursor = next;
+        }
+        return data;
+      },
+    ],
+    [
+      'oversized array',
+      () => ({ hpInfoId: '901', projectName: 'Factory', extra: Array.from({ length: 1001 }, () => null) }),
+    ],
+  ] as const)('rejects an injected business response with an %s budget violation', async (_label, makeData) => {
+    const request: EnterpriseRequest = { operation: 'project.detail', payload: { hpInfoId: '901' } };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockResolvedValue({ operation: 'project.detail', data: makeData() });
+    const { handlers } = await initializeBridge(apiClient);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).rejects.toMatchObject({
+      code: 'REQUEST_FAILED',
+    });
+  });
 
   it('discards a pending business response after a successful clear changes the session generation', async () => {
     const pendingResponse = createDeferred<{ operation: 'project.dashboard'; data: { secret: string } }>();

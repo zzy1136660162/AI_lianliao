@@ -262,4 +262,32 @@ describe('project detail boundary', () => {
     });
     await expectCode(loadProjectDetail(createClient(request), '901', new AbortController().signal), 'INVALID_RESPONSE');
   });
+
+  it.each([
+    ['extension text', '13800000000转8012', false],
+    ['grouped complete number', '138 0000 0000转8012', false],
+    ['dot-grouped complete number', '138.0000.0000转8012', false],
+    ['parenthesized complete number', '(138) 0000-0000', false],
+    ['raw digits followed by stars', '13800000000****', false],
+    ['multiple raw phones', '13800000000 / 02412345678', false],
+    ['missing purchase permission', '13800000000', undefined],
+  ] as const)('rejects %s when project phone permission is not explicit', async (_label, phone, purchased) => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'project.detail',
+      data: { ...project, phone, purchased },
+    });
+
+    await expectCode(loadProjectDetail(createClient(request), '901', new AbortController().signal), 'INVALID_RESPONSE');
+  });
+
+  it('accepts a strongly masked extension phone for an unpurchased project', async () => {
+    const detail = { ...project, phone: '138********转8012', purchased: false };
+    const request = vi
+      .fn<EnterpriseClient['request']>()
+      .mockResolvedValue({ operation: 'project.detail', data: detail });
+
+    await expect(loadProjectDetail(createClient(request), '901', new AbortController().signal)).resolves.toEqual(
+      detail
+    );
+  });
 });

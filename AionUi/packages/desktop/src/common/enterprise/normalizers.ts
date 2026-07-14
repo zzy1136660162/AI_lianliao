@@ -35,10 +35,22 @@ const optionalText = (...values: unknown[]): string | undefined => {
   return typeof value === 'string' ? value.trim() : undefined;
 };
 
-/** Mirrors the H5 getPhonexxx policy so full company phones never leave the trusted boundary. */
+const COMPLETE_PHONE_DIGIT_RUN = /\d(?:[\s().\-\u2013\u2014]*\d){6,19}/gu;
+
+/** Masks every complete phone-like digit run, including multiple numbers and extension text. */
 export const maskEnterprisePhone = (phone: string | null | undefined): string => {
   const value = String(phone || '');
   if (!value) return '';
+  let foundCompleteNumber = false;
+  const maskedNumbers = value.replace(COMPLETE_PHONE_DIGIT_RUN, (candidate) => {
+    foundCompleteNumber = true;
+    const digits = candidate.replace(/\D/gu, '');
+    return `${digits.slice(0, 3)}${'*'.repeat(digits.length - 3)}`;
+  });
+  if (foundCompleteNumber) return maskedNumbers;
+  if (value.includes('*')) {
+    return /\*+\d{1,6}$/u.test(value) ? value.replace(/\d{1,6}$/u, (digits) => '*'.repeat(digits.length)) : value;
+  }
   if (value.length <= 4) return '*'.repeat(value.length);
   return `${value.slice(0, -4)}****`;
 };

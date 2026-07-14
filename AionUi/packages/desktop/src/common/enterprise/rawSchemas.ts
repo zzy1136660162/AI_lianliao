@@ -10,6 +10,13 @@ const positiveIntegerSchema = z.number().int().positive().refine(Number.isSafeIn
 const nonNegativeIntegerSchema = z.number().int().nonnegative().refine(Number.isSafeInteger, 'Expected a safe integer');
 const requestIdentifierSchema = z.string().trim().min(1);
 const projectRequestIdentifierSchema = z.string().regex(/^[1-9]\d{0,30}$/);
+const projectKeywordSchema = z.string().max(100);
+const projectShortTextSchema = z.string().max(100);
+const projectLongTextSchema = z.string().max(200);
+const projectDateSchema = z.string().max(32);
+const projectPageNumSchema = positiveIntegerSchema.refine((value) => value <= 1_000_000, 'Page number is too large');
+const projectPageSizeSchema = positiveIntegerSchema.refine((value) => value <= 100, 'Page size is too large');
+const projectInvestmentSchema = z.number().finite().nonnegative().max(1_000_000_000_000);
 const FORBIDDEN_OBJECT_KEYS = ['__proto__', 'prototype', 'constructor'] as const;
 
 const hasOwn = (input: object, key: string): boolean => Object.prototype.hasOwnProperty.call(input, key);
@@ -538,14 +545,14 @@ const projectDrillQuerySchema = guardedObject(
   z
     .object({
       level: z.enum(ENTERPRISE_PROJECT_DRILL_LEVELS),
-      runId: z.string().optional(),
-      province: z.string().optional(),
-      city: z.string().optional(),
-      budgetRange: z.string().optional(),
-      categoryL1: z.string().optional(),
-      categoryL2: z.string().optional(),
-      materialShortName: z.string().optional(),
-      materialName: z.string().optional(),
+      runId: projectShortTextSchema.optional(),
+      province: projectShortTextSchema.optional(),
+      city: projectShortTextSchema.optional(),
+      budgetRange: projectShortTextSchema.optional(),
+      categoryL1: projectLongTextSchema.optional(),
+      categoryL2: projectLongTextSchema.optional(),
+      materialShortName: projectLongTextSchema.optional(),
+      materialName: projectLongTextSchema.optional(),
       minProjectCount: nonNegativeIntegerSchema.optional(),
     })
     .strict(),
@@ -555,23 +562,23 @@ const projectDrillQuerySchema = guardedObject(
 const projectListQuerySchema = guardedObject(
   z
     .object({
-      keyword: z.string().optional(),
-      runId: z.string().optional(),
-      categoryL1: z.string().optional(),
-      categoryL2: z.string().optional(),
-      materialShortName: z.string().optional(),
-      materialName: z.string().optional(),
-      province: z.string().optional(),
-      city: z.string().optional(),
-      budgetRange: z.string().optional(),
-      constructionNature: z.string().optional(),
-      investmentType: z.string().optional(),
-      publishedFrom: z.string().optional(),
-      publishedTo: z.string().optional(),
-      minInvestment: z.number().finite().nonnegative().optional(),
-      maxInvestment: z.number().finite().nonnegative().optional(),
-      pageNum: positiveIntegerSchema,
-      pageSize: positiveIntegerSchema,
+      keyword: projectKeywordSchema.optional(),
+      runId: projectShortTextSchema.optional(),
+      categoryL1: projectLongTextSchema.optional(),
+      categoryL2: projectLongTextSchema.optional(),
+      materialShortName: projectLongTextSchema.optional(),
+      materialName: projectLongTextSchema.optional(),
+      province: projectShortTextSchema.optional(),
+      city: projectShortTextSchema.optional(),
+      budgetRange: projectShortTextSchema.optional(),
+      constructionNature: projectShortTextSchema.optional(),
+      investmentType: projectShortTextSchema.optional(),
+      publishedFrom: projectDateSchema.optional(),
+      publishedTo: projectDateSchema.optional(),
+      minInvestment: projectInvestmentSchema.optional(),
+      maxInvestment: projectInvestmentSchema.optional(),
+      pageNum: projectPageNumSchema,
+      pageSize: projectPageSizeSchema,
     })
     .strict(),
   ['pageNum', 'pageSize']
@@ -583,7 +590,7 @@ const companyDetailPayloadSchema = guardedObject(z.object({ companyId: requestId
 const productDetailPayloadSchema = guardedObject(z.object({ productId: requestIdentifierSchema }).strict(), [
   'productId',
 ]);
-const projectDashboardPayloadSchema = guardedObject(z.object({ runId: z.string().optional() }).strict());
+const projectDashboardPayloadSchema = guardedObject(z.object({ runId: projectShortTextSchema.optional() }).strict());
 const projectDetailPayloadSchema = guardedObject(z.object({ hpInfoId: projectRequestIdentifierSchema }).strict(), [
   'hpInfoId',
 ]);

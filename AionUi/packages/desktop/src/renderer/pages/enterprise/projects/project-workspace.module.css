@@ -255,6 +255,11 @@
   margin-top: 14px;
 }
 
+.catalogSection:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .catalog,
 .catalogWithPreview {
   display: grid;

@@ -407,6 +407,34 @@ describe('enterprise schemas', () => {
   });
 
   it.each([
+    ['keyword', 'x'.repeat(101)],
+    ['categoryL1', 'x'.repeat(201)],
+    ['materialName', 'x'.repeat(201)],
+    ['province', 'x'.repeat(101)],
+    ['publishedFrom', 'x'.repeat(33)],
+  ])('rejects an overlong project list %s before IPC', (field, value) => {
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'project.list',
+        payload: { [field]: value, pageNum: 1, pageSize: 20 },
+      }).success
+    ).toBe(false);
+  });
+
+  it.each([
+    { operation: 'project.list', payload: { pageNum: 1_000_001, pageSize: 20 } },
+    { operation: 'project.list', payload: { pageNum: 1, pageSize: 101 } },
+    { operation: 'project.dashboard', payload: { runId: 'x'.repeat(101) } },
+    { operation: 'project.drill', payload: { level: 'l1', categoryL2: 'x'.repeat(201) } },
+    {
+      operation: 'project.list',
+      payload: { minInvestment: 1_000_000_000_001, pageNum: 1, pageSize: 20 },
+    },
+  ] as const)('rejects an unreasonable project request boundary before IPC', (request) => {
+    expect(enterpriseRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  it.each([
     {
       operation: 'company.list',
       payload: { pageNum: Number.MAX_SAFE_INTEGER + 1, pageSize: 20 },
@@ -574,7 +602,7 @@ describe('enterprise schemas', () => {
   it.each([
     ['', ''],
     ['1234', '****'],
-    ['13800000000', '1380000****'],
+    ['13800000000', '138********'],
     ['138****0000', '138********'],
     ['***********', '***********'],
   ])('masks a company-detail phone at the shared response boundary: %s', (phone, expectedPhone) => {
@@ -586,6 +614,26 @@ describe('enterprise schemas', () => {
 
     expect(response).toMatchObject({ data: { phone: expectedPhone } });
     expect(JSON.stringify(response)).not.toContain(phone === expectedPhone ? '138****0000' : phone || 'raw-phone');
+  });
+
+  it.each([
+    ['13800000000转8012', '138********转8012'],
+    ['138 0000 0000转8012', '138********转8012'],
+    ['138.0000.0000转8012', '138********转8012'],
+    ['(138) 0000-0000', '(138********'],
+    ['13800000000****', '138************'],
+    ['13800000000 / 02412345678', '138******** / 024********'],
+    ['1380000****', '138********'],
+  ])('masks every complete phone-like digit run in shared responses: %s', (phone, expectedPhone) => {
+    const response = parseEnterpriseResponse('project.detail', {
+      HP_INFO_ID: 901,
+      PROJECT_NAME: 'Factory Project',
+      PHONE: phone,
+      IS_PURCHASED: false,
+    });
+
+    expect(response).toMatchObject({ data: { phone: expectedPhone, purchased: false } });
+    expect((response.data as { phone: string }).phone).not.toMatch(/\d{7,}/u);
   });
 
   it('uses COM_INTRO for the profile description while keeping COM_ABS as the business summary', () => {
@@ -622,7 +670,7 @@ describe('enterprise schemas', () => {
         companyId: '12',
         companyName: 'Acme',
         summary: 'High-efficiency pump',
-        phone: '1380000****',
+        phone: '138********',
       },
     });
   });
@@ -717,12 +765,12 @@ describe('enterprise schemas', () => {
             district: '浑南区',
             address: '沈阳市浑南区产业路 8 号',
             contactName: '企业联系人',
-            phone: '1380000****',
+            phone: '138********',
           },
         ],
       },
     });
-    expect(detail).toMatchObject({ data: { phone: '1390000****' } });
+    expect(detail).toMatchObject({ data: { phone: '139********' } });
     expect(JSON.stringify({ list, detail })).not.toMatch(/13800000000|13900000000/);
   });
 
@@ -1064,7 +1112,7 @@ describe('enterprise schemas', () => {
       IS_PURCHASED: purchased,
     });
 
-    expect(response).toMatchObject({ data: { phone: '1380000****' } });
+    expect(response).toMatchObject({ data: { phone: '138********' } });
     if (purchased === false) expect(response).toMatchObject({ data: { purchased: false } });
     expect(JSON.stringify(response)).not.toContain('13800000000');
   });

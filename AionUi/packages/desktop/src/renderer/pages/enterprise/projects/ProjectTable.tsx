@@ -11,7 +11,7 @@ export type ProjectTableProps = {
   page: EnterprisePage<EnterpriseProjectSummary>;
   loading: boolean;
   selected: EnterpriseProjectSummary | null;
-  onSelect: (project: EnterpriseProjectSummary) => void;
+  onSelect: (project: EnterpriseProjectSummary, trigger: HTMLTableRowElement) => void;
   onViewDetails: (project: EnterpriseProjectSummary) => void;
   onPageChange: (pageNum: number, pageSize?: number) => void;
 };
@@ -110,12 +110,12 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
         onRow={(project) => ({
           tabIndex: 0,
           'aria-label': t('enterprise.projects.rowLabel', { name: displayProjectName(project, false, t) }),
-          onClick: () => onSelect(project),
+          onClick: (event: React.MouseEvent<HTMLTableRowElement>) => onSelect(project, event.currentTarget),
           onDoubleClick: () => onViewDetails(project),
           onKeyDown: (event: React.KeyboardEvent<HTMLTableRowElement>) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              onSelect(project);
+              onSelect(project, event.currentTarget);
             }
           },
         })}
