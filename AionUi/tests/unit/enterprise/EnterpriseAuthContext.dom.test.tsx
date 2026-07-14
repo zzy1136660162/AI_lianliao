@@ -123,9 +123,38 @@ describe('EnterpriseAuthProvider', () => {
 
     await flushPromises();
 
-    expect(screen.getByTestId('status')).toHaveTextContent('authenticated');
+    expect(screen.getByTestId('status')).toHaveTextContent(/^authenticated$/);
     expect(screen.getByTestId('user')).toHaveTextContent('辽宁示例企业');
     expect(restoreSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores from a replacement client identity without duplicating StrictMode restores', async () => {
+    const firstRestore = vi.fn(async () => null);
+    const replacementRestore = vi.fn(async () => USER);
+    const firstClient = makeClient({ restoreSession: firstRestore });
+    const replacementClient = makeClient({ restoreSession: replacementRestore });
+    const view = render(
+      <StrictMode>
+        <EnterpriseAuthProvider client={firstClient}>
+          <Probe />
+        </EnterpriseAuthProvider>
+      </StrictMode>
+    );
+    await flushPromises();
+    expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated');
+
+    view.rerender(
+      <StrictMode>
+        <EnterpriseAuthProvider client={replacementClient}>
+          <Probe />
+        </EnterpriseAuthProvider>
+      </StrictMode>
+    );
+    await flushPromises();
+
+    expect(screen.getByTestId('status')).toHaveTextContent(/^authenticated$/);
+    expect(firstRestore).toHaveBeenCalledTimes(1);
+    expect(replacementRestore).toHaveBeenCalledTimes(1);
   });
 
   it('settles as unauthenticated when no session can be restored', async () => {
@@ -254,6 +283,29 @@ describe('EnterpriseAuthProvider', () => {
 
     expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated');
     expect(screen.getByTestId('expired')).toHaveTextContent('true');
+  });
+
+  it('keeps one countdown chain when a pending poll retry is requested repeatedly', async () => {
+    const pendingPoll = deferred<EnterpriseLoginPollResult>();
+    const pollLoginSession = vi
+      .fn<EnterpriseClient['pollLoginSession']>()
+      .mockRejectedValueOnce(new EnterpriseRendererError('NETWORK'))
+      .mockReturnValueOnce(pendingPoll.promise);
+    renderProvider(makeClient({ pollLoginSession }));
+    await flushPromises();
+    await act(async () => latestContext?.startLogin());
+    await advance(3000);
+    expect(screen.getByTestId('status')).toHaveTextContent('error');
+
+    act(() => {
+      void latestContext?.retry();
+      void latestContext?.retry();
+    });
+
+    expect(pollLoginSession).toHaveBeenCalledTimes(2);
+    expect(vi.getTimerCount()).toBe(1);
+    pendingPoll.resolve({ status: 'WAITING' });
+    await flushPromises();
   });
 
   it('clears active login timers when the provider unmounts', async () => {

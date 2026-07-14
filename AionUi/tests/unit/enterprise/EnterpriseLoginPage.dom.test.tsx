@@ -3,9 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ENTERPRISE_REGISTRATION_URL } from '@/common/enterprise/constants';
+import { ENTERPRISE_IPC_ERROR_MESSAGES, ENTERPRISE_REGISTRATION_URL } from '@/common/enterprise/constants';
 import type { EnterpriseAuthContextValue } from '@/renderer/hooks/context/EnterpriseAuthContext';
-import EnterpriseLoginPage from '@/renderer/pages/enterprise/login/EnterpriseLoginPage';
+import EnterpriseLoginPage, { ENTERPRISE_ERROR_I18N_KEYS } from '@/renderer/pages/enterprise/login/EnterpriseLoginPage';
 import EnterpriseRegistrationPanel from '@/renderer/pages/enterprise/login/EnterpriseRegistrationPanel';
 
 const translations: Record<string, string> = {
@@ -89,7 +89,17 @@ describe('EnterpriseLoginPage', () => {
       'data:image/png;base64,AA=='
     );
     expect(screen.getByText('01:05')).toBeVisible();
+    expect(screen.getByText('01:05').closest('[aria-live]')).toBeNull();
     expect(screen.getByText(translations['enterprise.login.autoChecking'])).toBeVisible();
+  });
+
+  it('maps every stable IPC error code to an explicit translation key', () => {
+    const errorCodes = Object.keys(ENTERPRISE_IPC_ERROR_MESSAGES).toSorted();
+
+    expect(Object.keys(ENTERPRISE_ERROR_I18N_KEYS).toSorted()).toEqual(errorCodes);
+    expect(Object.entries(ENTERPRISE_ERROR_I18N_KEYS)).toEqual(
+      expect.arrayContaining(errorCodes.map((code) => [code, `enterprise.errors.${code}`]))
+    );
   });
 
   it('shows a safe retry action when the QR image cannot render', async () => {

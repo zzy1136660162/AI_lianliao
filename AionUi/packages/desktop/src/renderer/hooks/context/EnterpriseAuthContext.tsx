@@ -80,7 +80,7 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
 
   const mountedRef = useRef(false);
   const generationRef = useRef(0);
-  const restoreStartedRef = useRef(false);
+  const restoredClientRef = useRef<EnterpriseClient | null>(null);
   const sessionRef = useRef<EnterpriseLoginSession | null>(null);
   const registrationOpenIdRef = useRef<string | null>(null);
   const failedActionRef = useRef<FailedAction | null>(null);
@@ -189,6 +189,8 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
 
   const scheduleCountdown = useCallback(
     (generation: number) => {
+      if (countdownTimerRef.current !== null) clearTimeout(countdownTimerRef.current);
+      countdownTimerRef.current = null;
       const tick = () => {
         if (!isCurrent(generation)) return;
         const currentSession = sessionRef.current;
@@ -410,9 +412,16 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
   useEffect(() => {
     mountedRef.current = true;
     const scheduledGeneration = generationRef.current;
+    const scheduledClient = activeClient;
     void Promise.resolve().then(() => {
-      if (!mountedRef.current || generationRef.current !== scheduledGeneration || restoreStartedRef.current) return;
-      restoreStartedRef.current = true;
+      if (
+        !mountedRef.current ||
+        generationRef.current !== scheduledGeneration ||
+        restoredClientRef.current === scheduledClient
+      ) {
+        return;
+      }
+      restoredClientRef.current = scheduledClient;
       void restore();
     });
     return () => {
@@ -422,7 +431,7 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
       pollingGenerationRef.current = null;
       registrationPromiseRef.current = null;
     };
-  }, [clearTimers, restore]);
+  }, [activeClient, clearTimers, restore]);
 
   const value = useMemo<EnterpriseAuthContextValue>(
     () => ({

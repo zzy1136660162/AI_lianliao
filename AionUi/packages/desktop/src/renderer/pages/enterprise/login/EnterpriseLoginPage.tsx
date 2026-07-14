@@ -3,9 +3,34 @@ import { Alert, Button, Card, Spin } from '@arco-design/web-react';
 import { BuildingFour, CheckOne, Refresh, Shield } from '@icon-park/react';
 import { useTranslation } from 'react-i18next';
 
+import type { EnterpriseIpcErrorCode } from '@/common/enterprise/contracts';
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
+import type { I18nKey } from '@/renderer/services/i18n';
 import EnterpriseRegistrationPanel from './EnterpriseRegistrationPanel';
 import './enterprise-login.css';
+
+export const ENTERPRISE_ERROR_I18N_KEYS = {
+  INVALID_BASE_URL: 'enterprise.errors.INVALID_BASE_URL',
+  INVALID_REQUEST: 'enterprise.errors.INVALID_REQUEST',
+  MISSING_CONTEXT: 'enterprise.errors.MISSING_CONTEXT',
+  TIMEOUT: 'enterprise.errors.TIMEOUT',
+  NETWORK: 'enterprise.errors.NETWORK',
+  HTTP: 'enterprise.errors.HTTP',
+  INVALID_JSON: 'enterprise.errors.INVALID_JSON',
+  API_FAILURE: 'enterprise.errors.API_FAILURE',
+  INVALID_RESPONSE: 'enterprise.errors.INVALID_RESPONSE',
+  AUTH_CREATE_FAILED: 'enterprise.errors.AUTH_CREATE_FAILED',
+  AUTH_POLL_FAILED: 'enterprise.errors.AUTH_POLL_FAILED',
+  INVALID_AUTH_RESULT: 'enterprise.errors.INVALID_AUTH_RESULT',
+  REGISTRATION_INCOMPLETE: 'enterprise.errors.REGISTRATION_INCOMPLETE',
+  REGISTRATION_FAILED: 'enterprise.errors.REGISTRATION_FAILED',
+  SESSION_RESTORE_FAILED: 'enterprise.errors.SESSION_RESTORE_FAILED',
+  SESSION_CLEAR_FAILED: 'enterprise.errors.SESSION_CLEAR_FAILED',
+  REQUEST_FAILED: 'enterprise.errors.REQUEST_FAILED',
+  UNTRUSTED_SENDER: 'enterprise.errors.UNTRUSTED_SENDER',
+  IPC_UNAVAILABLE: 'enterprise.errors.IPC_UNAVAILABLE',
+  INVALID_IPC_RESPONSE: 'enterprise.errors.INVALID_IPC_RESPONSE',
+} as const satisfies Readonly<Record<EnterpriseIpcErrorCode, I18nKey>>;
 
 const formatCountdown = (remainingSeconds: number): string => {
   const safeSeconds = Math.max(0, Math.floor(remainingSeconds));
@@ -56,7 +81,7 @@ const EnterpriseLoginPage: React.FC = () => {
     }
 
     if (auth.status === 'error') {
-      const errorKey = `enterprise.errors.${auth.errorCode ?? 'UNKNOWN'}`;
+      const errorKey = auth.errorCode ? ENTERPRISE_ERROR_I18N_KEYS[auth.errorCode] : 'enterprise.errors.UNKNOWN';
       return (
         <div className='enterprise-login__error-state' role='alert'>
           <Alert type='error' showIcon title={t('enterprise.login.errorTitle')} content={t(errorKey)} />
@@ -105,7 +130,7 @@ const EnterpriseLoginPage: React.FC = () => {
             </div>
           )}
 
-          <div className='enterprise-login__qr-meta' aria-live='polite'>
+          <div className='enterprise-login__qr-meta'>
             <span className='enterprise-login__countdown'>{formatCountdown(auth.remainingSeconds)}</span>
             <span>{t('enterprise.login.remainingLabel')}</span>
           </div>
