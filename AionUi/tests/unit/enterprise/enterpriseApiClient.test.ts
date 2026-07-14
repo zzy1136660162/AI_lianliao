@@ -28,6 +28,17 @@ const responseWithJsonValue = (value: unknown): Response => {
   return response;
 };
 
+const responseWithFinalUrl = (body: BodyInit, finalUrl: string, init: ResponseInit = {}): Response => {
+  const response = new Response(body, init);
+  Object.defineProperty(response, 'url', {
+    value: finalUrl,
+    writable: false,
+    enumerable: false,
+    configurable: true,
+  });
+  return response;
+};
+
 const successfulData: Record<EnterpriseOperation, unknown> = {
   'company.list': {
     list: [{ id: 'company-target-1', name: 'Acme' }],
@@ -952,6 +963,7 @@ describe('EnterpriseApiClient.getUserContext', () => {
 describe('EnterpriseApiClient QR authentication', () => {
   const loginKey = 'enterprise_desktop_Ab3Def456Gh7Jk8Lm9';
   const qrPath = `/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=${loginKey}`;
+  const qrUrl = `https://cloud.lslnii.com${qrPath}`;
   const pngBytes = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
 
   const createResponseData = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
@@ -979,7 +991,10 @@ describe('EnterpriseApiClient QR authentication', () => {
         if (calls.length === 1) {
           return jsonResponse({ success: true, data: { loginKey, qrPath, expiresAt, pollIntervalMs: 3000 } });
         }
-        return new Response(pngBytes, { status: 200, headers: { 'Content-Type': 'image/png' } });
+        return responseWithFinalUrl(pngBytes, qrUrl, {
+          status: 200,
+          headers: { 'Content-Type': 'image/png' },
+        });
       },
     });
 
@@ -1011,7 +1026,7 @@ describe('EnterpriseApiClient QR authentication', () => {
 
   it('rejects an oversized declared QR body before reading it', async () => {
     let bodyReads = 0;
-    const qrResponse = new Response(pngBytes, {
+    const qrResponse = responseWithFinalUrl(pngBytes, qrUrl, {
       status: 200,
       headers: { 'Content-Length': String(2 * 1024 * 1024 + 1) },
     });
@@ -1035,13 +1050,24 @@ describe('EnterpriseApiClient QR authentication', () => {
   });
 
   it('rejects a QR response whose final URL indicates an ignored redirect', async () => {
-    const qrResponse = new Response(pngBytes, { status: 200 });
-    Object.defineProperty(qrResponse, 'url', { value: 'https://evil.test/redirected.png' });
+    const qrResponse = responseWithFinalUrl(pngBytes, 'https://evil.test/redirected.png', { status: 200 });
     let calls = 0;
     const client = new EnterpriseApiClient({
       transport: async () => {
         calls += 1;
         return calls === 1 ? createResponse() : qrResponse;
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+  });
+
+  it('rejects a QR response with an empty final URL', async () => {
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : new Response(pngBytes, { status: 200 });
       },
     });
 
@@ -1141,6 +1167,20 @@ describe('EnterpriseApiClient QR authentication', () => {
       `/ignored/../cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=${loginKey}`,
     ],
     ['trailing empty query segment', `${qrPath}&`],
+    ['trailing empty hash', `${qrPath}#`],
+    ['trailing question mark', `${qrPath}?`],
+    [
+      'reordered query',
+      `/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?front_sign=${loginKey}&ratio=8`,
+    ],
+    ['uppercase absolute host', `https://CLOUD.LSLNII.COM${qrPath}`],
+    ['uppercase absolute scheme', `HTTPS://cloud.lslnii.com${qrPath}`],
+    ['explicit default port', `https://cloud.lslnii.com:443${qrPath}`],
+    ['empty userinfo', `https://@cloud.lslnii.com${qrPath}`],
+    ['embedded tab', `https://cloud.lslnii.com\t${qrPath}`],
+    ['embedded carriage return', `https://cloud.lslnii.com\r${qrPath}`],
+    ['embedded line feed', `https://cloud.lslnii.com\n${qrPath}`],
+    ['embedded space', `https://cloud.lslnii.com ${qrPath}`],
     [
       'mismatched front_sign',
       '/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=enterprise_desktop_Zz9Yy8Xx7Ww6Vv5Uu4',
@@ -1160,12 +1200,12 @@ describe('EnterpriseApiClient QR authentication', () => {
   });
 
   it('accepts an exact same-origin absolute QR URL without relying on content-type', async () => {
-    const absoluteQrUrl = `https://cloud.lslnii.com${qrPath}`;
+    const absoluteQrUrl = qrUrl;
     let calls = 0;
     const client = new EnterpriseApiClient({
       transport: async () => {
         calls += 1;
-        return calls === 1 ? createResponse({ qrPath: absoluteQrUrl }) : new Response(pngBytes);
+        return calls === 1 ? createResponse({ qrPath: absoluteQrUrl }) : responseWithFinalUrl(pngBytes, qrUrl);
       },
     });
 
@@ -1183,7 +1223,7 @@ describe('EnterpriseApiClient QR authentication', () => {
     const client = new EnterpriseApiClient({
       transport: async () => {
         calls += 1;
-        return calls === 1 ? createResponse() : new Response(body);
+        return calls === 1 ? createResponse() : responseWithFinalUrl(body, qrUrl);
       },
     });
 
@@ -1196,7 +1236,7 @@ describe('EnterpriseApiClient QR authentication', () => {
     const client = new EnterpriseApiClient({
       transport: async () => {
         calls += 1;
-        return calls === 1 ? createResponse() : new Response(`failure for ${phone}`, { status: 502 });
+        return calls === 1 ? createResponse() : responseWithFinalUrl(`failure for ${phone}`, qrUrl, { status: 502 });
       },
     });
 
@@ -1225,7 +1265,7 @@ describe('EnterpriseApiClient QR authentication', () => {
   it('times out a hanging QR body read and clears its deadline timer', async () => {
     vi.useFakeTimers();
     let signal: AbortSignal | null = null;
-    const qrResponse = new Response(pngBytes);
+    const qrResponse = responseWithFinalUrl(pngBytes, qrUrl);
     Object.defineProperty(qrResponse, 'arrayBuffer', {
       value: () => new Promise<ArrayBuffer>(() => undefined),
     });

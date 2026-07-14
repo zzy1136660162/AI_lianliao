@@ -394,18 +394,9 @@ const unwrapCommonResult = (input: unknown): unknown => {
 };
 
 const parseQrUrl = (qrPath: string, baseUrl: string, loginKey: string): string => {
-  const queryStart = qrPath.indexOf('?');
-  const rawPath = queryStart === -1 ? qrPath : qrPath.slice(0, queryStart);
-  const rawQuery = queryStart === -1 ? '' : qrPath.slice(queryStart + 1).split('#', 1)[0];
-  const hasUnsafeLexicalForm =
-    qrPath !== qrPath.trim() ||
-    qrPath.includes('\\') ||
-    queryStart === -1 ||
-    qrPath.indexOf('?', queryStart + 1) !== -1 ||
-    /(^|\/)\.{1,2}(\/|$)/.test(rawPath) ||
-    rawQuery.split('&').length !== 2 ||
-    rawQuery.split('&').some((segment) => segment === '');
-  if (hasUnsafeLexicalForm) throw apiError('INVALID_RESPONSE');
+  const expectedRelative = `${QR_PATHNAME}?ratio=8&front_sign=${loginKey}`;
+  const expectedAbsolute = new URL(expectedRelative, baseUrl).toString();
+  if (qrPath !== expectedRelative && qrPath !== expectedAbsolute) throw apiError('INVALID_RESPONSE');
 
   let parsed: URL;
   try {
@@ -580,7 +571,7 @@ export class EnterpriseApiClient {
         signal,
       });
       if (!response.ok) throw apiError('HTTP');
-      if (response.url !== '' && response.url !== url) throw apiError('INVALID_RESPONSE');
+      if (response.url !== url) throw apiError('INVALID_RESPONSE');
 
       const declaredLength = response.headers.get('Content-Length');
       if (declaredLength !== null && /^\d+$/.test(declaredLength) && BigInt(declaredLength) > BigInt(MAX_QR_BYTES)) {
