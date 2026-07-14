@@ -2,6 +2,7 @@
   position: relative;
   display: grid;
   grid-template-columns: minmax(300px, 0.82fr) minmax(410px, 1.18fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 100vh;
   overflow: hidden;
   color: var(--text-primary);
@@ -24,6 +25,7 @@
 .enterprise-login__stage-card {
   position: relative;
   z-index: 1;
+  grid-row: 2;
 }
 
 .enterprise-login__story {
@@ -345,10 +347,12 @@
 @media (max-width: 880px) {
   .enterprise-login {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
     overflow: auto;
   }
 
   .enterprise-login__story {
+    grid-row: 2;
     padding: 44px 32px;
     border-right: 0;
     border-bottom: 1px solid var(--border-base);
@@ -359,6 +363,7 @@
   }
 
   .enterprise-login__stage-card {
+    grid-row: 3;
     width: min(560px, calc(100% - 32px));
     min-height: 540px;
     margin: 28px auto;

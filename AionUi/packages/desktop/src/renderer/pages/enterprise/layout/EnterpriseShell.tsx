@@ -5,6 +5,7 @@ import { Outlet } from 'react-router-dom';
 
 import EnterpriseHeader from './EnterpriseHeader';
 import EnterpriseSider from './EnterpriseSider';
+import EnterpriseWindowChrome from './EnterpriseWindowChrome';
 import './enterprise-shell.css';
 
 /** Three-column enterprise workspace with a separately collapsible assistant slot. */
@@ -15,6 +16,7 @@ const EnterpriseShell: React.FC = () => {
   return (
     <div className={`enterprise-shell${assistantOpen ? '' : ' enterprise-shell--assistant-closed'}`}>
       <div className='enterprise-shell__blueprint' aria-hidden='true' />
+      <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
       <EnterpriseSider />
       <div className='enterprise-shell__workspace'>
         <EnterpriseHeader

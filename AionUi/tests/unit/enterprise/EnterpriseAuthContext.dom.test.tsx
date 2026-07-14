@@ -424,7 +424,7 @@ describe('EnterpriseAuthProvider', () => {
     expect(screen.getByTestId('session')).toHaveTextContent(latestSession.loginKey);
   });
 
-  it('clears the persisted session on logout and retries a clear failure', async () => {
+  it('preserves the authenticated workspace when clearing logout fails and retries safely', async () => {
     const clearSession = vi
       .fn<EnterpriseClient['clearSession']>()
       .mockRejectedValueOnce(new EnterpriseRendererError('SESSION_CLEAR_FAILED'))
@@ -432,8 +432,13 @@ describe('EnterpriseAuthProvider', () => {
     renderProvider(makeClient({ clearSession, restoreSession: vi.fn(async () => USER) }));
     await flushPromises();
 
-    await act(async () => latestContext?.logout());
-    expect(screen.getByTestId('status')).toHaveTextContent('error');
+    let firstResult: boolean | undefined;
+    await act(async () => {
+      firstResult = await latestContext?.logout();
+    });
+    expect(firstResult).toBe(false);
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated');
+    expect(screen.getByTestId('user')).toHaveTextContent(USER.companyName!);
     expect(screen.getByTestId('error')).toHaveTextContent('SESSION_CLEAR_FAILED');
     await act(async () => latestContext?.retry());
 

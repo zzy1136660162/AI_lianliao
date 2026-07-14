@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { EnterpriseIpcErrorCode } from '@/common/enterprise/contracts';
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 import type { I18nKey } from '@/renderer/services/i18n';
+import EnterpriseWindowChrome from '../layout/EnterpriseWindowChrome';
 import EnterpriseRegistrationPanel from './EnterpriseRegistrationPanel';
 import './enterprise-login.css';
 
@@ -148,6 +149,7 @@ const EnterpriseLoginPage: React.FC = () => {
   return (
     <main className='enterprise-login'>
       <div className='enterprise-login__blueprint' aria-hidden='true' />
+      <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
       <section className='enterprise-login__story' aria-labelledby='enterprise-login-brand-title'>
         <div className='enterprise-login__brand-mark' aria-hidden='true'>
           <BuildingFour size={29} />

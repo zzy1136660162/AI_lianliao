@@ -11,7 +11,7 @@ const routerMocks = vi.hoisted(() => ({
   appStatus: 'authenticated' as 'checking' | 'authenticated' | 'unauthenticated',
   desktop: true,
   enterpriseStatus: 'authenticated' as EnterpriseAuthContextValue['status'],
-  logout: vi.fn<EnterpriseAuthContextValue['logout']>(async () => undefined),
+  logout: vi.fn<EnterpriseAuthContextValue['logout']>(async () => true),
 }));
 
 vi.mock('@/renderer/hooks/context/AuthContext', () => ({
@@ -41,6 +41,11 @@ vi.mock('@/renderer/hooks/context/EnterpriseAuthContext', () => ({
 
 vi.mock('@/renderer/utils/platform', () => ({
   isElectronDesktop: () => routerMocks.desktop,
+  isMacOS: () => false,
+}));
+
+vi.mock('@/renderer/components/layout/WindowControls', () => ({
+  default: () => <div data-testid='shared-window-controls'>shared controls</div>,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -72,7 +77,7 @@ describe('enterprise desktop routing', () => {
     routerMocks.desktop = true;
     routerMocks.enterpriseStatus = 'authenticated';
     routerMocks.logout.mockReset();
-    routerMocks.logout.mockResolvedValue(undefined);
+    routerMocks.logout.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -127,12 +132,14 @@ describe('enterprise desktop routing', () => {
 
     expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
     expect(screen.getByRole('navigation', { name: 'enterprise.accessibility.primaryNavigation' })).toBeVisible();
+    expect(screen.getByTestId('shared-window-controls')).toBeVisible();
     expect(container).not.toHaveTextContent('openid-must-not-be-rendered');
   });
 
   it('clears the enterprise session and returns to enterprise login', async () => {
     routerMocks.logout.mockImplementationOnce(async () => {
       routerMocks.enterpriseStatus = 'unauthenticated';
+      return true;
     });
     renderAt('/enterprise/dashboard');
 
@@ -166,6 +173,14 @@ describe('enterprise desktop routing', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'enterprise.assistant.actions.show' }));
     expect(assistant).toHaveAttribute('aria-hidden', 'false');
+  });
+
+  it('keeps identity and assistant controls available to compact-window users', async () => {
+    renderAt('/enterprise/dashboard');
+
+    expect(await screen.findByText('辽宁测试企业')).toBeVisible();
+    expect(screen.getByText('测试用户')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.hide' })).toBeVisible();
   });
 });
 

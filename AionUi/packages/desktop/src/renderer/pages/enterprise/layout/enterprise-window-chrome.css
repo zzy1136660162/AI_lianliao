@@ -1,0 +1,45 @@
+.enterprise-window-chrome {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  min-width: 0;
+  min-height: 42px;
+  grid-column: 1 / -1;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border-base);
+  user-select: none;
+  background: color-mix(in srgb, var(--bg-1) 96%, transparent);
+  -webkit-app-region: drag;
+}
+
+.enterprise-window-chrome--mac {
+  min-height: 45px;
+  padding-left: 78px;
+  align-items: center;
+}
+
+.enterprise-window-chrome__title {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding-left: 12px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enterprise-window-chrome--desktop .enterprise-window-chrome__title {
+  padding-right: 12px;
+}
+
+.enterprise-window-chrome .app-window-controls {
+  flex: 0 0 auto;
+  -webkit-app-region: no-drag;
+}

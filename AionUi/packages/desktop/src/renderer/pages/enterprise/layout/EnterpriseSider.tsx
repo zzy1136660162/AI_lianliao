@@ -38,7 +38,11 @@ const EnterpriseSider: React.FC = () => {
     setLogoutPending(true);
     setLogoutFailed(false);
     try {
-      await logout();
+      const sessionCleared = await logout();
+      if (!sessionCleared) {
+        setLogoutFailed(true);
+        return;
+      }
       navigate('/enterprise/login', { replace: true });
     } catch {
       setLogoutFailed(true);

@@ -28,6 +28,15 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => translations[key] ?? key }),
 }));
 
+vi.mock('@/renderer/utils/platform', () => ({
+  isElectronDesktop: () => true,
+  isMacOS: () => false,
+}));
+
+vi.mock('@/renderer/components/layout/WindowControls', () => ({
+  default: () => <div data-testid='shared-window-controls'>shared controls</div>,
+}));
+
 const startLogin = vi.fn(async () => undefined);
 const retry = vi.fn(async () => undefined);
 const checkRegistration = vi.fn(async () => undefined);
@@ -47,7 +56,7 @@ const makeAuth = (overrides: Partial<EnterpriseAuthContextValue> = {}): Enterpri
   errorCode: null,
   startLogin,
   retry,
-  logout: vi.fn(async () => undefined),
+  logout: vi.fn(async () => true),
   checkRegistration,
   isExpired: false,
   remainingSeconds: 0,
@@ -69,6 +78,7 @@ describe('EnterpriseLoginPage', () => {
     );
 
     await waitFor(() => expect(startLogin).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('shared-window-controls')).toBeVisible();
   });
 
   it('renders the main-process QR image, accessible countdown, and automatic status', () => {

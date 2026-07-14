@@ -31,7 +31,8 @@ export type EnterpriseAuthContextValue = {
   errorCode: EnterpriseIpcErrorCode | null;
   startLogin: () => Promise<void>;
   retry: () => Promise<void>;
-  logout: () => Promise<void>;
+  /** Returns true only after the persisted enterprise session has been cleared. */
+  logout: () => Promise<boolean>;
   checkRegistration: () => Promise<void>;
   isExpired: boolean;
   remainingSeconds: number;
@@ -342,26 +343,33 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
     }
   }, [activeClient, isCurrent, publishAuthenticated, publishError, replaceFlow]);
 
-  const logout = useCallback(async (): Promise<void> => {
+  const logout = useCallback(async (): Promise<boolean> => {
     const generation = replaceFlow();
     failedActionRef.current = null;
     setErrorCode(null);
-    setStatus('checking');
     try {
       await activeClient.clearSession();
-      if (!isCurrent(generation)) return;
+      if (!isCurrent(generation)) return false;
       sessionRef.current = null;
       registrationOpenIdRef.current = null;
+      failedActionRef.current = null;
       setUser(null);
       setLoginSession(null);
       setRegistrationOpenId(null);
+      setErrorCode(null);
       setIsExpired(false);
       setRemainingSeconds(0);
       setStatus('unauthenticated');
+      return true;
     } catch (error) {
-      publishError(generation, 'clear', error, 'SESSION_CLEAR_FAILED');
+      if (!isCurrent(generation)) return false;
+      // A failed local clear is recoverable. Keep the authenticated workspace mounted
+      // and expose only the stable IPC code so implementation details never reach the UI.
+      failedActionRef.current = 'clear';
+      setErrorCode(errorCodeOf(error, 'SESSION_CLEAR_FAILED'));
+      return false;
     }
-  }, [activeClient, isCurrent, publishError, replaceFlow]);
+  }, [activeClient, isCurrent, replaceFlow]);
 
   const checkRegistration = useCallback(async (): Promise<void> => {
     const generation = generationRef.current;
