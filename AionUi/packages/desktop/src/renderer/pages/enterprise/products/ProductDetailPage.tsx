@@ -1,6 +1,6 @@
 import { Button, Card, Tag } from '@arco-design/web-react';
 import { CubeFive, Left } from '@icon-park/react';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
@@ -14,10 +14,15 @@ import styles from './product-catalog.module.css';
 
 export type ProductDetailPageProps = { client?: EnterpriseClient };
 
-const DetailImage: React.FC<{ product: EnterpriseProductDetail }> = ({ product }) => {
+export const DetailImage: React.FC<{ product: EnterpriseProductDetail }> = ({ product }) => {
   const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
   const imageUrl = parseSafeProductImageUrl(product.imageUrl);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [product.productId, product.imageUrl]);
+
   return (
     <div className={styles.detailImage}>
       {imageUrl && !failed ? (

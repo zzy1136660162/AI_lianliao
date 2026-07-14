@@ -1,6 +1,6 @@
 import { Button, Tag } from '@arco-design/web-react';
 import { ArrowRight, BuildingFour, CloseSmall } from '@icon-park/react';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -15,14 +15,32 @@ export type ProductQuickViewProps = {
 };
 
 const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, onViewDetails }) => {
+  const quickViewRef = useRef<HTMLElement>(null);
   const { t } = useTranslation();
   const missing = t('enterprise.products.missing');
   const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
   const displayIndustry = product.industry || product.companyIndustry;
   const showCompanyIndustry = Boolean(product.companyIndustry) && product.companyIndustry !== displayIndustry;
 
+  useEffect(() => {
+    const quickView = quickViewRef.current;
+    if (!quickView) return;
+
+    quickView.focus({ preventScroll: true });
+    if (!window.matchMedia('(max-width: 820px)').matches) return;
+
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    quickView.scrollIntoView({ block: 'nearest', behavior: reducedMotion ? 'auto' : 'smooth' });
+  }, [product.productId]);
+
   return (
-    <aside className={styles.quickView} role='complementary' aria-label={t('enterprise.products.quickView.label')}>
+    <aside
+      ref={quickViewRef}
+      className={styles.quickView}
+      role='complementary'
+      tabIndex={-1}
+      aria-label={t('enterprise.products.quickView.label')}
+    >
       <div className={styles.quickViewIndex}>
         {t('enterprise.products.quickView.index', { index: product.productId.slice(-4).padStart(4, '0') })}
       </div>

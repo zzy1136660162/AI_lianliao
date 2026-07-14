@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 import type { EnterpriseResponse } from '@/common/enterprise/contracts';
-import ProductDetailPage from '@/renderer/pages/enterprise/products/ProductDetailPage';
+import ProductDetailPage, { DetailImage } from '@/renderer/pages/enterprise/products/ProductDetailPage';
 import ProductListPage from '@/renderer/pages/enterprise/products/ProductListPage';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
@@ -15,8 +15,8 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-beforeAll(() => {
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+const createMatchMedia = (compact = false) =>
+  vi.fn().mockImplementation((query: string) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -25,7 +25,16 @@ beforeAll(() => {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
+    ...(compact && query === '(max-width: 820px)' ? { matches: true } : {}),
   })) as typeof window.matchMedia;
+
+beforeAll(() => {
+  window.matchMedia = createMatchMedia();
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    writable: true,
+    value: vi.fn(),
+  });
 });
 
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void };
@@ -94,7 +103,11 @@ const replaceInput = async (user: ReturnType<typeof userEvent.setup>, placeholde
 };
 
 describe('product catalog interactions', () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    window.matchMedia = createMatchMedia();
+    vi.mocked(HTMLElement.prototype.scrollIntoView).mockReset();
+  });
 
   it('submits product filters at page one and renders a plain-text responsive card', async () => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(page('Industrial pump'));
@@ -194,6 +207,30 @@ describe('product catalog interactions', () => {
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/products/9');
   });
 
+  it('focuses and reveals the quick view at compact widths whenever the selected product changes', async () => {
+    window.matchMedia = createMatchMedia(true);
+    const products = page('First pump') as Extract<EnterpriseResponse, { operation: 'product.list' }>;
+    products.data.list.push({ ...products.data.list[0], productId: '10', name: 'Second pump' });
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(products);
+    const user = userEvent.setup();
+    renderList(createClient(request));
+
+    const previewButtons = await screen.findAllByRole('button', {
+      name: 'enterprise.products.actions.quickPreview',
+    });
+    await user.click(previewButtons[0]);
+    const quickView = screen.getByRole('complementary', { name: 'enterprise.products.quickView.label' });
+    await waitFor(() => expect(quickView).toHaveFocus());
+    expect(quickView).toHaveAttribute('tabindex', '-1');
+    expect(within(quickView).getByRole('button', { name: 'enterprise.products.actions.closeQuickView' })).toBeVisible();
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'smooth' });
+
+    await user.click(previewButtons[1]);
+    expect(within(quickView).getByRole('heading', { name: 'Second pump' })).toBeVisible();
+    await waitFor(() => expect(quickView).toHaveFocus());
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
   it('shows an image text fallback without leaking an unsafe URL', async () => {
     const unsafePage = page('Unsafe image') as Extract<EnterpriseResponse, { operation: 'product.list' }>;
     unsafePage.data.list[0] = { ...unsafePage.data.list[0], imageUrl: 'https://evil.example/raw-secret.png' };
@@ -273,5 +310,31 @@ describe('product detail', () => {
     expect(await screen.findByText('enterprise.productDetail.invalid.title')).toBeVisible();
     expect(request).not.toHaveBeenCalled();
     expect(container).not.toHaveTextContent('13800000000');
+  });
+
+  it('recovers from a failed image when the same detail image receives a different product', async () => {
+    const brokenProduct = {
+      productId: '9',
+      companyId: '42',
+      name: 'Broken image pump',
+      imageUrl: 'https://cloud.lslnii.com/product/broken.png',
+    };
+    const workingProduct = {
+      productId: '10',
+      companyId: '42',
+      name: 'Working image pump',
+      imageUrl: 'https://cloud.lslnii.com/product/working.png',
+    };
+    const { rerender } = render(<DetailImage product={brokenProduct} />);
+
+    const brokenImage = screen.getByRole('img', { name: 'enterprise.products.imageAlt:Broken image pump' });
+    fireEvent.error(brokenImage);
+    expect(screen.getByRole('img', { name: 'enterprise.products.imageUnavailable' })).toBeVisible();
+
+    rerender(<DetailImage product={workingProduct} />);
+    expect(await screen.findByRole('img', { name: 'enterprise.products.imageAlt:Working image pump' })).toHaveAttribute(
+      'src',
+      'https://cloud.lslnii.com/product/working.png'
+    );
   });
 });

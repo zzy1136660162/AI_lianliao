@@ -133,11 +133,11 @@
     },
     "products": {
       "title": "产品库",
-      "description": "真实产品数据将在企业库体验完成后接入。"
+      "description": "浏览已接入的真实企业产品库，并打开经过校验的产品档案。"
     },
     "productDetail": {
       "title": "产品详情",
-      "description": "经过接口校验的产品详情将在产品开发任务中接入。"
+      "description": "查看经过校验的产品信息、关联企业与已脱敏的联系方式。"
     },
     "projects": {
       "title": "在建项目",

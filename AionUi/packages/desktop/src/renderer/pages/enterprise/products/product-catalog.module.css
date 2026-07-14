@@ -472,6 +472,8 @@
   }
 
   .quickView {
+    order: -1;
+    scroll-margin-top: 12px;
     border-top: 1px solid var(--border-base);
     border-left: 0;
   }

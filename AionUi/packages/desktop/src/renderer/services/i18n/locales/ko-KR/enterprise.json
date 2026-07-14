@@ -133,11 +133,11 @@
     },
     "products": {
       "title": "Product directory",
-      "description": "The live product directory will be connected after the company experience."
+      "description": "Browse the live enterprise product directory and open validated product records."
     },
     "productDetail": {
       "title": "Product profile",
-      "description": "Verified product details will be connected in the product development task."
+      "description": "Review validated product information, its related company and masked contact details."
     },
     "projects": {
       "title": "Projects under construction",
