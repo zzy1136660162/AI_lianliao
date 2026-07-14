@@ -81,7 +81,13 @@ const drillResponse = (): EnterpriseResponse => ({
   ],
 });
 
-const listResponse = (name = 'Factory expansion', hpInfoId = '901', pageNum = 1, total = 1): EnterpriseResponse => ({
+const listResponse = (
+  name = 'Factory expansion',
+  hpInfoId = '901',
+  pageNum = 1,
+  total = 1,
+  province = 'Liaoning'
+): EnterpriseResponse => ({
   operation: 'project.list',
   data: {
     list: [
@@ -89,7 +95,7 @@ const listResponse = (name = 'Factory expansion', hpInfoId = '901', pageNum = 1,
         hpInfoId,
         projectName: name,
         constructionUnit: 'Acme Manufacturing',
-        province: 'Liaoning',
+        province,
         city: 'Shenyang',
         totalInvestment: 5000,
         constructionNature: 'New build',
@@ -147,7 +153,7 @@ describe('project dashboard and catalog', () => {
   it('renders live KPI, distribution, drill and plain-text project rows', async () => {
     const { container } = renderProjects(createClient(createRequest()));
 
-    expect(await screen.findByRole('heading', { name: 'Factory expansion' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible();
     expect(screen.getByText('128')).toBeVisible();
     expect(container).toHaveTextContent('36.5');
     expect(screen.getByText('Shenyang')).toBeVisible();
@@ -156,11 +162,28 @@ describe('project dashboard and catalog', () => {
     expect(container.querySelector('strong strong')).toBeNull();
   });
 
+  it('desensitizes list and quick-view names while preserving the numeric detail route', async () => {
+    const { container } = renderProjects(createClient(createRequest()));
+
+    const protectedHeading = await screen.findByRole('heading', {
+      name: /enterprise\.projectDetail\.lockedProjectTitle/,
+    });
+    expect(container).not.toHaveTextContent('Factory expansion');
+    expect(container).not.toHaveTextContent('Acme Manufacturing');
+
+    fireEvent.click(protectedHeading.closest('tr') as HTMLElement);
+    const quickView = screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' });
+    expect(quickView).not.toHaveTextContent('Factory expansion');
+    expect(quickView).not.toHaveTextContent('Acme Manufacturing');
+    fireEvent.click(within(quickView).getByRole('button', { name: 'enterprise.projects.actions.viewDetails' }));
+    expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/projects/901');
+  });
+
   it('submits all desktop project filters at page one', async () => {
     const request = createRequest();
     const user = userEvent.setup();
     renderProjects(createClient(request));
-    await screen.findByRole('heading', { name: 'Factory expansion' });
+    await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
 
     await user.type(screen.getByPlaceholderText('enterprise.projects.filters.keywordPlaceholder'), ' factory ');
     await user.type(screen.getByPlaceholderText('enterprise.projects.filters.categoryL1Placeholder'), ' Building ');
@@ -208,26 +231,26 @@ describe('project dashboard and catalog', () => {
       if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
       if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
       listCalls += 1;
-      if (listCalls === 1) return Promise.resolve(listResponse('Page one project', '901', 1, 45));
+      if (listCalls === 1) return Promise.resolve(listResponse('Page one project', '901', 1, 45, 'Region one'));
       if (listCalls === 2) return pageTwo.promise;
       return pageThree.promise;
     });
     const { container } = renderProjects(createClient(request));
 
-    const row = (await screen.findByRole('heading', { name: 'Page one project' })).closest('tr') as HTMLElement;
+    const row = (await screen.findByRole('heading', { name: /Region one/ })).closest('tr') as HTMLElement;
     fireEvent.click(row);
     expect(screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' })).toBeVisible();
     const pageButtons = () => Array.from(container.querySelectorAll('.arco-pagination-item'));
     fireEvent.click(pageButtons().find((item) => item.textContent === '2') as HTMLElement);
-    expect(screen.getByRole('heading', { name: 'Page one project' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: /Region one/ })).toBeVisible();
     expect(screen.queryByRole('complementary', { name: 'enterprise.projects.quickView.label' })).toBeNull();
     fireEvent.click(pageButtons().find((item) => item.textContent === '3') as HTMLElement);
 
-    pageThree.resolve(listResponse('Latest project', '903', 3, 45));
-    expect(await screen.findByRole('heading', { name: 'Latest project' })).toBeVisible();
-    pageTwo.resolve(listResponse('Stale project', '902', 2, 45));
+    pageThree.resolve(listResponse('Latest project', '903', 3, 45, 'Region three'));
+    expect(await screen.findByRole('heading', { name: /Region three/ })).toBeVisible();
+    pageTwo.resolve(listResponse('Stale project', '902', 2, 45, 'Region two'));
     await Promise.resolve();
-    expect(screen.queryByText('Stale project')).toBeNull();
+    expect(screen.queryByText(/Region two/)).toBeNull();
   });
 
   it('focuses and reveals quick view at compact width and respects reduced motion', async () => {
@@ -235,7 +258,9 @@ describe('project dashboard and catalog', () => {
     const user = userEvent.setup();
     renderProjects(createClient(createRequest()));
 
-    const row = (await screen.findByRole('heading', { name: 'Factory expansion' })).closest('tr') as HTMLElement;
+    const row = (await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).closest(
+      'tr'
+    ) as HTMLElement;
     row.focus();
     await user.keyboard('{Enter}');
     const quickView = screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' });

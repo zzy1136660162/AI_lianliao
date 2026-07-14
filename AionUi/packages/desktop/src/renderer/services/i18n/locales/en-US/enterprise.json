@@ -437,7 +437,8 @@
       "title": "Protected project identity",
       "description": "The service has not confirmed access. Owner, contact, phone and address are withheld; this page does not unlock them.",
       "enterpriseInvestor": "enterprise investment",
-      "governmentInvestor": "government investment"
+      "governmentInvestor": "government investment",
+      "defaultNature": "new build"
     },
     "invalid": {
       "title": "This project link is invalid",

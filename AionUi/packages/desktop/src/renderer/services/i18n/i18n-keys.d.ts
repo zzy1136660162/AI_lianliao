@@ -995,6 +995,7 @@ export type I18nKey =
   | 'enterprise.projectDetail.invalid.description'
   | 'enterprise.projectDetail.invalid.title'
   | 'enterprise.projectDetail.loading'
+  | 'enterprise.projectDetail.locked.defaultNature'
   | 'enterprise.projectDetail.locked.description'
   | 'enterprise.projectDetail.locked.enterpriseInvestor'
   | 'enterprise.projectDetail.locked.governmentInvestor'

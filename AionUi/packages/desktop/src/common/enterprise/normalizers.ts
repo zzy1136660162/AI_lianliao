@@ -150,6 +150,14 @@ const requiredIdentifier = (operation: string, field: string, ...values: unknown
   return value;
 };
 
+const PROJECT_IDENTIFIER_PATTERN = /^[1-9]\d{0,30}$/;
+
+const requiredProjectIdentifier = (operation: string, field: string, ...values: unknown[]): string => {
+  const value = requiredIdentifier(operation, field, ...values);
+  if (!PROJECT_IDENTIFIER_PATTERN.test(value)) throw operationError(operation, `invalid ${field}`);
+  return value;
+};
+
 const numberWithRule = (
   operation: string,
   field: string,
@@ -349,7 +357,7 @@ const normalizeProjectSummary = (
 ): EnterpriseProjectSummary => {
   const raw = enterpriseProjectRawSchema.parse(input);
   const result: EnterpriseProjectSummary = {
-    hpInfoId: requiredIdentifier(
+    hpInfoId: requiredProjectIdentifier(
       operation,
       'hpInfoId',
       raw.hpInfoId,

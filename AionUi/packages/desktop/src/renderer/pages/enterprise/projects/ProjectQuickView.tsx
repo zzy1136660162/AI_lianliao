@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { EnterpriseProjectSummary } from '@/common/enterprise/contracts';
 
+import { displayProjectName } from './projectData';
 import styles from './project-workspace.module.css';
 
 export type ProjectQuickViewProps = {
@@ -18,6 +19,7 @@ const ProjectQuickView: React.FC<ProjectQuickViewProps> = ({ project, onClose, o
   const { t } = useTranslation();
   const missing = t('enterprise.projects.missing');
   const region = [project.province, project.city].filter(Boolean).join(' / ') || missing;
+  const protectedName = displayProjectName(project, false, t);
 
   useEffect(() => {
     const quickView = quickViewRef.current;
@@ -49,7 +51,7 @@ const ProjectQuickView: React.FC<ProjectQuickViewProps> = ({ project, onClose, o
       />
       <div className={styles.quickViewHeading}>
         <span>{t('enterprise.projects.quickView.title')}</span>
-        <h2>{project.projectName}</h2>
+        <h2>{protectedName}</h2>
         {project.constructionNature || project.projectNature ? (
           <Tag>{project.constructionNature || project.projectNature}</Tag>
         ) : null}

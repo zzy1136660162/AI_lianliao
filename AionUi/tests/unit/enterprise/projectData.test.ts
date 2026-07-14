@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import {
   ProjectDataError,
+  buildDesensitizedProjectName,
   buildProjectListQuery,
+  displayProjectName,
   loadProjectDashboard,
   loadProjectDetail,
   loadProjectList,
@@ -72,6 +74,56 @@ const expectCode = async (promise: Promise<unknown>, code: string) => {
   expect(error).toBeInstanceOf(ProjectDataError);
   expect(error).toMatchObject({ code });
 };
+
+const translateProjectName = (key: string, values?: Record<string, unknown>): string => {
+  if (key === 'enterprise.projectDetail.locked.enterpriseInvestor') return '某企业投资';
+  if (key === 'enterprise.projectDetail.locked.governmentInvestor') return '政府投资';
+  if (key === 'enterprise.projectDetail.locked.defaultNature') return '新建';
+  if (key === 'enterprise.projectDetail.lockedInvestment') return `${String(values?.value ?? '')}万元`;
+  if (key === 'enterprise.projectDetail.lockedProjectTitle') {
+    return `${String(values?.province ?? '')}${String(values?.investor ?? '')}${String(values?.investment ?? '')}${String(values?.nature ?? '')}项目`;
+  }
+  throw new Error(`Unexpected translation key: ${key}`);
+};
+
+describe('project display privacy', () => {
+  it('builds the H5-compatible enterprise title without exposing the raw project or owner name', () => {
+    const protectedName = buildDesensitizedProjectName(
+      {
+        ...project,
+        projectName: '原始机密项目名',
+        constructionUnit: '辽宁装备制造有限公司',
+        province: '辽宁省',
+        constructionNature: '扩建项目',
+      },
+      translateProjectName
+    );
+
+    expect(protectedName).toBe('辽宁省某企业投资5000万元扩建项目');
+    expect(protectedName).not.toContain('原始机密项目名');
+    expect(protectedName).not.toContain('辽宁装备制造有限公司');
+  });
+
+  it('defaults to a government-funded new-build title when safe source fields are absent', () => {
+    expect(
+      buildDesensitizedProjectName(
+        {
+          hpInfoId: '901',
+          projectName: '不得展示的项目名',
+          constructionUnit: '沈阳市发展和改革委员会',
+          province: '辽宁省',
+        },
+        translateProjectName
+      )
+    ).toBe('辽宁省政府投资新建项目');
+  });
+
+  it('reveals the raw name only after the detail response explicitly confirms purchase', () => {
+    expect(displayProjectName(project, true, translateProjectName)).toBe('Factory expansion');
+    expect(displayProjectName(project, false, translateProjectName)).not.toContain('Factory expansion');
+    expect(displayProjectName(project, undefined, translateProjectName)).not.toContain('Factory expansion');
+  });
+});
 
 describe('project list boundary', () => {
   it('trims every supported filter and includes explicit investment bounds', () => {

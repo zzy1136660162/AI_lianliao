@@ -120,7 +120,7 @@ describe('enterprise desktop routing', () => {
 
   it('redirects unauthenticated enterprise routes to the enterprise login', async () => {
     routerMocks.enterpriseStatus = 'unauthenticated';
-    renderAt('/enterprise/projects/project-1');
+    renderAt('/enterprise/projects/901');
 
     expect(await screen.findByText('enterprise-login-page')).toBeVisible();
     expect(window.location.hash).toBe('#/enterprise/login');
@@ -139,7 +139,7 @@ describe('enterprise desktop routing', () => {
     ['/enterprise/products', 'enterprise.routes.products.title'],
     ['/enterprise/products/1', 'enterprise.routes.productDetail.title'],
     ['/enterprise/projects', 'enterprise.routes.projects.title'],
-    ['/enterprise/projects/project-1', 'enterprise.routes.projectDetail.title'],
+    ['/enterprise/projects/901', 'enterprise.routes.projectDetail.title'],
     ['/enterprise/favorites', 'enterprise.routes.favorites.title'],
     ['/enterprise/leads', 'enterprise.routes.leads.title'],
   ])('registers %s inside the enterprise shell', async (path, heading) => {

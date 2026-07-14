@@ -78,6 +78,54 @@ export type ProjectDetailState = {
   retry: () => void;
 };
 
+export type ProjectNameTranslator = (
+  key:
+    | 'enterprise.projectDetail.locked.enterpriseInvestor'
+    | 'enterprise.projectDetail.locked.governmentInvestor'
+    | 'enterprise.projectDetail.locked.defaultNature'
+    | 'enterprise.projectDetail.lockedInvestment'
+    | 'enterprise.projectDetail.lockedProjectTitle',
+  values?: Record<string, unknown>
+) => string;
+
+const ENTERPRISE_OWNER_KEYWORDS = ['公司', '集团', '厂'] as const;
+
+/** Builds the same safe project identity shown by H5 without returning the raw project or owner name. */
+export const buildDesensitizedProjectName = (
+  project: Readonly<EnterpriseProjectSummary>,
+  translate: ProjectNameTranslator
+): string => {
+  const ownerName = project.constructionUnit ?? '';
+  const investor = translate(
+    ENTERPRISE_OWNER_KEYWORDS.some((keyword) => ownerName.includes(keyword))
+      ? 'enterprise.projectDetail.locked.enterpriseInvestor'
+      : 'enterprise.projectDetail.locked.governmentInvestor'
+  );
+  const sourceNature =
+    project.constructionNature ||
+    project.projectNature ||
+    project.investmentType ||
+    translate('enterprise.projectDetail.locked.defaultNature');
+  const nature = sourceNature.replace(/项目$/u, '') || translate('enterprise.projectDetail.locked.defaultNature');
+  const investment =
+    project.totalInvestment === undefined
+      ? ''
+      : translate('enterprise.projectDetail.lockedInvestment', { value: project.totalInvestment });
+  return translate('enterprise.projectDetail.lockedProjectTitle', {
+    province: project.province ?? '',
+    investor,
+    investment,
+    nature,
+  });
+};
+
+/** Raw project names are visible only on an explicitly purchased detail response. */
+export const displayProjectName = (
+  project: Readonly<EnterpriseProjectSummary>,
+  purchased: boolean | undefined,
+  translate: ProjectNameTranslator
+): string => (purchased === true ? project.projectName : buildDesensitizedProjectName(project, translate));
+
 /** Stable renderer-side project failure that never includes backend payloads or identities. */
 export class ProjectDataError extends Error {
   declare readonly code: EnterpriseIpcErrorCode;

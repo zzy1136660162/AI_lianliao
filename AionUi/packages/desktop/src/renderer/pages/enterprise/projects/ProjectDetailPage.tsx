@@ -8,7 +8,7 @@ import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePa
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
-import { useProjectDetail } from './projectData';
+import { displayProjectName, useProjectDetail } from './projectData';
 import styles from './project-workspace.module.css';
 
 export type ProjectDetailPageProps = { client?: EnterpriseClient };
@@ -48,20 +48,7 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
     const purchased = project.purchased === true;
     const nature = project.constructionNature || project.projectNature || project.investmentType || missing;
     const region = [project.province, project.city].filter(Boolean).join(' / ') || missing;
-    const lockedInvestor = /公司|集团|厂/u.test(project.constructionUnit ?? '')
-      ? t('enterprise.projectDetail.locked.enterpriseInvestor')
-      : t('enterprise.projectDetail.locked.governmentInvestor');
-    const displayProjectName = purchased
-      ? project.projectName
-      : t('enterprise.projectDetail.lockedProjectTitle', {
-          province: project.province ?? '',
-          investor: lockedInvestor,
-          investment:
-            project.totalInvestment === undefined
-              ? ''
-              : t('enterprise.projectDetail.lockedInvestment', { value: project.totalInvestment }),
-          nature,
-        });
+    const protectedProjectName = displayProjectName(project, purchased, t);
     const commonFacts = [
       ['region', region],
       ['nature', nature],
@@ -78,7 +65,7 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
       <div className={styles.detailBody}>
         <section className={styles.detailHero} aria-labelledby='project-detail-name'>
           <span className={styles.eyebrow}>{t('enterprise.projectDetail.profileEyebrow')}</span>
-          <h2 id='project-detail-name'>{displayProjectName}</h2>
+          <h2 id='project-detail-name'>{protectedProjectName}</h2>
           <div className={styles.detailTags}>
             <Tag>{region}</Tag>
             <Tag>{nature}</Tag>

@@ -437,7 +437,8 @@
       "title": "项目主体信息受限",
       "description": "接口尚未确认查看权限，建设单位、联系人、电话与地址已隐藏；本页面不会自动解锁。",
       "enterpriseInvestor": "某企业投资",
-      "governmentInvestor": "政府投资"
+      "governmentInvestor": "政府投资",
+      "defaultNature": "新建"
     },
     "invalid": {
       "title": "项目链接无效",

@@ -781,6 +781,25 @@ describe('enterprise bridge', () => {
     expect(apiClient.request).not.toHaveBeenCalled();
   });
 
+  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+    'rejects the noncanonical project detail identity %s before session hydration',
+    async (hpInfoId) => {
+      const apiClient = makeApiClient();
+      const sessionStore = makeSessionStore();
+      const { handlers } = await initializeBridge(apiClient, sessionStore);
+
+      await expect(
+        invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, {
+          operation: 'project.detail',
+          payload: { hpInfoId },
+        })
+      ).rejects.toMatchObject({ code: 'INVALID_REQUEST' });
+      expect(sessionStore.loadOpenId).not.toHaveBeenCalled();
+      expect(apiClient.getUserContext).not.toHaveBeenCalled();
+      expect(apiClient.request).not.toHaveBeenCalled();
+    }
+  );
+
   it('deduplicates concurrent persisted-session hydration', async () => {
     const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
     const apiClient = makeApiClient();

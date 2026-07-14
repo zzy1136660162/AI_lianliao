@@ -9,6 +9,7 @@ const rawBooleanSchema = z.union([z.string(), z.number(), z.boolean()]).nullish(
 const positiveIntegerSchema = z.number().int().positive().refine(Number.isSafeInteger, 'Expected a safe integer');
 const nonNegativeIntegerSchema = z.number().int().nonnegative().refine(Number.isSafeInteger, 'Expected a safe integer');
 const requestIdentifierSchema = z.string().trim().min(1);
+const projectRequestIdentifierSchema = z.string().regex(/^[1-9]\d{0,30}$/);
 const FORBIDDEN_OBJECT_KEYS = ['__proto__', 'prototype', 'constructor'] as const;
 
 const hasOwn = (input: object, key: string): boolean => Object.prototype.hasOwnProperty.call(input, key);
@@ -583,7 +584,7 @@ const productDetailPayloadSchema = guardedObject(z.object({ productId: requestId
   'productId',
 ]);
 const projectDashboardPayloadSchema = guardedObject(z.object({ runId: z.string().optional() }).strict());
-const projectDetailPayloadSchema = guardedObject(z.object({ hpInfoId: requestIdentifierSchema }).strict(), [
+const projectDetailPayloadSchema = guardedObject(z.object({ hpInfoId: projectRequestIdentifierSchema }).strict(), [
   'hpInfoId',
 ]);
 

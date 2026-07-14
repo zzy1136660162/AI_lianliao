@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { EnterprisePage, EnterpriseProjectSummary } from '@/common/enterprise/contracts';
 
+import { displayProjectName } from './projectData';
 import styles from './project-workspace.module.css';
 
 export type ProjectTableProps = {
@@ -31,12 +32,15 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
         title: t('enterprise.projects.columns.name'),
         dataIndex: 'projectName',
         width: 240,
-        render: (_value, project) => (
-          <div className={styles.projectNameCell}>
-            <h2>{project.projectName}</h2>
-            <span>{project.constructionUnit || missing}</span>
-          </div>
-        ),
+        render: (_value, project) => {
+          const protectedName = displayProjectName(project, false, t);
+          return (
+            <div className={styles.projectNameCell}>
+              <h2>{protectedName}</h2>
+              <span>{project.projectNature || project.investmentType || project.constructionNature || missing}</span>
+            </div>
+          );
+        },
       },
       {
         title: t('enterprise.projects.columns.region'),
@@ -105,7 +109,7 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
         rowClassName={(project) => (selected?.hpInfoId === project.hpInfoId ? styles.selectedRow : '')}
         onRow={(project) => ({
           tabIndex: 0,
-          'aria-label': t('enterprise.projects.rowLabel', { name: project.projectName }),
+          'aria-label': t('enterprise.projects.rowLabel', { name: displayProjectName(project, false, t) }),
           onClick: () => onSelect(project),
           onDoubleClick: () => onViewDetails(project),
           onKeyDown: (event: React.KeyboardEvent<HTMLTableRowElement>) => {

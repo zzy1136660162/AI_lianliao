@@ -385,6 +385,27 @@ describe('enterprise schemas', () => {
     ).toBe(true);
   });
 
+  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+    'rejects the noncanonical project detail request identity %s',
+    (hpInfoId) => {
+      expect(
+        enterpriseRequestSchema.safeParse({
+          operation: 'project.detail',
+          payload: { hpInfoId },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('accepts a bounded positive decimal project detail request identity', () => {
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'project.detail',
+        payload: { hpInfoId: '901' },
+      }).success
+    ).toBe(true);
+  });
+
   it.each([
     {
       operation: 'company.list',
@@ -982,6 +1003,26 @@ describe('enterprise schemas', () => {
       },
     });
   });
+
+  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+    'rejects the noncanonical project response identity %s',
+    (hpInfoId) => {
+      expect(() =>
+        parseEnterpriseResponse('project.list', {
+          list: [{ hpInfoId, projectName: 'Protected project' }],
+          pageNum: 1,
+          pageSize: 10,
+          total: 1,
+        })
+      ).toThrow(/project\.list.*hpInfoId/i);
+      expect(() =>
+        parseEnterpriseResponse('project.detail', {
+          hpInfoId,
+          projectName: 'Protected project',
+        })
+      ).toThrow(/project\.detail.*hpInfoId/i);
+    }
+  );
 
   it('normalizes project detail identifiers and displayed legacy fields', () => {
     const response = parseEnterpriseResponse('project.detail', {

@@ -72,13 +72,13 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
   },
   'project.drill': [{ name: 'Cement', level: 'materialName', projectCount: 1 }],
   'project.list': {
-    list: [{ hpInfoId: 'project-1', projectName: 'Factory' }],
+    list: [{ hpInfoId: '901', projectName: 'Factory' }],
     pageNum: 1,
     pageSize: 20,
     pages: 1,
     total: 1,
   },
-  'project.detail': { hpInfoId: 'project-1', projectName: 'Factory' },
+  'project.detail': { hpInfoId: '901', projectName: 'Factory' },
 };
 
 const successResponse = (operation: EnterpriseOperation): Response =>
@@ -296,6 +296,25 @@ describe('EnterpriseApiClient request boundary', () => {
     });
   });
 
+  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+    'rejects the noncanonical project detail identity %s before transport',
+    async (hpInfoId) => {
+      let calls = 0;
+      const client = new EnterpriseApiClient({
+        transport: async () => {
+          calls += 1;
+          return successResponse('project.detail');
+        },
+      });
+
+      await expectApiError(
+        client.request({ operation: 'project.detail', payload: { hpInfoId } }, REGISTERED_CONTEXT),
+        'INVALID_REQUEST'
+      );
+      expect(calls).toBe(0);
+    }
+  );
+
   it('does not echo rejected request data, openId, or phone numbers', async () => {
     const phone = '13800000000';
     const unsafeRequest = {
@@ -482,9 +501,9 @@ describe('EnterpriseApiClient serialization and context injection', () => {
     },
     {
       operation: 'project.detail',
-      request: { operation: 'project.detail', payload: { hpInfoId: 'project-7' } },
+      request: { operation: 'project.detail', payload: { hpInfoId: '907' } },
       expectedBody: {
-        hpInfoId: 'project-7',
+        hpInfoId: '907',
         openId: REGISTERED_CONTEXT.openId,
         companyId: REGISTERED_CONTEXT.companyId,
       },
@@ -700,7 +719,7 @@ describe('EnterpriseApiClient serialization and context injection', () => {
     { operation: 'project.dashboard', payload: {} },
     { operation: 'project.drill', payload: { level: 'l1' } },
     { operation: 'project.list', payload: { pageNum: 1, pageSize: 20 } },
-    { operation: 'project.detail', payload: { hpInfoId: 'project-target' } },
+    { operation: 'project.detail', payload: { hpInfoId: '901' } },
   ] satisfies EnterpriseRequest[])('rejects missing identity for $operation before transport', async (request) => {
     let calls = 0;
     const client = new EnterpriseApiClient({
