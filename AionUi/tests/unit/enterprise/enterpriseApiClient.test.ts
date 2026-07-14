@@ -948,3 +948,605 @@ describe('EnterpriseApiClient.getUserContext', () => {
     expect(error.message).not.toContain(openId);
   });
 });
+
+describe('EnterpriseApiClient QR authentication', () => {
+  const loginKey = 'enterprise_desktop_Ab3Def456Gh7Jk8Lm9';
+  const qrPath = `/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=${loginKey}`;
+  const pngBytes = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]);
+
+  const createResponseData = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+    loginKey,
+    qrPath,
+    expiresAt: new Date(Date.now() + 300_000).toISOString(),
+    pollIntervalMs: 3000,
+    ...overrides,
+  });
+
+  const createResponse = (overrides: Record<string, unknown> = {}): Response =>
+    jsonResponse({ success: true, data: createResponseData(overrides) });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('creates a session through the fixed POST route and downloads its QR PNG with a locked GET', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const expiresAt = new Date(Date.now() + 300_000).toISOString();
+    const client = new EnterpriseApiClient({
+      transport: async (url, init) => {
+        calls.push({ url, init });
+        if (calls.length === 1) {
+          return jsonResponse({ success: true, data: { loginKey, qrPath, expiresAt, pollIntervalMs: 3000 } });
+        }
+        return new Response(pngBytes, { status: 200, headers: { 'Content-Type': 'image/png' } });
+      },
+    });
+
+    const session = await client.createLoginSession();
+
+    expect(session).toEqual({
+      loginKey,
+      qrDataUrl: `data:image/png;base64,${Buffer.from(pngBytes).toString('base64')}`,
+      expiresAt,
+      pollIntervalMs: 3000,
+    });
+    expect(calls.map(({ url }) => url)).toEqual([
+      'https://cloud.lslnii.com/cloud-api/CommonWxGZHQrCodeLogIn/desktop/create',
+      `https://cloud.lslnii.com${qrPath}`,
+    ]);
+    expect(calls[0]?.init).toMatchObject({
+      method: 'POST',
+      redirect: 'error',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(calls[1]?.init).toMatchObject({
+      method: 'GET',
+      redirect: 'error',
+      headers: { Accept: 'image/png' },
+    });
+    expect(calls[1]?.init.body).toBeUndefined();
+  });
+
+  it('rejects an oversized declared QR body before reading it', async () => {
+    let bodyReads = 0;
+    const qrResponse = new Response(pngBytes, {
+      status: 200,
+      headers: { 'Content-Length': String(2 * 1024 * 1024 + 1) },
+    });
+    Object.defineProperty(qrResponse, 'arrayBuffer', {
+      value: async () => {
+        bodyReads += 1;
+        return pngBytes.buffer;
+      },
+    });
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : qrResponse;
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(bodyReads).toBe(0);
+  });
+
+  it('rejects a QR response whose final URL indicates an ignored redirect', async () => {
+    const qrResponse = new Response(pngBytes, { status: 200 });
+    Object.defineProperty(qrResponse, 'url', { value: 'https://evil.test/redirected.png' });
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : qrResponse;
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+  });
+
+  it.each([
+    ['invalid login key', { loginKey: 'enterprise_desktop_short' }],
+    ['blank QR path', { qrPath: ' ' }],
+    ['invalid expiry', { expiresAt: '2026-07-14' }],
+    ['past expiry', { expiresAt: new Date(Date.now() - 60_000).toISOString() }],
+    ['excessive expiry', { expiresAt: new Date(Date.now() + 360_000).toISOString() }],
+    ['short polling interval', { pollIntervalMs: 999 }],
+    ['long polling interval', { pollIntervalMs: 10_001 }],
+    ['fractional polling interval', { pollIntervalMs: 3000.5 }],
+  ])('rejects malformed create data with %s before downloading the QR image', async (_label, override) => {
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return createResponse(override);
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(calls).toBe(1);
+  });
+
+  it('rejects accessor-backed create data without evaluating it', async () => {
+    let accessorReads = 0;
+    const data = Object.create(null) as Record<string, unknown>;
+    Object.defineProperties(data, {
+      loginKey: {
+        enumerable: true,
+        get: () => {
+          accessorReads += 1;
+          return loginKey;
+        },
+      },
+      qrPath: { enumerable: true, value: qrPath },
+      expiresAt: { enumerable: true, value: new Date(Date.now() + 300_000).toISOString() },
+      pollIntervalMs: { enumerable: true, value: 3000 },
+    });
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue({ success: true, data }),
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(accessorReads).toBe(0);
+  });
+
+  it.each([
+    [
+      'a custom prototype',
+      () => Object.assign(Object.create({ inherited: 'sensitive' }), createResponseData()) as unknown,
+    ],
+    [
+      'a symbol key',
+      () => {
+        const data = createResponseData() as Record<PropertyKey, unknown>;
+        data[Symbol('secret')] = 'sensitive';
+        return data;
+      },
+    ],
+    ['a dangerous prototype key', () => ({ ...createResponseData(), prototype: 'sensitive' }) as unknown],
+  ])('rejects create data with %s', async (_label, makeData) => {
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue({ success: true, data: makeData() }),
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+  });
+
+  it.each([
+    ['cross-origin URL', `https://evil.test${qrPath}`],
+    [
+      'wrong absolute path',
+      `https://cloud.lslnii.com/cloud-api/CommonWxGZHQrCodeLogIn/desktop/create?ratio=8&front_sign=${loginKey}`,
+    ],
+    ['userinfo', `https://user@cloud.lslnii.com${qrPath}`],
+    ['hash', `${qrPath}#fragment`],
+    ['duplicate ratio', `${qrPath}&ratio=8`],
+    ['duplicate front_sign', `${qrPath}&front_sign=${loginKey}`],
+    ['extra query', `${qrPath}&next=https://evil.test`],
+    [
+      'encoded path',
+      `/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/%67etNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=${loginKey}`,
+    ],
+    [
+      'encoded query',
+      `/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=%38&front_sign=${loginKey}`,
+    ],
+    [
+      'normalized traversal path',
+      `/ignored/../cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=${loginKey}`,
+    ],
+    ['trailing empty query segment', `${qrPath}&`],
+    [
+      'mismatched front_sign',
+      '/cloud-api/CommonWxGZHQrCodeLogIn/ln1433/getNewJJGCLoginQRCode_ln1433?ratio=8&front_sign=enterprise_desktop_Zz9Yy8Xx7Ww6Vv5Uu4',
+    ],
+  ])('rejects a QR path with %s before GET', async (_label, unsafeQrPath) => {
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return createResponse({ qrPath: unsafeQrPath });
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+
+    expect(calls).toBe(1);
+  });
+
+  it('accepts an exact same-origin absolute QR URL without relying on content-type', async () => {
+    const absoluteQrUrl = `https://cloud.lslnii.com${qrPath}`;
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse({ qrPath: absoluteQrUrl }) : new Response(pngBytes);
+      },
+    });
+
+    const session = await client.createLoginSession();
+
+    expect(session.qrDataUrl).toBe(`data:image/png;base64,${Buffer.from(pngBytes).toString('base64')}`);
+  });
+
+  it.each([
+    ['an empty body', new Uint8Array()],
+    ['a non-PNG body', Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8])],
+    ['an oversized body', new Uint8Array(2 * 1024 * 1024 + 1)],
+  ])('rejects %s after the QR GET', async (_label, body) => {
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : new Response(body);
+      },
+    });
+
+    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+  });
+
+  it('maps a QR HTTP failure without reading or exposing its body', async () => {
+    const phone = '13800000000';
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return calls === 1 ? createResponse() : new Response(`failure for ${phone}`, { status: 502 });
+      },
+    });
+
+    const error = await expectApiError(client.createLoginSession(), 'HTTP');
+
+    expect(error.message).not.toContain(phone);
+  });
+
+  it('maps a blocked QR redirect to NETWORK without exposing the URL or login key', async () => {
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async (_url, init) => {
+        calls += 1;
+        if (calls === 1) return createResponse();
+        expect(init.redirect).toBe('error');
+        throw new Error(`redirected ${loginKey} ${qrPath}`);
+      },
+    });
+
+    const error = await expectApiError(client.createLoginSession(), 'NETWORK');
+
+    expect(error.message).not.toContain(loginKey);
+    expect(error.message).not.toContain(qrPath);
+  });
+
+  it('times out a hanging QR body read and clears its deadline timer', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | null = null;
+    const qrResponse = new Response(pngBytes);
+    Object.defineProperty(qrResponse, 'arrayBuffer', {
+      value: () => new Promise<ArrayBuffer>(() => undefined),
+    });
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      timeoutMs: 25,
+      transport: async (_url, init) => {
+        calls += 1;
+        signal = init.signal ?? null;
+        return calls === 1 ? createResponse() : qrResponse;
+      },
+    });
+
+    const outcome = expectApiError(client.createLoginSession(), 'TIMEOUT');
+    await vi.advanceTimersByTimeAsync(25);
+    await outcome;
+
+    expect(signal?.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('polls a validated login key through the fixed POST route and returns WAITING only', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const client = new EnterpriseApiClient({
+      transport: async (url, init) => {
+        calls.push({ url, init });
+        return jsonResponse({ success: true, data: { status: 'WAITING', phone: '13800000000' } });
+      },
+    });
+
+    const result = await client.pollLoginSession(loginKey);
+
+    expect(result).toEqual({ status: 'WAITING' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://cloud.lslnii.com/cloud-api/CommonWxGZHQrCodeLogIn/desktop/poll');
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ loginKey });
+  });
+
+  it('rejects a non-string login key without coercing it or performing IO', async () => {
+    let primitiveReads = 0;
+    const unsafeKey = Object.create(null) as Record<PropertyKey, unknown>;
+    Object.defineProperty(unsafeKey, Symbol.toPrimitive, {
+      get: () => {
+        primitiveReads += 1;
+        return () => loginKey;
+      },
+    });
+    let calls = 0;
+    const client = new EnterpriseApiClient({
+      transport: async () => {
+        calls += 1;
+        return jsonResponse({ success: true, data: { status: 'WAITING' } });
+      },
+    });
+
+    await expectApiError(client.pollLoginSession(unsafeKey as unknown as string), 'INVALID_REQUEST');
+
+    expect(primitiveReads).toBe(0);
+    expect(calls).toBe(0);
+  });
+
+  it('rejects an unsafe nested poll object without evaluating its accessor', async () => {
+    let accessorReads = 0;
+    const unsafeContext = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(unsafeContext, 'openId', {
+      enumerable: true,
+      get: () => {
+        accessorReads += 1;
+        return 'openid-sensitive';
+      },
+    });
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        responseWithJsonValue({ success: true, data: { status: 'WAITING', userContext: unsafeContext } }),
+    });
+
+    await expectApiError(client.pollLoginSession(loginKey), 'INVALID_RESPONSE');
+
+    expect(accessorReads).toBe(0);
+  });
+
+  it('rejects an unsafe object nested in a field that would otherwise be stripped', async () => {
+    const unsafeExtra = Object.assign(Object.create({ inherited: 'sensitive' }), { value: 'ignored' }) as unknown;
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue({ success: true, data: { status: 'WAITING', extra: unsafeExtra } }),
+    });
+
+    await expectApiError(client.pollLoginSession(loginKey), 'INVALID_RESPONSE');
+  });
+
+  it.each(['', ' ', 'enterprise_desktop_short', `${loginKey}x`, ` ${loginKey}`, `${loginKey} `])(
+    'rejects the invalid login key %j before polling',
+    async (invalidKey) => {
+      let calls = 0;
+      const client = new EnterpriseApiClient({
+        transport: async () => {
+          calls += 1;
+          return jsonResponse({ success: true, data: { status: 'WAITING' } });
+        },
+      });
+
+      const error = await expectApiError(client.pollLoginSession(invalidKey), 'INVALID_REQUEST');
+
+      if (invalidKey.trim() !== '') expect(error.message).not.toContain(invalidKey);
+      expect(calls).toBe(0);
+    }
+  );
+
+  it('returns EXPIRED without copying unexpected response fields', async () => {
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        jsonResponse({ success: true, data: { status: 'EXPIRED', openId: 'must-not-leak', phone: '13800000000' } }),
+    });
+
+    await expect(client.pollLoginSession(loginKey)).resolves.toEqual({ status: 'EXPIRED' });
+  });
+
+  it('returns the fixed registration URL for an unregistered scanned identity', async () => {
+    const openId = 'openid-unregistered-42';
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        jsonResponse({
+          success: true,
+          data: { status: 'REGISTER_REQUIRED', openId, phone: '13800000000', unionId: 'must-not-leak' },
+        }),
+    });
+
+    await expect(client.pollLoginSession(loginKey)).resolves.toEqual({
+      status: 'REGISTER_REQUIRED',
+      openId,
+      registrationUrl: 'https://sjbang.lslnii.com/jjgc/foreground/vip_store/index.html#/qiyema/register',
+    });
+  });
+
+  it('returns a normalized authenticated context with backend-only identity fields removed', async () => {
+    const openId = 'openid-authenticated-42';
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        jsonResponse({
+          success: true,
+          data: {
+            status: 'AUTHENTICATED',
+            openId,
+            phone: '13800000000',
+            userContext: {
+              registered: true,
+              openId,
+              userId: '1001',
+              userName: 'User',
+              companyId: '2001',
+              companyName: 'Acme',
+              companyLevel: 3,
+              roleId: '7',
+              phone: '13900000000',
+              unionId: 'must-not-leak',
+            },
+          },
+        }),
+    });
+
+    await expect(client.pollLoginSession(loginKey)).resolves.toEqual({
+      status: 'AUTHENTICATED',
+      openId,
+      userContext: {
+        registered: true,
+        openId,
+        userId: '1001',
+        userName: 'User',
+        companyId: '2001',
+        companyName: 'Acme',
+        companyLevel: 3,
+        roleId: '7',
+      },
+    });
+  });
+
+  it.each([
+    ['missing status', {}],
+    ['unknown status', { status: 'DONE' }],
+    ['lowercase status', { status: 'waiting' }],
+    ['registration without openId', { status: 'REGISTER_REQUIRED' }],
+    ['registration with blank openId', { status: 'REGISTER_REQUIRED', openId: '   ' }],
+    ['authentication without openId', { status: 'AUTHENTICATED', userContext: {} }],
+    ['authentication without context', { status: 'AUTHENTICATED', openId: 'openid-42' }],
+    [
+      'mismatched openId',
+      {
+        status: 'AUTHENTICATED',
+        openId: 'openid-top',
+        userContext: {
+          registered: true,
+          openId: 'openid-nested',
+          userId: '1001',
+          companyId: '2001',
+        },
+      },
+    ],
+    [
+      'unregistered context',
+      {
+        status: 'AUTHENTICATED',
+        openId: 'openid-42',
+        userContext: {
+          registered: false,
+          openId: 'openid-42',
+          userId: '1001',
+          companyId: '2001',
+        },
+      },
+    ],
+    [
+      'zero user ID',
+      {
+        status: 'AUTHENTICATED',
+        openId: 'openid-42',
+        userContext: {
+          registered: true,
+          openId: 'openid-42',
+          userId: '0',
+          companyId: '2001',
+        },
+      },
+    ],
+    [
+      'non-decimal company ID',
+      {
+        status: 'AUTHENTICATED',
+        openId: 'openid-42',
+        userContext: {
+          registered: true,
+          openId: 'openid-42',
+          userId: '1001',
+          companyId: 'company-2001',
+        },
+      },
+    ],
+  ])('rejects malformed poll data with %s', async (_label, data) => {
+    const client = new EnterpriseApiClient({
+      transport: async () => jsonResponse({ success: true, data }),
+    });
+
+    const error = await expectApiError(client.pollLoginSession(loginKey), 'INVALID_RESPONSE');
+
+    expect(error.message).not.toContain('openid-top');
+    expect(error.message).not.toContain('openid-nested');
+  });
+
+  it.each([
+    [
+      'a custom prototype',
+      () =>
+        Object.assign(Object.create({ inherited: 'sensitive' }), {
+          registered: true,
+          openId: 'openid-42',
+          userId: '1001',
+          companyId: '2001',
+        }) as unknown,
+    ],
+    [
+      'a symbol key',
+      () => {
+        const context = {
+          registered: true,
+          openId: 'openid-42',
+          userId: '1001',
+          companyId: '2001',
+        } as Record<PropertyKey, unknown>;
+        context[Symbol('secret')] = 'sensitive';
+        return context;
+      },
+    ],
+    [
+      'a dangerous constructor key',
+      () =>
+        JSON.parse(
+          '{"registered":true,"openId":"openid-42","userId":"1001","companyId":"2001","constructor":"sensitive"}'
+        ) as unknown,
+    ],
+  ])('rejects an authenticated context with %s', async (_label, makeContext) => {
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        responseWithJsonValue({
+          success: true,
+          data: { status: 'AUTHENTICATED', openId: 'openid-42', userContext: makeContext() },
+        }),
+    });
+
+    await expectApiError(client.pollLoginSession(loginKey), 'INVALID_RESPONSE');
+  });
+
+  it('rejects an accessor-backed poll status without evaluating it', async () => {
+    let accessorReads = 0;
+    const data = Object.create(null) as Record<string, unknown>;
+    Object.defineProperty(data, 'status', {
+      enumerable: true,
+      get: () => {
+        accessorReads += 1;
+        return 'WAITING';
+      },
+    });
+    const client = new EnterpriseApiClient({
+      transport: async () => responseWithJsonValue({ success: true, data }),
+    });
+
+    await expectApiError(client.pollLoginSession(loginKey), 'INVALID_RESPONSE');
+
+    expect(accessorReads).toBe(0);
+  });
+
+  it.each([
+    ['create', 'API_FAILURE', { success: false, data: null, message: 'denied for 13800000000' }],
+    ['poll', 'API_FAILURE', { success: false, data: null, message: 'denied for 13800000000' }],
+    ['create', 'INVALID_RESPONSE', { success: false, message: 'denied' }],
+    ['poll', 'INVALID_RESPONSE', { success: false, message: 'denied' }],
+  ] as const)('maps a %s CommonResult failure to %s', async (method, code, envelope) => {
+    const client = new EnterpriseApiClient({ transport: async () => responseWithJsonValue(envelope) });
+
+    const promise = method === 'create' ? client.createLoginSession() : client.pollLoginSession(loginKey);
+    const error = await expectApiError(promise, code);
+
+    expect(error.message).not.toContain(loginKey);
+    expect(error.message).not.toContain('13800000000');
+  });
+});
