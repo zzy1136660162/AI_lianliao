@@ -596,6 +596,61 @@ describe('enterprise bridge', () => {
     });
   });
 
+  it('shares one failed clear across concurrent callers, restores context, and releases the retry reference', async () => {
+    const pendingClear = createDeferred<void>();
+    const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
+    const response = { operation: 'project.dashboard' as const, data: { available: true } };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockResolvedValue(response);
+    const sessionStore = makeSessionStore();
+    sessionStore.clear.mockReturnValueOnce(pendingClear.promise).mockResolvedValue(undefined);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    const firstClear = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    const secondClear = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    const concurrentResults = Promise.allSettled([firstClear, secondClear]);
+    await vi.waitFor(() => expect(sessionStore.clear).toHaveBeenCalledOnce());
+    pendingClear.reject(new Error(`${OPEN_ID} clear failed`));
+
+    await expect(concurrentResults).resolves.toEqual([
+      { status: 'rejected', reason: expect.objectContaining({ code: 'SESSION_CLEAR_FAILED' }) },
+      { status: 'rejected', reason: expect.objectContaining({ code: 'SESSION_CLEAR_FAILED' }) },
+    ]);
+    expect(sessionStore.clear).toHaveBeenCalledOnce();
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toEqual(response);
+    expect(apiClient.request).toHaveBeenLastCalledWith(request, USER_CONTEXT);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR)).resolves.toBeUndefined();
+    expect(sessionStore.clear).toHaveBeenCalledTimes(2);
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).rejects.toMatchObject({
+      code: 'MISSING_CONTEXT',
+    });
+  });
+
+  it('shares one successful clear across concurrent callers and releases the completed reference', async () => {
+    const pendingClear = createDeferred<void>();
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    const sessionStore = makeSessionStore();
+    sessionStore.clear.mockReturnValueOnce(pendingClear.promise).mockResolvedValue(undefined);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    const concurrentClears = Promise.all([
+      invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
+      invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
+    ]);
+    await vi.waitFor(() => expect(sessionStore.clear).toHaveBeenCalledOnce());
+    pendingClear.resolve();
+
+    await expect(concurrentClears).resolves.toEqual([undefined, undefined]);
+    expect(sessionStore.clear).toHaveBeenCalledOnce();
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR)).resolves.toBeUndefined();
+    expect(sessionStore.clear).toHaveBeenCalledTimes(2);
+  });
+
   it('does not roll an old context back when a newer login wins during a failed clear', async () => {
     const pendingClear = createDeferred<void>();
     const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };

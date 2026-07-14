@@ -230,6 +230,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
 
   let activeContext: EnterpriseUserContext | null = null;
   let hydrationPromise: Promise<EnterpriseUserContext | null> | null = null;
+  let clearSessionPromise: Promise<void> | null = null;
   let sessionGeneration = 0;
   let automaticHydrationBlocked = false;
 
@@ -250,8 +251,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     return result;
   };
 
-  const clearSessionState = async (): Promise<void> => {
-    assertCurrentLifecycle();
+  const performClearSessionState = async (): Promise<void> => {
     const previousActiveContext = activeContext;
     const previousAutomaticHydrationBlocked = automaticHydrationBlocked;
     sessionGeneration += 1;
@@ -273,6 +273,20 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     assertCurrentLifecycle();
     if (sessionGeneration !== clearGeneration) throw bridgeError('MISSING_CONTEXT');
     automaticHydrationBlocked = false;
+  };
+
+  const clearSessionState = (): Promise<void> => {
+    assertCurrentLifecycle();
+    if (clearSessionPromise) return clearSessionPromise;
+
+    const clearPromise = performClearSessionState();
+    clearSessionPromise = clearPromise;
+    void clearPromise
+      .finally(() => {
+        if (clearSessionPromise === clearPromise) clearSessionPromise = null;
+      })
+      .catch((): undefined => undefined);
+    return clearPromise;
   };
 
   const refreshPersistedContext = (): Promise<EnterpriseUserContext | null> => {
