@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import type { EnterpriseResponse } from '@/common/enterprise/contracts';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import {
   CompanyDataError,
@@ -20,6 +21,14 @@ const createClient = (request: EnterpriseClient['request']): EnterpriseClient =>
   clearSession: vi.fn(),
   request,
 });
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+};
 
 describe('company catalog query mapping', () => {
   it('maps trimmed name, industry, province, city, district, member level and pagination', () => {
@@ -63,6 +72,22 @@ describe('company catalog query mapping', () => {
     ).toEqual({ companyLevel: 0, pageNum: 1, pageSize: 20 });
   });
 
+  it('maps the VIP aggregate without leaking a concrete member level into the renderer request', () => {
+    expect(buildCompanyListQuery({ vip: true, companyLevel: 3.1 }, { pageNum: 2, pageSize: 20 })).toEqual({
+      vip: true,
+      pageNum: 2,
+      pageSize: 20,
+    });
+  });
+
+  it('maps a real decimal member level without adding the VIP aggregate flag', () => {
+    expect(buildCompanyListQuery({ companyLevel: 3.1 }, { pageNum: 1, pageSize: 20 })).toEqual({
+      companyLevel: 3.1,
+      pageNum: 1,
+      pageSize: 20,
+    });
+  });
+
   it('includes every query condition in a deterministic cache key', () => {
     const base = buildCompanyListQuery({ keyword: 'steel' }, { pageNum: 1, pageSize: 20 });
     const otherProvince = buildCompanyListQuery(
@@ -72,6 +97,19 @@ describe('company catalog query mapping', () => {
 
     expect(createCompanyQueryKey(base)).not.toBe(createCompanyQueryKey(otherProvince));
     expect(createCompanyQueryKey({ ...base })).toBe(createCompanyQueryKey(base));
+  });
+
+  it('treats VIP, concrete levels and cleared membership as distinct query keys', () => {
+    const pagination = { pageNum: 1, pageSize: 20 };
+    const vip = buildCompanyListQuery({ vip: true }, pagination);
+    const level = buildCompanyListQuery({ companyLevel: 3.1 }, pagination);
+    const cleared = buildCompanyListQuery({}, pagination);
+
+    expect(
+      new Set([createCompanyQueryKey(vip), createCompanyQueryKey(level), createCompanyQueryKey(cleared)]).size
+    ).toBe(3);
+    expect(isPaginationOnlyCompanyQueryChange(vip, level)).toBe(false);
+    expect(isPaginationOnlyCompanyQueryChange(level, cleared)).toBe(false);
   });
 
   it('preserves prior data only when pagination changes', () => {
@@ -92,7 +130,7 @@ describe('company catalog response boundaries', () => {
     });
     const query = buildCompanyListQuery({ keyword: 'steel' }, { pageNum: 1, pageSize: 20 });
 
-    await expect(loadCompanyList(createClient(request), query)).resolves.toEqual({
+    await expect(loadCompanyList(createClient(request), query, new AbortController().signal)).resolves.toEqual({
       list: [],
       pageNum: 1,
       pageSize: 20,
@@ -110,7 +148,8 @@ describe('company catalog response boundaries', () => {
 
     const error = await loadCompanyList(
       createClient(request),
-      buildCompanyListQuery({}, { pageNum: 1, pageSize: 20 })
+      buildCompanyListQuery({}, { pageNum: 1, pageSize: 20 }),
+      new AbortController().signal
     ).catch((reason: unknown) => reason);
 
     expect(error).toBeInstanceOf(CompanyDataError);
@@ -140,7 +179,9 @@ describe('company catalog response boundaries', () => {
       throw new Error('unexpected operation');
     });
 
-    await expect(loadCompanyDetailBundle(createClient(request), '42')).resolves.toMatchObject({
+    await expect(
+      loadCompanyDetailBundle(createClient(request), '42', new AbortController().signal)
+    ).resolves.toMatchObject({
       company: { companyId: '42', phone: '***********' },
       products: { total: 1 },
     });
@@ -152,6 +193,78 @@ describe('company catalog response boundaries', () => {
       operation: 'product.list',
       payload: { companyId: '42', pageNum: 1, pageSize: 12 },
     });
+  });
+
+  it('does not start a company-list IPC request when its signal is already aborted', async () => {
+    const request = vi.fn<EnterpriseClient['request']>();
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      loadCompanyList(createClient(request), buildCompanyListQuery({}, { pageNum: 1, pageSize: 20 }), controller.signal)
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('discards a company-list response that settles after cancellation', async () => {
+    const pending = deferred<Extract<EnterpriseResponse, { operation: 'company.list' }>>();
+    const request = vi.fn<EnterpriseClient['request']>().mockReturnValue(pending.promise);
+    const controller = new AbortController();
+    const loading = loadCompanyList(
+      createClient(request),
+      buildCompanyListQuery({}, { pageNum: 1, pageSize: 20 }),
+      controller.signal
+    );
+    controller.abort();
+    pending.resolve({
+      operation: 'company.list',
+      data: { list: [], pageNum: 1, pageSize: 20, pages: 0, total: 0 },
+    });
+
+    await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+    expect(request).toHaveBeenCalledOnce();
+  });
+
+  it('never starts product.list when cancellation wins after company.detail', async () => {
+    const pendingDetail = deferred<Extract<EnterpriseResponse, { operation: 'company.detail' }>>();
+    const request = vi.fn<EnterpriseClient['request']>().mockImplementation((input) => {
+      if (input.operation === 'company.detail') return pendingDetail.promise;
+      return Promise.reject(new Error('product.list must not start'));
+    });
+    const controller = new AbortController();
+    const loading = loadCompanyDetailBundle(createClient(request), '42', controller.signal);
+    pendingDetail.resolve({
+      operation: 'company.detail',
+      data: { companyId: '42', name: 'Liaoning Pumps' },
+    });
+    controller.abort();
+
+    await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+    expect(request).toHaveBeenCalledOnce();
+    expect(request.mock.calls[0]?.[0]).toMatchObject({ operation: 'company.detail' });
+  });
+
+  it('discards product.list when cancellation wins while that IPC request is in flight', async () => {
+    const pendingProducts = deferred<Extract<EnterpriseResponse, { operation: 'product.list' }>>();
+    const request = vi.fn<EnterpriseClient['request']>((input) => {
+      if (input.operation === 'company.detail') {
+        return Promise.resolve({
+          operation: 'company.detail',
+          data: { companyId: '42', name: 'Liaoning Pumps' },
+        });
+      }
+      return pendingProducts.promise;
+    });
+    const controller = new AbortController();
+    const loading = loadCompanyDetailBundle(createClient(request), '42', controller.signal);
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    controller.abort();
+    pendingProducts.resolve({
+      operation: 'product.list',
+      data: { list: [], pageNum: 1, pageSize: 12, pages: 0, total: 0 },
+    });
+
+    await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
   });
 });
 

@@ -800,6 +800,24 @@ describe('enterprise bridge', () => {
     expect(apiClient.request).toHaveBeenCalledTimes(2);
   });
 
+  it('masks a company-detail phone again at the final main-process IPC boundary', async () => {
+    const rawPhone = '13800000000';
+    const request: EnterpriseRequest = { operation: 'company.detail', payload: { companyId: '42' } };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockResolvedValue({
+      operation: 'company.detail',
+      data: { companyId: '42', name: 'Acme', phone: rawPhone },
+    });
+    const { handlers } = await initializeBridge(apiClient);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    const response = await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
+
+    expect(response).toMatchObject({ data: { phone: '1380000****' } });
+    expect(JSON.stringify(response)).not.toContain(rawPhone);
+  });
+
   it('discards a pending business response after a successful clear changes the session generation', async () => {
     const pendingResponse = createDeferred<{ operation: 'project.dashboard'; data: { secret: string } }>();
     const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };

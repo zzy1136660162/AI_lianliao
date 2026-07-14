@@ -162,6 +162,40 @@ describe('company list data lifecycle', () => {
     expect(await screen.findByText('Filtered Company')).toBeVisible();
   });
 
+  it('offers the H5 member levels and resets page one when selecting the VIP aggregate', async () => {
+    const request = vi.fn<EnterpriseClient['request']>(async (input) => {
+      if (input.operation !== 'company.list') throw new Error('unexpected operation');
+      return companyPage(`Page ${input.payload.pageNum}`, '42', input.payload.pageNum, 45);
+    });
+    const user = userEvent.setup();
+    const { container } = renderList(createClient(request));
+
+    await screen.findByText('Page 1');
+    const pageTwo = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
+      (item) => item.textContent === '2'
+    );
+    await user.click(pageTwo as HTMLElement);
+    expect(await screen.findByText('Page 2')).toBeVisible();
+
+    const levelSelect = screen
+      .getByPlaceholderText('enterprise.companies.filters.memberLevelPlaceholder')
+      .closest('.arco-select');
+    expect(levelSelect).not.toBeNull();
+    await user.click(levelSelect as HTMLElement);
+    expect(await screen.findByText('enterprise.companies.memberLevel.vipAggregate')).toBeVisible();
+    for (const level of [1, 1.1, 1.2, 2, 3, 3.1, 4, 5, 6, 7, 8, 9, 10]) {
+      expect(screen.getByRole('option', { name: `enterprise.companies.memberLevel.value:${level}` })).toBeVisible();
+    }
+    fireEvent.click(screen.getByRole('option', { name: 'enterprise.companies.memberLevel.vipAggregate' }));
+    await user.click(screen.getByRole('button', { name: 'enterprise.companies.actions.search' }));
+
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(3));
+    expect(request.mock.calls[2]?.[0]).toEqual({
+      operation: 'company.list',
+      payload: { vip: true, pageNum: 1, pageSize: 20 },
+    });
+  });
+
   it('ignores a stale filter response that resolves after the latest query', async () => {
     const firstFilter = deferred<EnterpriseResponse>();
     const latestFilter = deferred<EnterpriseResponse>();
@@ -206,6 +240,15 @@ describe('company list data lifecycle', () => {
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[1]?.[0]).toEqual(request.mock.calls[0]?.[0]);
   });
+
+  it('does not publish AbortError as a company-list failure', async () => {
+    const abortError = new DOMException('cancelled', 'AbortError');
+    const request = vi.fn<EnterpriseClient['request']>().mockRejectedValue(abortError);
+    renderList(createClient(request));
+
+    expect(await screen.findByText('enterprise.companies.empty.title')).toBeVisible();
+    expect(screen.queryByText('enterprise.companies.error.title')).not.toBeInTheDocument();
+  });
 });
 
 describe('company list interactions', () => {
@@ -248,6 +291,41 @@ describe('company list interactions', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/42');
   });
+
+  it('clears the selected quick view when submitted filters replace the result set', async () => {
+    const request = vi
+      .fn<EnterpriseClient['request']>()
+      .mockResolvedValueOnce(companyPage('Alpha Hydraulics', '42'))
+      .mockResolvedValueOnce(companyPage('Beta Controls', '43'));
+    const user = userEvent.setup();
+    renderList(createClient(request));
+
+    const row = (await screen.findByText('Alpha Hydraulics')).closest('tr');
+    await user.click(row as HTMLElement);
+    expect(screen.getByRole('complementary', { name: 'enterprise.companies.quickView.label' })).toBeVisible();
+    await replaceInput(user, screen.getByPlaceholderText('enterprise.companies.filters.keywordPlaceholder'), 'beta');
+    await user.click(screen.getByRole('button', { name: 'enterprise.companies.actions.search' }));
+
+    expect(await screen.findByText('Beta Controls')).toBeVisible();
+    expect(
+      screen.queryByRole('complementary', { name: 'enterprise.companies.quickView.label' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('clears the selected quick view synchronously when filters are reset', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(companyPage('Alpha Hydraulics'));
+    const user = userEvent.setup();
+    renderList(createClient(request));
+
+    const row = (await screen.findByText('Alpha Hydraulics')).closest('tr');
+    await user.click(row as HTMLElement);
+    expect(screen.getByRole('complementary', { name: 'enterprise.companies.quickView.label' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'enterprise.companies.actions.reset' }));
+
+    expect(
+      screen.queryByRole('complementary', { name: 'enterprise.companies.quickView.label' })
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('company detail', () => {
@@ -264,6 +342,7 @@ describe('company detail', () => {
     );
 
   it('shows only returned contact permissions, plain-text profile fields and related products', async () => {
+    const rawPhone = '13800000000';
     const request = vi.fn<EnterpriseClient['request']>(async (input) => {
       if (input.operation === 'company.detail') {
         return {
@@ -280,9 +359,9 @@ describe('company detail', () => {
             companyType: 'Limited company',
             unifiedSocialCreditCode: 'CODE-42',
             contactName: 'Permission protected',
-            phone: '***********',
-            businessSummary: '<strong>Hydraulic systems</strong>',
-            description: '<script>window.stolen=true</script>Trusted profile',
+            phone: '1380000****',
+            businessSummary: '<strong>Business summary</strong>',
+            description: '<script>window.stolen=true</script>Enterprise introduction',
           },
         };
       }
@@ -300,9 +379,17 @@ describe('company detail', () => {
     const { container } = renderDetail(createClient(request));
 
     expect(await screen.findByRole('heading', { name: 'Alpha Hydraulics' })).toBeVisible();
-    expect(screen.getByText('***********')).toBeVisible();
-    expect(screen.getByText('<strong>Hydraulic systems</strong>')).toBeVisible();
-    expect(screen.getByText('<script>window.stolen=true</script>Trusted profile')).toBeVisible();
+    expect(screen.getByText('1380000****')).toBeVisible();
+    expect(container).not.toHaveTextContent(rawPhone);
+    const contactSection = screen.getByText('enterprise.companyDetail.sections.contact').closest('.arco-card');
+    expect(contactSection).not.toBeNull();
+    expect(contactSection?.querySelector('button, a')).toBeNull();
+    const summarySection = screen.getByText('enterprise.companyDetail.sections.businessSummary').closest('.arco-card');
+    const descriptionSection = screen.getByText('enterprise.companyDetail.sections.description').closest('.arco-card');
+    expect(within(summarySection as HTMLElement).getByText('<strong>Business summary</strong>')).toBeVisible();
+    expect(
+      within(descriptionSection as HTMLElement).getByText('<script>window.stolen=true</script>Enterprise introduction')
+    ).toBeVisible();
     expect(container.querySelector('script')).toBeNull();
     expect(screen.getByText('Industrial pump').closest('a')).toHaveAttribute('href', '/enterprise/products/9');
     expect(request).toHaveBeenCalledWith({

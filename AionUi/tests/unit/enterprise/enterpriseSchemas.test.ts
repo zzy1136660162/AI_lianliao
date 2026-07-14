@@ -535,6 +535,39 @@ describe('enterprise schemas', () => {
     ).toMatchObject({ data: { companyId: '9007199254740993' } });
   });
 
+  it.each([
+    ['', ''],
+    ['1234', '****'],
+    ['13800000000', '1380000****'],
+    ['138****0000', '138********'],
+    ['***********', '***********'],
+  ])('masks a company-detail phone at the shared response boundary: %s', (phone, expectedPhone) => {
+    const response = parseEnterpriseResponse('company.detail', {
+      ID: 12,
+      NAME: 'Acme',
+      PHONE: phone,
+    });
+
+    expect(response).toMatchObject({ data: { phone: expectedPhone } });
+    expect(JSON.stringify(response)).not.toContain(phone === expectedPhone ? '138****0000' : phone || 'raw-phone');
+  });
+
+  it('uses COM_INTRO for the profile description while keeping COM_ABS as the business summary', () => {
+    expect(
+      parseEnterpriseResponse('company.detail', {
+        ID: 12,
+        NAME: 'Acme',
+        COM_INTRO: 'Long-form enterprise introduction',
+        COM_ABS: 'Industrial controls and equipment',
+      })
+    ).toMatchObject({
+      data: {
+        description: 'Long-form enterprise introduction',
+        businessSummary: 'Industrial controls and equipment',
+      },
+    });
+  });
+
   it('normalizes product detail aliases into the stable model', () => {
     const response = parseEnterpriseResponse('product.detail', {
       ID: 51,

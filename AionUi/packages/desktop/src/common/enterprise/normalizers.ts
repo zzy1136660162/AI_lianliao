@@ -35,6 +35,14 @@ const optionalText = (...values: unknown[]): string | undefined => {
   return typeof value === 'string' ? value.trim() : undefined;
 };
 
+/** Mirrors the H5 getPhonexxx policy so full company phones never leave the trusted boundary. */
+export const maskEnterprisePhone = (phone: string | null | undefined): string => {
+  const value = String(phone || '');
+  if (!value) return '';
+  if (value.length <= 4) return '*'.repeat(value.length);
+  return `${value.slice(0, -4)}****`;
+};
+
 const optionalIdentifier = (...values: unknown[]): string | undefined => {
   const value = firstScalar(...values);
   if (typeof value === 'string') return value.trim() || undefined;
@@ -259,12 +267,12 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
     setText(
       result,
       'description',
+      raw.comIntro,
+      raw.COM_INTRO,
       raw.description,
       raw.DESCRIPTION,
       raw.comAbs,
-      raw.COM_ABS,
-      raw.comIntro,
-      raw.COM_INTRO
+      raw.COM_ABS
     );
     setText(
       result,
@@ -276,7 +284,8 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
     );
     setText(result, 'contactName', raw.contactName, raw.CONTACT_NAME, raw.contactPerson, raw.CONTACT_PERSON);
     setText(result, 'contactTitle', raw.contactTitle, raw.CONTACT_TITLE, raw.contactDuty, raw.CONTACT_DUTY);
-    setText(result, 'phone', raw.phone, raw.PHONE);
+    const phone = raw.phone ?? raw.PHONE;
+    if (phone !== undefined) result.phone = maskEnterprisePhone(phone);
   }
   return result;
 };

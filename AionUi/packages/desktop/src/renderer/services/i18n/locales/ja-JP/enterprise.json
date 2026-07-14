@@ -199,6 +199,7 @@
       "actions": "Actions"
     },
     "memberLevel": {
+      "vipAggregate": "All VIP companies",
       "value": "Level {{level}}",
       "unknown": "Not classified"
     },

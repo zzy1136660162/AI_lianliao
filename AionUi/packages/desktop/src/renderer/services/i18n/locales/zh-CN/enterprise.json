@@ -199,6 +199,7 @@
       "actions": "操作"
     },
     "memberLevel": {
+      "vipAggregate": "全部 VIP 企业",
       "value": "{{level}} 级会员",
       "unknown": "暂未分级"
     },

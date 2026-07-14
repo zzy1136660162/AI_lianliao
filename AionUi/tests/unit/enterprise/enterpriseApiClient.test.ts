@@ -305,8 +305,7 @@ describe('EnterpriseApiClient serialization and context injection', () => {
           province: 'Liaoning',
           city: 'Shenyang',
           district: 'Hunnan',
-          companyLevel: 2,
-          vip: true,
+          companyLevel: 3.1,
           pageNum: 2,
           pageSize: 30,
         },
@@ -317,8 +316,7 @@ describe('EnterpriseApiClient serialization and context injection', () => {
         province: 'Liaoning',
         city: 'Shenyang',
         district: 'Hunnan',
-        comLevel: 2,
-        vip: true,
+        comLevel: 3.1,
         pageNum: 2,
         pageSize: 30,
         openId: REGISTERED_CONTEXT.openId,
@@ -486,6 +484,52 @@ describe('EnterpriseApiClient serialization and context injection', () => {
     );
 
     expect(JSON.parse(String(calls[0]?.init.body))).toMatchObject({ comLevel: -2, vip: true });
+  });
+
+  it('never serializes the VIP flag alongside an explicit member level', async () => {
+    const { calls, transport } = captureTransport('company.list');
+    const client = new EnterpriseApiClient({ transport });
+
+    await client.request(
+      { operation: 'company.list', payload: { companyLevel: 3.1, vip: true, pageNum: 1, pageSize: 20 } },
+      REGISTERED_CONTEXT
+    );
+
+    const body = JSON.parse(String(calls[0]?.init.body)) as Record<string, unknown>;
+    expect(body.comLevel).toBe(3.1);
+    expect(body).not.toHaveProperty('vip');
+  });
+
+  it('masks the raw company phone before the main-process response can cross IPC', async () => {
+    const rawPhone = '13800000000';
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        jsonResponse({
+          success: true,
+          data: {
+            ID: 'company-target-1',
+            NAME: 'Acme',
+            PHONE: rawPhone,
+            COM_INTRO: 'Detailed introduction',
+            COM_ABS: 'Business summary',
+          },
+        }),
+    });
+
+    const response = await client.request(
+      { operation: 'company.detail', payload: { companyId: 'company-target-1' } },
+      REGISTERED_CONTEXT
+    );
+
+    expect(response).toMatchObject({
+      operation: 'company.detail',
+      data: {
+        phone: '1380000****',
+        description: 'Detailed introduction',
+        businessSummary: 'Business summary',
+      },
+    });
+    expect(JSON.stringify(response)).not.toContain(rawPhone);
   });
 
   it('preserves vip=false without converting it to the VIP level', async () => {

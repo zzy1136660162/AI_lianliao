@@ -17,6 +17,7 @@ export type CompanyFilters = {
   city?: string;
   district?: string;
   companyLevel?: number;
+  vip?: boolean;
 };
 
 export type CompanyPagination = Pick<CompanyListQuery, 'pageNum' | 'pageSize'>;
@@ -47,6 +48,10 @@ export type CompanyDetailState = {
 
 const QUERY_FILTER_KEYS = ['keyword', 'industry', 'province', 'city', 'district', 'companyLevel', 'vip'] as const;
 const COMPANY_ID_PATTERN = /^[1-9]\d{0,30}$/;
+
+/** H5-backed membership choices, including decimal and upper-tier values observed in production. */
+export const COMPANY_LEVEL_FILTERS = [1, 1.1, 1.2, 2, 3, 3.1, 4, 5, 6, 7, 8, 9, 10] as const;
+export const COMPANY_VIP_FILTER_VALUE = 'vip' as const;
 
 const normalizeText = (value: string | undefined): string | undefined => {
   const normalized = value?.trim();
@@ -86,6 +91,22 @@ const safeErrorCode = (error: unknown): EnterpriseIpcErrorCode => {
   }
 };
 
+const isAbortError = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null) return false;
+  try {
+    return Reflect.get(error, 'name') === 'AbortError';
+  } catch {
+    return false;
+  }
+};
+
+const throwIfAborted = (signal: AbortSignal): void => {
+  if (!signal.aborted) return;
+  const error = new Error('Aborted');
+  error.name = 'AbortError';
+  throw error;
+};
+
 /** Builds the exact company-list request payload while removing empty filters. */
 export const buildCompanyListQuery = (
   filters: Readonly<CompanyFilters>,
@@ -105,7 +126,8 @@ export const buildCompanyListQuery = (
   if (province) query.province = province;
   if (city) query.city = city;
   if (district) query.district = district;
-  if (filters.companyLevel !== undefined) query.companyLevel = filters.companyLevel;
+  if (filters.vip === true) query.vip = true;
+  else if (filters.companyLevel !== undefined) query.companyLevel = filters.companyLevel;
   return query;
 };
 
@@ -171,9 +193,13 @@ const validatePage = <T>(value: unknown, validateItem: (item: unknown) => item i
 /** Fetches and validates a real company page; malformed pages fail closed. */
 export const loadCompanyList = async (
   client: Pick<EnterpriseClient, 'request'>,
-  query: CompanyListQuery
+  query: CompanyListQuery,
+  signal: AbortSignal
 ): Promise<EnterprisePage<EnterpriseCompanySummary>> => {
+  // Enterprise IPC has no physical cancellation contract; boundary checks discard stale results instead.
+  throwIfAborted(signal);
   const response = await client.request({ operation: 'company.list', payload: query });
+  throwIfAborted(signal);
   if (response.operation !== 'company.list' || !validatePage(response.data, validateCompany)) {
     throw new CompanyDataError('INVALID_RESPONSE');
   }
@@ -207,20 +233,27 @@ export const parseSafeCompanyImageUrl = (value: string | undefined): string | nu
 /** Loads the verified company profile and its associated real product page. */
 export const loadCompanyDetailBundle = async (
   client: Pick<EnterpriseClient, 'request'>,
-  companyId: string
+  companyId: string,
+  signal: AbortSignal
 ): Promise<CompanyDetailBundle> => {
   const validCompanyId = parseCompanyId(companyId);
+  throwIfAborted(signal);
   const detailResponse = await client.request({
     operation: 'company.detail',
     payload: { companyId: validCompanyId },
   });
+  throwIfAborted(signal);
+  if (detailResponse.operation !== 'company.detail' || !validateCompany(detailResponse.data)) {
+    throw new CompanyDataError('INVALID_RESPONSE');
+  }
+
+  // Check again immediately before the dependent request so an aborted detail never starts product.list.
+  throwIfAborted(signal);
   const productResponse = await client.request({
     operation: 'product.list',
     payload: { companyId: validCompanyId, pageNum: 1, pageSize: 12 },
   });
-  if (detailResponse.operation !== 'company.detail' || !validateCompany(detailResponse.data)) {
-    throw new CompanyDataError('INVALID_RESPONSE');
-  }
+  throwIfAborted(signal);
   if (productResponse.operation !== 'product.list' || !validatePage(productResponse.data, validateProduct)) {
     throw new CompanyDataError('INVALID_RESPONSE');
   }
@@ -256,6 +289,7 @@ export const useCompanyCatalog = (
       filters.city,
       filters.district,
       filters.companyLevel,
+      filters.vip,
       pagination.pageNum,
       pagination.pageSize,
     ]
@@ -277,14 +311,14 @@ export const useCompanyCatalog = (
     setIsLoading(true);
     setErrorCode(null);
 
-    void loadCompanyList(client, query)
+    void loadCompanyList(client, query, controller.signal)
       .then((page) => {
         if (controller.signal.aborted || generation !== requestGenerationRef.current) return;
         dataRef.current = page;
         setData(page);
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted || generation !== requestGenerationRef.current) return;
+        if (controller.signal.aborted || isAbortError(error) || generation !== requestGenerationRef.current) return;
         setErrorCode(safeErrorCode(error));
       })
       .finally(() => {
@@ -341,13 +375,13 @@ export const useCompanyDetail = (
       return () => controller.abort();
     }
     setIsLoading(true);
-    void loadCompanyDetailBundle(client, companyId)
+    void loadCompanyDetailBundle(client, companyId, controller.signal)
       .then((bundle) => {
         if (controller.signal.aborted || generation !== requestGenerationRef.current) return;
         setData(bundle);
       })
       .catch((error: unknown) => {
-        if (controller.signal.aborted || generation !== requestGenerationRef.current) return;
+        if (controller.signal.aborted || isAbortError(error) || generation !== requestGenerationRef.current) return;
         setErrorCode(safeErrorCode(error));
       })
       .finally(() => {

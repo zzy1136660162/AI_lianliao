@@ -186,7 +186,7 @@ const serializeCompanyList = (
   setDefined(body, 'city', payload.city);
   setDefined(body, 'district', payload.district);
   setDefined(body, 'comLevel', payload.companyLevel ?? (payload.vip === true ? -2 : undefined));
-  setDefined(body, 'vip', payload.vip);
+  if (payload.companyLevel === undefined) setDefined(body, 'vip', payload.vip);
   return body;
 };
 

@@ -199,6 +199,7 @@
       "actions": "Actions"
     },
     "memberLevel": {
+      "vipAggregate": "全部 VIP 企業",
       "value": "Level {{level}}",
       "unknown": "Not classified"
     },

@@ -15,6 +15,7 @@ import type {
   EnterpriseResponse,
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
+import { maskEnterprisePhone } from '@/common/enterprise/normalizers';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
@@ -70,6 +71,15 @@ const parseStrictEnterpriseRequest = (value: unknown): EnterpriseRequest | undef
   const parsed = enterpriseRequestSchema.safeParse(value);
   if (!parsed.success || !hasRequiredEnterpriseRequestFields(parsed.data)) return undefined;
   return parsed.data;
+};
+
+/** Defense in depth for injected API clients: raw company phones must not cross Electron IPC. */
+const protectCompanyDetailPhone = (response: EnterpriseResponse): EnterpriseResponse => {
+  if (response.operation !== 'company.detail' || response.data.phone === undefined) return response;
+  return {
+    operation: 'company.detail',
+    data: { ...response.data, phone: maskEnterprisePhone(response.data.phone) },
+  };
 };
 
 /** Internal typed failure; handlers always convert it to a plain IPC result. */
@@ -441,7 +451,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
         const response = await apiClient.request(parsedRequest, context);
         assertCurrentLifecycle();
         if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
-        return response;
+        return protectCompanyDetailPhone(response);
       }),
     ],
   ];

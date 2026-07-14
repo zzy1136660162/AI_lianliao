@@ -10,7 +10,7 @@ import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClien
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 
 import CompanyQuickView from './CompanyQuickView';
-import { type CompanyFilters, useCompanyCatalog } from './companyData';
+import { COMPANY_LEVEL_FILTERS, COMPANY_VIP_FILTER_VALUE, type CompanyFilters, useCompanyCatalog } from './companyData';
 import styles from './company-catalog.module.css';
 
 export type CompanyListPageProps = {
@@ -102,7 +102,13 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
   const resetFilters = () => {
     const emptyFilters: CompanyFilters = {};
     setDraftFilters(emptyFilters);
+    setSelectedCompany(null);
     catalog.applyFilters(emptyFilters);
+  };
+
+  const submitFilters = () => {
+    setSelectedCompany(null);
+    catalog.applyFilters(draftFilters);
   };
 
   const renderContent = () => {
@@ -190,7 +196,7 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
         <div className={styles.headerRule} aria-hidden='true' />
       </header>
 
-      <Form className={styles.filterForm} layout='vertical' onSubmit={() => catalog.applyFilters(draftFilters)}>
+      <Form className={styles.filterForm} layout='vertical' onSubmit={submitFilters}>
         <Form.Item label={t('enterprise.companies.filters.keywordLabel')}>
           <Input
             value={draftFilters.keyword}
@@ -233,17 +239,24 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
         </Form.Item>
         <Form.Item label={t('enterprise.companies.filters.memberLevelLabel')}>
           <Select
-            value={draftFilters.companyLevel}
+            value={draftFilters.vip ? COMPANY_VIP_FILTER_VALUE : draftFilters.companyLevel}
             allowClear
             placeholder={t('enterprise.companies.filters.memberLevelPlaceholder')}
-            options={[1, 2, 3, 4, 5, 6].map((level) => ({
-              value: level,
-              label: t('enterprise.companies.memberLevel.value', { level }),
-            }))}
-            onChange={(companyLevel) =>
+            options={[
+              {
+                value: COMPANY_VIP_FILTER_VALUE,
+                label: t('enterprise.companies.memberLevel.vipAggregate'),
+              },
+              ...COMPANY_LEVEL_FILTERS.map((level) => ({
+                value: level,
+                label: t('enterprise.companies.memberLevel.value', { level }),
+              })),
+            ]}
+            onChange={(membership) =>
               setDraftFilters((current) => ({
                 ...current,
-                companyLevel: typeof companyLevel === 'number' ? companyLevel : undefined,
+                vip: membership === COMPANY_VIP_FILTER_VALUE ? true : undefined,
+                companyLevel: typeof membership === 'number' ? membership : undefined,
               }))
             }
           />

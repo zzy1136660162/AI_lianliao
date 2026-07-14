@@ -845,6 +845,7 @@ export type I18nKey =
   | 'enterprise.companies.loading'
   | 'enterprise.companies.memberLevel.unknown'
   | 'enterprise.companies.memberLevel.value'
+  | 'enterprise.companies.memberLevel.vipAggregate'
   | 'enterprise.companies.missing'
   | 'enterprise.companies.quickView.hint'
   | 'enterprise.companies.quickView.index'
