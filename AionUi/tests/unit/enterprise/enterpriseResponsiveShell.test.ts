@@ -20,4 +20,14 @@ describe('enterprise compact shell CSS contract', () => {
     expect(reducedMotionCss).toContain('.enterprise-assistant');
     expect(reducedMotionCss).toContain('transition: none');
   });
+
+  it('lays out identity and utility actions as a discoverable two-row grid without footer scrolling', () => {
+    const footerRule = compactCss.match(/\.enterprise-sider__footer\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const identityRule = compactCss.match(/\.enterprise-sider__identity\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(footerRule).toMatch(/display:\s*grid/);
+    expect(footerRule).toMatch(/grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+    expect(footerRule).not.toMatch(/overflow(?:-x)?:\s*(?:auto|scroll)/);
+    expect(identityRule).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+  });
 });

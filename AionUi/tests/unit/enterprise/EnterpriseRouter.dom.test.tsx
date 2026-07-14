@@ -182,6 +182,23 @@ describe('enterprise desktop routing', () => {
     expect(screen.getByText('测试用户')).toBeVisible();
     expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.hide' })).toBeVisible();
   });
+
+  it('keeps compact footer actions in direct keyboard order after primary navigation', async () => {
+    const user = userEvent.setup();
+    renderAt('/enterprise/dashboard');
+    const leads = await screen.findByRole('link', { name: 'enterprise.navigation.leads' });
+    const ai = screen.getByRole('link', { name: 'enterprise.shell.actions.ai' });
+    const settings = screen.getByRole('link', { name: 'enterprise.shell.actions.settings' });
+    const logout = screen.getByRole('button', { name: 'enterprise.shell.actions.logout' });
+
+    leads.focus();
+    await user.tab();
+    expect(ai).toHaveFocus();
+    await user.tab();
+    expect(settings).toHaveFocus();
+    await user.tab();
+    expect(logout).toHaveFocus();
+  });
 });
 
 describe('existing WebUI routes', () => {

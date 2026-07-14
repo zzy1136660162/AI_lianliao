@@ -252,11 +252,26 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
 
   const clearSessionState = async (): Promise<void> => {
     assertCurrentLifecycle();
+    const previousActiveContext = activeContext;
+    const previousAutomaticHydrationBlocked = automaticHydrationBlocked;
     sessionGeneration += 1;
+    const clearGeneration = sessionGeneration;
     activeContext = null;
     automaticHydrationBlocked = true;
-    await runSessionMutation('write', () => sessionStore.clear());
+
+    try {
+      await runSessionMutation('write', () => sessionStore.clear());
+    } catch {
+      if (lifecycleEpoch !== epoch) throw bridgeError('MISSING_CONTEXT');
+      if (sessionGeneration === clearGeneration) {
+        activeContext = previousActiveContext;
+        automaticHydrationBlocked = previousAutomaticHydrationBlocked;
+      }
+      throw bridgeError('SESSION_CLEAR_FAILED');
+    }
+
     assertCurrentLifecycle();
+    if (sessionGeneration !== clearGeneration) throw bridgeError('MISSING_CONTEXT');
     automaticHydrationBlocked = false;
   };
 
@@ -405,10 +420,13 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
       wrapHandler('REQUEST_FAILED', async (_event, request) => {
         const parsedRequest = parseStrictEnterpriseRequest(request);
         if (!parsedRequest) throw bridgeError('INVALID_REQUEST');
+        const generationAtStart = sessionGeneration;
         const context = await requireActiveContext();
         assertCurrentLifecycle();
+        if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
         const response = await apiClient.request(parsedRequest, context);
         assertCurrentLifecycle();
+        if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
         return response;
       }),
     ],

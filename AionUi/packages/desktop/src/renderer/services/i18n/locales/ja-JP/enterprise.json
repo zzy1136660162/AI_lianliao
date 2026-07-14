@@ -35,6 +35,12 @@
     "retry": "Try again",
     "refreshQr": "Refresh QR code"
   },
+  "windowControls": {
+    "minimize": "ウィンドウを最小化",
+    "maximize": "ウィンドウを最大化",
+    "restore": "ウィンドウを元のサイズに戻す",
+    "close": "ウィンドウを閉じる"
+  },
   "steps": {
     "scan": {
       "title": "Scan in WeChat",

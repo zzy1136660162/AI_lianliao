@@ -35,6 +35,12 @@
     "retry": "Try again",
     "refreshQr": "Refresh QR code"
   },
+  "windowControls": {
+    "minimize": "Згорнути вікно",
+    "maximize": "Розгорнути вікно",
+    "restore": "Відновити вікно",
+    "close": "Закрити вікно"
+  },
   "steps": {
     "scan": {
       "title": "Scan in WeChat",

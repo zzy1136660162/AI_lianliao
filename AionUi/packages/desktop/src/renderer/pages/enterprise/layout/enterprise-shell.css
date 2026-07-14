@@ -416,28 +416,28 @@
   }
 
   .enterprise-sider__footer {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
-    overflow-x: auto;
     padding: 8px 12px 10px;
     border-top: 1px solid var(--border-light);
   }
 
   .enterprise-sider__identity {
-    flex: 0 0 min(220px, 56vw);
+    grid-column: 1 / -1;
     margin: 0;
-    padding: 0 10px;
-    border-right: 1px solid var(--border-light);
-    border-bottom: 0;
+    padding: 4px 10px 10px;
+    border-bottom: 1px solid var(--border-light);
   }
 
   .enterprise-sider__utility {
-    width: auto;
-    flex: 0 0 auto;
+    width: 100%;
+    justify-content: center;
+    padding: 0 6px;
   }
 
   .enterprise-sider__logout-error {
-    flex: 0 0 220px;
+    grid-column: 1 / -1;
   }
 
   .enterprise-shell__workspace {

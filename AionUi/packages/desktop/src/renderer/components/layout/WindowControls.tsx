@@ -2,6 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { Minus, CloseSmall } from '@icon-park/react';
 import { ipcBridge } from '@/common';
 
+export type WindowControlsLabels = {
+  minimize: string;
+  maximize: string;
+  restore: string;
+  close: string;
+};
+
+type WindowControlsProps = {
+  labels?: WindowControlsLabels;
+};
+
+const DEFAULT_WINDOW_CONTROL_LABELS: WindowControlsLabels = {
+  minimize: 'Minimize',
+  maximize: 'Maximize',
+  restore: 'Restore',
+  close: 'Close',
+};
+
 const WindowMaximizeIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
   <svg width={size} height={size} viewBox='0 0 18 18' fill='none' stroke='currentColor' strokeWidth='1.4'>
     <rect x='3.5' y='3.5' width='11' height='11' rx='1.2' />
@@ -18,7 +36,7 @@ const WindowRestoreIcon: React.FC<{ size?: number }> = ({ size = 14 }) => (
   </svg>
 );
 
-const WindowControls: React.FC = () => {
+const WindowControls: React.FC<WindowControlsProps> = ({ labels = DEFAULT_WINDOW_CONTROL_LABELS }) => {
   const [isMaximized, setIsMaximized] = useState(false);
   const [available, setAvailable] = useState(true);
 
@@ -77,14 +95,19 @@ const WindowControls: React.FC = () => {
 
   return (
     <div className='app-window-controls'>
-      <button type='button' className='app-window-controls__button' onClick={handleMinimize} aria-label='Minimize'>
+      <button
+        type='button'
+        className='app-window-controls__button'
+        onClick={handleMinimize}
+        aria-label={labels.minimize}
+      >
         <Minus theme='outline' size='14' fill='currentColor' strokeWidth={4} />
       </button>
       <button
         type='button'
         className='app-window-controls__button'
         onClick={handleToggleMaximize}
-        aria-label={isMaximized ? 'Restore' : 'Maximize'}
+        aria-label={isMaximized ? labels.restore : labels.maximize}
       >
         {isMaximized ? <WindowRestoreIcon size={14} /> : <WindowMaximizeIcon size={14} />}
       </button>
@@ -92,7 +115,7 @@ const WindowControls: React.FC = () => {
         type='button'
         className='app-window-controls__button app-window-controls__button--close'
         onClick={handleClose}
-        aria-label='Close'
+        aria-label={labels.close}
       >
         <CloseSmall theme='outline' size='16' fill='currentColor' strokeWidth={3} />
       </button>

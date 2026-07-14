@@ -573,6 +573,71 @@ describe('enterprise bridge', () => {
     expect(sessionStore.clear).toHaveBeenCalledOnce();
   });
 
+  it('restores the authenticated context when persisted clear fails and removes it after a successful retry', async () => {
+    const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
+    const response = { operation: 'project.dashboard' as const, data: { available: true } };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockResolvedValue(response);
+    const sessionStore = makeSessionStore();
+    sessionStore.clear.mockRejectedValueOnce(new Error(`${OPEN_ID} clear failed`)).mockResolvedValueOnce(undefined);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR)).rejects.toMatchObject({
+      code: 'SESSION_CLEAR_FAILED',
+    });
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toEqual(response);
+    expect(apiClient.request).toHaveBeenLastCalledWith(request, USER_CONTEXT);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR)).resolves.toBeUndefined();
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).rejects.toMatchObject({
+      code: 'MISSING_CONTEXT',
+    });
+  });
+
+  it('does not roll an old context back when a newer login wins during a failed clear', async () => {
+    const pendingClear = createDeferred<void>();
+    const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValueOnce(OLD_USER_CONTEXT).mockResolvedValueOnce(USER_CONTEXT);
+    apiClient.request.mockResolvedValue({ operation: 'project.dashboard', data: {} });
+    const sessionStore = makeSessionStore();
+    sessionStore.clear.mockReturnValueOnce(pendingClear.promise);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OLD_OPEN_ID);
+
+    const clearing = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    await vi.waitFor(() => expect(sessionStore.clear).toHaveBeenCalledOnce());
+    const newLogin = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+    await vi.waitFor(() => expect(apiClient.getUserContext).toHaveBeenCalledWith(OPEN_ID));
+    pendingClear.reject(new Error(`${OLD_OPEN_ID} clear failed`));
+
+    await expect(clearing).rejects.toMatchObject({ code: 'SESSION_CLEAR_FAILED' });
+    await expect(newLogin).resolves.toEqual(USER_CONTEXT);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
+    expect(apiClient.request).toHaveBeenLastCalledWith(request, USER_CONTEXT);
+  });
+
+  it('does not let an old successful clear unlock a newer login generation', async () => {
+    const pendingClear = createDeferred<void>();
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValueOnce(OLD_USER_CONTEXT).mockResolvedValueOnce(USER_CONTEXT);
+    const sessionStore = makeSessionStore();
+    sessionStore.clear.mockReturnValueOnce(pendingClear.promise);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OLD_OPEN_ID);
+
+    const clearing = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    await vi.waitFor(() => expect(sessionStore.clear).toHaveBeenCalledOnce());
+    const newLogin = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+    await vi.waitFor(() => expect(apiClient.getUserContext).toHaveBeenCalledWith(OPEN_ID));
+    pendingClear.resolve();
+
+    await expect(clearing).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await expect(newLogin).resolves.toEqual(USER_CONTEXT);
+  });
+
   it('rejects business requests before transport when no active or persisted session exists', async () => {
     const apiClient = makeApiClient();
     const { handlers } = await initializeBridge(apiClient);
@@ -678,6 +743,46 @@ describe('enterprise bridge', () => {
     expect(sessionStore.loadOpenId).toHaveBeenCalledOnce();
     expect(apiClient.getUserContext).toHaveBeenCalledOnce();
     expect(apiClient.request).toHaveBeenCalledTimes(2);
+  });
+
+  it('discards a pending business response after a successful clear changes the session generation', async () => {
+    const pendingResponse = createDeferred<{ operation: 'project.dashboard'; data: { secret: string } }>();
+    const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(USER_CONTEXT);
+    apiClient.request.mockReturnValue(pendingResponse.promise);
+    const { handlers } = await initializeBridge(apiClient);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+
+    const requesting = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
+    await vi.waitFor(() => expect(apiClient.request).toHaveBeenCalledWith(request, USER_CONTEXT));
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR);
+    pendingResponse.resolve({ operation: 'project.dashboard', data: { secret: OPEN_ID } });
+
+    await expect(requesting).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+  });
+
+  it('discards an old business response when a newer authenticated identity wins', async () => {
+    const pendingResponse = createDeferred<{ operation: 'project.dashboard'; data: { owner: string } }>();
+    const request: EnterpriseRequest = { operation: 'project.dashboard', payload: {} };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValueOnce(OLD_USER_CONTEXT).mockResolvedValueOnce(USER_CONTEXT);
+    apiClient.request
+      .mockReturnValueOnce(pendingResponse.promise)
+      .mockResolvedValueOnce({ operation: 'project.dashboard', data: { owner: OPEN_ID } });
+    const { handlers } = await initializeBridge(apiClient);
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OLD_OPEN_ID);
+
+    const oldRequest = invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request);
+    await vi.waitFor(() => expect(apiClient.request).toHaveBeenCalledWith(request, OLD_USER_CONTEXT));
+    await invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID);
+    pendingResponse.resolve({ operation: 'project.dashboard', data: { owner: OLD_OPEN_ID } });
+
+    await expect(oldRequest).rejects.toMatchObject({ code: 'MISSING_CONTEXT' });
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.REQUEST, request)).resolves.toMatchObject({
+      data: { owner: OPEN_ID },
+    });
+    expect(apiClient.request).toHaveBeenLastCalledWith(request, USER_CONTEXT);
   });
 
   it.each([

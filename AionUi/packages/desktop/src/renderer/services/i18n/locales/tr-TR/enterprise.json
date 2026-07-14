@@ -35,6 +35,12 @@
     "retry": "Try again",
     "refreshQr": "Refresh QR code"
   },
+  "windowControls": {
+    "minimize": "Pencereyi küçült",
+    "maximize": "Pencereyi büyüt",
+    "restore": "Pencereyi geri yükle",
+    "close": "Pencereyi kapat"
+  },
   "steps": {
     "scan": {
       "title": "Scan in WeChat",

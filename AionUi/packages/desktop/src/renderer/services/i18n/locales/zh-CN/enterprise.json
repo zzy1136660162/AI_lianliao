@@ -35,6 +35,12 @@
     "retry": "重试",
     "refreshQr": "刷新二维码"
   },
+  "windowControls": {
+    "minimize": "最小化窗口",
+    "maximize": "最大化窗口",
+    "restore": "还原窗口",
+    "close": "关闭窗口"
+  },
   "steps": {
     "scan": {
       "title": "微信扫码",
