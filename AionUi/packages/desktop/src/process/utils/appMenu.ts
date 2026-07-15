@@ -7,6 +7,21 @@
 import { ipcBridge } from '@/common';
 import type { MenuItemConstructorOptions } from 'electron';
 import { Menu, app } from 'electron';
+import { isDevToolsEnabled } from './devToolsPolicy';
+
+export const buildViewMenuItems = (isPackaged: boolean): MenuItemConstructorOptions[] => [
+  { role: 'reload' },
+  { role: 'forceReload' },
+  ...(isDevToolsEnabled(isPackaged)
+    ? ([{ role: 'toggleDevTools' }] as MenuItemConstructorOptions[])
+    : []),
+  { type: 'separator' },
+  { role: 'resetZoom' },
+  { role: 'zoomIn' },
+  { role: 'zoomOut' },
+  { type: 'separator' },
+  { role: 'togglefullscreen' },
+];
 
 export function setupApplicationMenu(): void {
   const isMac = process.platform === 'darwin';
@@ -47,17 +62,7 @@ export function setupApplicationMenu(): void {
 
   template.push({
     label: 'View',
-    submenu: [
-      { role: 'reload' },
-      { role: 'forceReload' },
-      { role: 'toggleDevTools' },
-      { type: 'separator' },
-      { role: 'resetZoom' },
-      { role: 'zoomIn' },
-      { role: 'zoomOut' },
-      { type: 'separator' },
-      { role: 'togglefullscreen' },
-    ],
+    submenu: buildViewMenuItems(app.isPackaged),
   });
 
   template.push({

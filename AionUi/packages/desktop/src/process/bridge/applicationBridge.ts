@@ -10,6 +10,7 @@ import { ipcBridge } from '@/common';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { getZoomFactor, setZoomFactor } from '@process/utils/zoom';
 import { getCdpStatus, updateCdpConfig } from '@process/utils/configureChromium';
+import { isDevToolsEnabled } from '@process/utils/devToolsPolicy';
 import { getGpuStatus, setGpuUserOverride } from '@process/utils/gpuRecovery';
 import { initApplicationBridgeCore } from './applicationBridgeCore';
 import type { IOpenClawPrepareStatus, IStartOnBootStatus } from '@/common/adapter/ipcBridge';
@@ -119,6 +120,8 @@ export function initApplicationBridge(): void {
   });
 
   ipcBridge.application.openDevTools.provider(() => {
+    if (!isDevToolsEnabled(app.isPackaged)) return Promise.resolve(false);
+
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       const win = mainWindowRef;
       const wasOpen = win.webContents.isDevToolsOpened();
