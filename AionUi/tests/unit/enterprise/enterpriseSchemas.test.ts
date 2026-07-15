@@ -385,7 +385,7 @@ describe('enterprise schemas', () => {
     ).toBe(true);
   });
 
-  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+  it.each(['project-7', '0', '-0', '+1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
     'rejects the noncanonical project detail request identity %s',
     (hpInfoId) => {
       expect(
@@ -397,11 +397,11 @@ describe('enterprise schemas', () => {
     }
   );
 
-  it('accepts a bounded positive decimal project detail request identity', () => {
+  it.each(['901', '-901'])('accepts a bounded non-zero signed project detail request identity: %s', (hpInfoId) => {
     expect(
       enterpriseRequestSchema.safeParse({
         operation: 'project.detail',
-        payload: { hpInfoId: '901' },
+        payload: { hpInfoId },
       }).success
     ).toBe(true);
   });
@@ -1056,7 +1056,7 @@ describe('enterprise schemas', () => {
     });
   });
 
-  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+  it.each(['project-7', '0', '-0', '+1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
     'rejects the noncanonical project response identity %s',
     (hpInfoId) => {
       expect(() =>
@@ -1075,6 +1075,15 @@ describe('enterprise schemas', () => {
       ).toThrow(/project\.detail.*hpInfoId/i);
     }
   );
+
+  it('normalizes a negative project response identity', () => {
+    expect(
+      parseEnterpriseResponse('project.detail', {
+        hpInfoId: '-901',
+        projectName: 'Legacy project',
+      })
+    ).toMatchObject({ operation: 'project.detail', data: { hpInfoId: '-901' } });
+  });
 
   it('normalizes project detail identifiers and displayed legacy fields', () => {
     const response = parseEnterpriseResponse('project.detail', {

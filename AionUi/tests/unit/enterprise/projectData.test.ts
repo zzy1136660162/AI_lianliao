@@ -222,7 +222,20 @@ describe('project dashboard boundary', () => {
 });
 
 describe('project detail boundary', () => {
-  it.each(['', '0', '-1', '1.2', 'project-901', '901?phone=13800000000'])(
+  it('loads a signed project identity', async () => {
+    const signedDetail = { ...project, hpInfoId: '-901' };
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'project.detail',
+      data: signedDetail,
+    });
+
+    await expect(loadProjectDetail(createClient(request), '-901', new AbortController().signal)).resolves.toEqual(
+      signedDetail
+    );
+    expect(request).toHaveBeenCalledWith({ operation: 'project.detail', payload: { hpInfoId: '-901' } });
+  });
+
+  it.each(['', '0', '-0', '+1', '1.2', 'project-901', '901?phone=13800000000'])(
     'rejects invalid route identity %s before request',
     async (hpInfoId) => {
       const request = vi.fn<EnterpriseClient['request']>();

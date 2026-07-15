@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ENTERPRISE_PROJECT_DRILL_LEVELS } from './constants';
+import { isEnterpriseEntityId } from './entityId';
 import type {
   EnterpriseCompanyDetail,
   EnterpriseDashboardDistributionItem,
@@ -145,11 +146,9 @@ const requiredIdentifier = (operation: string, field: string, ...values: unknown
   return value;
 };
 
-const PROJECT_IDENTIFIER_PATTERN = /^[1-9]\d{0,30}$/;
-
 const requiredProjectIdentifier = (operation: string, field: string, ...values: unknown[]): string => {
   const value = requiredIdentifier(operation, field, ...values);
-  if (!PROJECT_IDENTIFIER_PATTERN.test(value)) throw operationError(operation, `invalid ${field}`);
+  if (!isEnterpriseEntityId(value, 31)) throw operationError(operation, `invalid ${field}`);
   return value;
 };
 

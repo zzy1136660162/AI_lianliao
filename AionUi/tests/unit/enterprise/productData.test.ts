@@ -144,7 +144,20 @@ describe('product detail boundary', () => {
     expect(request).toHaveBeenCalledWith({ operation: 'product.detail', payload: { productId: '9' } });
   });
 
-  it.each(['', '0', '-1', '1.2', 'product-9', '9?phone=13800000000', '90071992547409931234567890123456'])(
+  it('loads signed product and company identities', async () => {
+    const signedProduct = { ...product, productId: '-9', companyId: '-42' };
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'product.detail',
+      data: signedProduct,
+    });
+
+    await expect(loadProductDetail(createClient(request), '-9', new AbortController().signal)).resolves.toEqual(
+      signedProduct
+    );
+    expect(request).toHaveBeenCalledWith({ operation: 'product.detail', payload: { productId: '-9' } });
+  });
+
+  it.each(['', '0', '-0', '+1', '1.2', 'product-9', '9?phone=13800000000', '90071992547409931234567890123456'])(
     'rejects invalid route identity %s before request',
     async (productId) => {
       const request = vi.fn<EnterpriseClient['request']>();

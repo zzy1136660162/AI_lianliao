@@ -471,11 +471,14 @@ describe('company catalog response boundaries', () => {
 });
 
 describe('company route identifiers', () => {
-  it.each(['42', '900719925474099312345'])('accepts a non-zero decimal identifier: %s', (value) => {
-    expect(parseCompanyId(value)).toBe(value);
-  });
+  it.each(['42', '-42', '900719925474099312345', '-900719925474099312345'])(
+    'accepts a non-zero signed decimal identifier: %s',
+    (value) => {
+      expect(parseCompanyId(value)).toBe(value);
+    }
+  );
 
-  it.each([undefined, '', '0', '-1', '1/2', '42?phone=13800000000', '12345678901234567890123456789012'])(
+  it.each([undefined, '', '0', '-0', '+1', '1/2', '42?phone=13800000000', '12345678901234567890123456789012'])(
     'rejects an unsafe company identifier without echoing it: %s',
     (value) => {
       expect(() => parseCompanyId(value)).toThrowError(CompanyDataError);

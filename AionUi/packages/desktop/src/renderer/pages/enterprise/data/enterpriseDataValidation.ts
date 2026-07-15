@@ -1,4 +1,5 @@
 import type { EnterprisePage } from '@/common/enterprise/contracts';
+import { isEnterpriseEntityId } from '@/common/enterprise/entityId';
 
 export type EnterpriseDataFieldKind = 'string' | 'finiteNumber' | 'boolean';
 export type EnterpriseDataFieldRule = readonly [
@@ -8,7 +9,6 @@ export type EnterpriseDataFieldRule = readonly [
   nonEmpty?: true,
 ];
 
-const NUMERIC_ENTERPRISE_ID_PATTERN = /^[1-9]\d{0,30}$/;
 const ENTERPRISE_IMAGE_HOSTS = new Set(['cloud.lslnii.com', 'sjbang.lslnii.com', 'www.lslnii.com']);
 
 const isNonNegativeInteger = (value: unknown): value is number =>
@@ -130,8 +130,7 @@ export const parseEnterpriseOperationData = (value: unknown, expectedOperation: 
   return fields.get('data');
 };
 
-export const isNumericEnterpriseId = (value: string | undefined): value is string =>
-  value !== undefined && NUMERIC_ENTERPRISE_ID_PATTERN.test(value);
+export const isNumericEnterpriseId = (value: string | undefined): value is string => isEnterpriseEntityId(value, 31);
 
 /**
  * Allows product and company images only from the three existing trusted HTTPS hosts.

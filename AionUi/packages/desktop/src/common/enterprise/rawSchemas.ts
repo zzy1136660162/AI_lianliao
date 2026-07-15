@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { ENTERPRISE_LOGIN_STATUSES, ENTERPRISE_PROJECT_DRILL_LEVELS } from './constants';
+import { isEnterpriseEntityId } from './entityId';
 
 const rawTextSchema = z.string().nullish();
 const rawIdentifierSchema = z.union([z.string(), z.number()]).nullish();
@@ -9,7 +10,7 @@ const rawBooleanSchema = z.union([z.string(), z.number(), z.boolean()]).nullish(
 const positiveIntegerSchema = z.number().int().positive().refine(Number.isSafeInteger, 'Expected a safe integer');
 const nonNegativeIntegerSchema = z.number().int().nonnegative().refine(Number.isSafeInteger, 'Expected a safe integer');
 const requestIdentifierSchema = z.string().trim().min(1);
-const projectRequestIdentifierSchema = z.string().regex(/^[1-9]\d{0,30}$/);
+const projectRequestIdentifierSchema = z.string().refine((value) => isEnterpriseEntityId(value, 31));
 const projectKeywordSchema = z.string().max(100);
 const projectShortTextSchema = z.string().max(100);
 const projectLongTextSchema = z.string().max(200);
