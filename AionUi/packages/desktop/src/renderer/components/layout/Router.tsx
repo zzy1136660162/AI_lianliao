@@ -120,71 +120,73 @@ const FallbackRoute: React.FC = () => {
   return <Navigate to={appStatus === 'authenticated' ? '/guid' : '/login'} replace />;
 };
 
-const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
+/** Shared production route tree; the desktop entry wraps it in HashRouter while tests may provide an in-memory router. */
+export const PanelRoutes: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
   const { status } = useAuth();
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route index element={<RootRoute />} />
-        <Route path='/enterprise/login' element={<EnterpriseLoginRoute />} />
-        <Route path='/enterprise' element={<EnterpriseProtectedLayout />}>
-          <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
-          <Route path='dashboard' element={withRouteFallback(DashboardPage)} />
-          <Route path='companies' element={withRouteFallback(CompanyListPage)} />
-          <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
-          <Route path='products' element={withRouteFallback(ProductListPage)} />
-          <Route path='products/:productId' element={withRouteFallback(ProductDetailPage)} />
-          <Route path='projects' element={withRouteFallback(ProjectPage)} />
-          <Route path='projects/:hpInfoId' element={withRouteFallback(ProjectDetailPage)} />
-          {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
-            <Route
-              key={path}
-              path={path}
-              element={<EnterprisePlaceholderPage titleKey={titleKey} descriptionKey={descriptionKey} />}
-            />
-          ))}
-          <Route path='*' element={<Navigate to='/enterprise/dashboard' replace />} />
-        </Route>
+    <Routes>
+      <Route index element={<RootRoute />} />
+      <Route path='/enterprise/login' element={<EnterpriseLoginRoute />} />
+      <Route path='/enterprise' element={<EnterpriseProtectedLayout />}>
+        <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
+        <Route path='dashboard' element={withRouteFallback(DashboardPage)} />
+        <Route path='companies' element={withRouteFallback(CompanyListPage)} />
+        <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
+        <Route path='products' element={withRouteFallback(ProductListPage)} />
+        <Route path='products/:productId' element={withRouteFallback(ProductDetailPage)} />
+        <Route path='projects' element={withRouteFallback(ProjectPage)} />
+        <Route path='projects/:hpInfoId' element={withRouteFallback(ProjectDetailPage)} />
+        {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
+          <Route
+            key={path}
+            path={path}
+            element={<EnterprisePlaceholderPage titleKey={titleKey} descriptionKey={descriptionKey} />}
+          />
+        ))}
+        <Route path='*' element={<Navigate to='/enterprise/dashboard' replace />} />
+      </Route>
+      <Route
+        path='/login'
+        element={status === 'authenticated' ? <Navigate to='/guid' replace /> : withRouteFallback(LoginPage)}
+      />
+      <Route element={<ProtectedLayout layout={layout} />}>
+        <Route path='/guid' element={withRouteFallback(Guid)} />
+        <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
         <Route
-          path='/login'
-          element={status === 'authenticated' ? <Navigate to='/guid' replace /> : withRouteFallback(LoginPage)}
+          path='/team/:id'
+          element={TEAM_MODE_ENABLED ? withRouteFallback(TeamIndex) : <Navigate to='/guid' replace />}
         />
-        <Route element={<ProtectedLayout layout={layout} />}>
-          <Route path='/guid' element={withRouteFallback(Guid)} />
-          <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
-          <Route
-            path='/team/:id'
-            element={TEAM_MODE_ENABLED ? withRouteFallback(TeamIndex) : <Navigate to='/guid' replace />}
-          />
-          <Route path='/settings/model' element={withRouteFallback(ModeSettings)} />
-          <Route path='/settings/assistants' element={withRouteFallback(AssistantSettings)} />
-          <Route path='/settings/agent' element={withRouteFallback(AgentSettings)} />
-          <Route path='/settings/agent/:id/repair' element={withRouteFallback(AgentRepairPage)} />
-          <Route path='/settings/capabilities' element={withRouteFallback(CapabilitiesSettings)} />
-          <Route
-            path='/settings/capabilities/skills/import-history'
-            element={withRouteFallback(CapabilitiesSettings)}
-          />
-          {/* Legacy routes — redirect to the merged /settings/capabilities page */}
-          <Route path='/settings/skills-hub' element={<Navigate to='/settings/capabilities?tab=skills' replace />} />
-          <Route path='/settings/tools' element={<Navigate to='/settings/capabilities?tab=tools' replace />} />
-          <Route path='/settings/appearance' element={withRouteFallback(AppearanceSettings)} />
-          <Route path='/settings/display' element={<Navigate to='/settings/appearance' replace />} />
-          <Route path='/settings/webui' element={withRouteFallback(WebuiSettings)} />
-          <Route path='/settings/pet' element={withRouteFallback(PetSettings)} />
-          <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
-          <Route path='/settings/about' element={withRouteFallback(SystemSettings)} />
-          <Route path='/settings/ext/:tabId' element={withRouteFallback(ExtensionSettingsPage)} />
-          <Route path='/settings' element={<Navigate to='/settings/model' replace />} />
-          <Route path='/test/components' element={withRouteFallback(ComponentsShowcase)} />
-          <Route path='/scheduled' element={withRouteFallback(ScheduledTasksPage)} />
-          <Route path='/scheduled/:job_id' element={withRouteFallback(TaskDetailPage)} />
-        </Route>
-        <Route path='*' element={<FallbackRoute />} />
-      </Routes>
-    </HashRouter>
+        <Route path='/settings/model' element={withRouteFallback(ModeSettings)} />
+        <Route path='/settings/assistants' element={withRouteFallback(AssistantSettings)} />
+        <Route path='/settings/agent' element={withRouteFallback(AgentSettings)} />
+        <Route path='/settings/agent/:id/repair' element={withRouteFallback(AgentRepairPage)} />
+        <Route path='/settings/capabilities' element={withRouteFallback(CapabilitiesSettings)} />
+        <Route path='/settings/capabilities/skills/import-history' element={withRouteFallback(CapabilitiesSettings)} />
+        {/* Legacy routes — redirect to the merged /settings/capabilities page */}
+        <Route path='/settings/skills-hub' element={<Navigate to='/settings/capabilities?tab=skills' replace />} />
+        <Route path='/settings/tools' element={<Navigate to='/settings/capabilities?tab=tools' replace />} />
+        <Route path='/settings/appearance' element={withRouteFallback(AppearanceSettings)} />
+        <Route path='/settings/display' element={<Navigate to='/settings/appearance' replace />} />
+        <Route path='/settings/webui' element={withRouteFallback(WebuiSettings)} />
+        <Route path='/settings/pet' element={withRouteFallback(PetSettings)} />
+        <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
+        <Route path='/settings/about' element={withRouteFallback(SystemSettings)} />
+        <Route path='/settings/ext/:tabId' element={withRouteFallback(ExtensionSettingsPage)} />
+        <Route path='/settings' element={<Navigate to='/settings/model' replace />} />
+        <Route path='/test/components' element={withRouteFallback(ComponentsShowcase)} />
+        <Route path='/scheduled' element={withRouteFallback(ScheduledTasksPage)} />
+        <Route path='/scheduled/:job_id' element={withRouteFallback(TaskDetailPage)} />
+      </Route>
+      <Route path='*' element={<FallbackRoute />} />
+    </Routes>
   );
 };
+
+const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => (
+  <HashRouter>
+    <PanelRoutes layout={layout} />
+  </HashRouter>
+);
 
 export default PanelRoute;
