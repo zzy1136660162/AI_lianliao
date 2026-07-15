@@ -1,7 +1,7 @@
 import { Robot } from '@icon-park/react';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import EnterpriseHeader from './EnterpriseHeader';
 import EnterpriseSider from './EnterpriseSider';
@@ -11,7 +11,13 @@ import './enterprise-shell.css';
 /** Three-column enterprise workspace with a separately collapsible assistant slot. */
 const EnterpriseShell: React.FC = () => {
   const { t } = useTranslation();
+  const location = useLocation();
+  const mainRef = useRef<HTMLElement>(null);
   const [assistantOpen, setAssistantOpen] = useState(true);
+
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [location.pathname]);
 
   return (
     <div className={`enterprise-shell${assistantOpen ? '' : ' enterprise-shell--assistant-closed'}`}>
@@ -24,7 +30,7 @@ const EnterpriseShell: React.FC = () => {
           onToggleAssistant={() => setAssistantOpen((current) => !current)}
         />
         <div className='enterprise-shell__work-area'>
-          <main className='enterprise-shell__main' aria-label={t('enterprise.accessibility.workspace')}>
+          <main ref={mainRef} className='enterprise-shell__main' aria-label={t('enterprise.accessibility.workspace')}>
             <Outlet />
           </main>
           <aside

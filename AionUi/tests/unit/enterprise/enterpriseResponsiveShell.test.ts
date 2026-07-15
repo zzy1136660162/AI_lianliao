@@ -7,7 +7,49 @@ const compactStart = css.indexOf('@media (max-width: 780px)');
 const compactEnd = css.indexOf('@media (prefers-reduced-motion: reduce)');
 const compactCss = css.slice(compactStart, compactEnd);
 
+describe('enterprise desktop shell CSS contract', () => {
+  it('constrains the shell to the viewport without allowing its grid to grow', () => {
+    const shellRule = css.match(/\.enterprise-shell\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(shellRule).toMatch(/^\s*height:\s*100vh/m);
+    expect(shellRule).toMatch(/^\s*height:\s*100dvh/m);
+    expect(shellRule).toMatch(/^\s*min-height:\s*0/m);
+    expect(shellRule).toMatch(/^\s*overflow:\s*hidden/m);
+  });
+
+  it('assigns business-content scrolling to the main pane', () => {
+    const mainRule = css.match(/\.enterprise-shell__main\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(mainRule).toMatch(/overflow:\s*auto/);
+  });
+
+  it('keeps navigation and assistant content independently scrollable in short windows', () => {
+    const navigationRule = css.match(/\.enterprise-sider__navigation\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const assistantRule = css.match(/\.enterprise-assistant\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(navigationRule).toMatch(/overflow-y:\s*auto/);
+    expect(assistantRule).toMatch(/overflow-y:\s*auto/);
+  });
+});
+
 describe('enterprise compact shell CSS contract', () => {
+  it('releases the document lock only around the enterprise shell', () => {
+    const rootReleaseRule =
+      compactCss.match(
+        /html:has\(\.enterprise-shell\),\s*body:has\(\.enterprise-shell\),\s*#root:has\(\.enterprise-shell\)\s*\{([^}]*)\}/s
+      )?.[1] ?? '';
+    const shellRule = compactCss.match(/\.enterprise-shell\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const mainRule = compactCss.match(/\.enterprise-shell__main\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(rootReleaseRule).toMatch(/^\s*height:\s*auto/m);
+    expect(rootReleaseRule).toMatch(/^\s*min-height:\s*100%/m);
+    expect(rootReleaseRule).toMatch(/^\s*overflow:\s*visible/m);
+    expect(shellRule).toMatch(/^\s*height:\s*auto/m);
+    expect(shellRule).toMatch(/^\s*min-height:\s*100vh/m);
+    expect(shellRule).toMatch(/^\s*overflow:\s*visible/m);
+    expect(mainRule).toMatch(/overflow:\s*visible/);
+  });
+
   it('does not permanently remove identity, assistant content, or its toggle at narrow widths', () => {
     expect(compactStart).toBeGreaterThanOrEqual(0);
     expect(compactCss).not.toMatch(/\.enterprise-sider__identity\s*\{[^}]*display:\s*none/s);

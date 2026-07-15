@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Outlet } from 'react-router-dom';
@@ -59,9 +59,20 @@ vi.mock('@/renderer/utils/platform', () => ({
   isMacOS: () => false,
 }));
 
-vi.mock('@/renderer/components/layout/WindowControls', () => ({
-  default: () => <div data-testid='shared-window-controls'>shared controls</div>,
-}));
+vi.mock('@/renderer/components/layout/WindowControls', async () => {
+  const { useLocation } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  const WindowControlsMock = () => {
+    const location = useLocation();
+
+    return (
+      <div data-testid='shared-window-controls' data-location-search={location.search}>
+        shared controls
+      </div>
+    );
+  };
+
+  return { default: WindowControlsMock };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -228,6 +239,41 @@ describe('enterprise desktop routing', () => {
     expect(settings).toHaveFocus();
     await user.tab();
     expect(logout).toHaveFocus();
+  });
+
+  it('returns the enterprise workspace to the top after navigating to another enterprise pathname', async () => {
+    const { container } = renderAt('/enterprise/dashboard');
+    await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, ROUTE_WAIT_OPTIONS);
+    const main = container.querySelector<HTMLElement>('.enterprise-shell__main');
+
+    expect(main).not.toBeNull();
+    main!.scrollTop = 320;
+    const primaryNavigation = screen.getByRole('navigation', {
+      name: 'enterprise.accessibility.primaryNavigation',
+    });
+    await userEvent.click(within(primaryNavigation).getByRole('link', { name: 'enterprise.navigation.companies' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'enterprise.routes.companies.title' }, ROUTE_WAIT_OPTIONS)
+    ).toBeVisible();
+    expect(main).toHaveProperty('scrollTop', 0);
+  });
+
+  it('preserves enterprise workspace scroll when only the hash query changes', async () => {
+    const { container } = renderAt('/enterprise/dashboard');
+    await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, ROUTE_WAIT_OPTIONS);
+    const main = container.querySelector<HTMLElement>('.enterprise-shell__main');
+
+    expect(main).not.toBeNull();
+    main!.scrollTop = 320;
+    window.location.hash = '#/enterprise/dashboard?page=2';
+    fireEvent.popState(window);
+
+    await waitFor(
+      () => expect(screen.getByTestId('shared-window-controls')).toHaveAttribute('data-location-search', '?page=2'),
+      ROUTE_WAIT_OPTIONS
+    );
+    expect(main).toHaveProperty('scrollTop', 320);
   });
 });
 
