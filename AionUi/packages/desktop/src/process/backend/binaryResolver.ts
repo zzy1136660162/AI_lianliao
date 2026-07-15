@@ -2,17 +2,25 @@
  * Resolve the aioncore binary path.
  *
  * Search order:
- *  1. Bundled with app (production)
- *  2. System PATH
+ *  1. Development environment override
+ *  2. Bundled with app (production)
+ *  3. System PATH
  */
 
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 
 const BINARY_NAME = 'aioncore';
 const MAX_DIR_ENTRIES = 20;
 const MAX_LOOKUP_TEXT_LENGTH = 1000;
+
+export type BackendBinaryResolveContext = {
+  appPath: string;
+  env: NodeJS.ProcessEnv;
+  isPackaged: boolean;
+  resourcesPath?: string;
+};
 
 type BackendBinaryResolveDiagnostics = {
   resourcesPath?: string;
@@ -23,6 +31,8 @@ type BackendBinaryResolveDiagnostics = {
   runtimeDirExists?: boolean;
   resourcesDirEntries?: string[];
   runtimeDirEntries?: string[];
+  envOverridePath?: string;
+  envOverrideExists?: boolean;
   pathLookupCommand: string;
   pathLookupResult?: string;
   pathLookupError?: string;
@@ -60,11 +70,28 @@ function trimLookupText(text: string): string {
   return text.trim().slice(0, MAX_LOOKUP_TEXT_LENGTH);
 }
 
+function resolveDevelopmentOverride(
+  context: BackendBinaryResolveContext,
+  diagnostics: BackendBinaryResolveDiagnostics
+): string | null {
+  if (context.isPackaged) return null;
+  const configuredPath = context.env.AIONUI_BACKEND_BIN?.trim();
+  if (!configuredPath) return null;
+
+  const candidate = resolve(configuredPath);
+  diagnostics.envOverridePath = candidate;
+  diagnostics.envOverrideExists = existsSync(candidate);
+  if (!diagnostics.envOverrideExists) {
+    throw new BackendBinaryResolveError(`Configured AIONUI_BACKEND_BIN does not exist: ${candidate}`, diagnostics);
+  }
+  return candidate;
+}
+
 /**
  * Resolve the aioncore binary path.
  * Returns the absolute path to the binary, or throws if not found.
  */
-export function resolveBinaryPath(): string {
+export function resolveBinaryPath(context: BackendBinaryResolveContext): string {
   const runtimeKey = getRuntimeKey();
   const binaryName = getBinaryName();
   const diagnostics: BackendBinaryResolveDiagnostics = {
@@ -73,7 +100,10 @@ export function resolveBinaryPath(): string {
     pathLookupCommand: process.platform === 'win32' ? `where ${BINARY_NAME}` : `which ${BINARY_NAME}`,
   };
 
-  const bundled = bundledPath(runtimeKey, binaryName, diagnostics);
+  const override = resolveDevelopmentOverride(context, diagnostics);
+  if (override) return override;
+
+  const bundled = bundledPath(context.resourcesPath, runtimeKey, binaryName, diagnostics);
   if (bundled) return bundled;
 
   const fromPath = resolveFromSystemPATH(diagnostics);
@@ -90,11 +120,11 @@ export function resolveBinaryPath(): string {
  * Layout: bundled-aioncore/{platform}-{arch}/aioncore[.exe]
  */
 function bundledPath(
+  resourcesPath: string | undefined,
   runtimeKey: string,
   binaryName: string,
   diagnostics: BackendBinaryResolveDiagnostics
 ): string | null {
-  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
   if (!resourcesPath) return null;
   diagnostics.resourcesPath = resourcesPath;
 
