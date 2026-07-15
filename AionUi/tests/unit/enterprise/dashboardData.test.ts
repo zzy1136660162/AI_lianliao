@@ -111,6 +111,64 @@ describe('dashboard unified search loader', () => {
     expect(result.errorCode).toBeNull();
   });
 
+  it('caps every successful search group at five records when a response is overfull', async () => {
+    const request = vi.fn<EnterpriseClient['request']>((operation) => {
+      if (operation.operation === 'company.list') {
+        return Promise.resolve({
+          operation: 'company.list',
+          data: {
+            list: Array.from({ length: 6 }, (_, index) => ({
+              companyId: String(index + 1),
+              name: `Company ${index + 1}`,
+            })),
+            pageNum: 1,
+            pageSize: 5,
+            pages: 2,
+            total: 6,
+          },
+        });
+      }
+      if (operation.operation === 'product.list') {
+        return Promise.resolve({
+          operation: 'product.list',
+          data: {
+            list: Array.from({ length: 6 }, (_, index) => ({
+              productId: String(index + 1),
+              companyId: '1',
+              name: `Product ${index + 1}`,
+            })),
+            pageNum: 1,
+            pageSize: 5,
+            pages: 2,
+            total: 6,
+          },
+        });
+      }
+      if (operation.operation === 'project.list') {
+        return Promise.resolve({
+          operation: 'project.list',
+          data: {
+            list: Array.from({ length: 6 }, (_, index) => ({
+              hpInfoId: String(index + 1),
+              projectName: `Project ${index + 1}`,
+            })),
+            pageNum: 1,
+            pageSize: 5,
+            pages: 2,
+            total: 6,
+          },
+        });
+      }
+      return Promise.reject(new Error('unexpected operation'));
+    });
+
+    const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
+
+    expect(result.companies.items.map((item) => item.companyId)).toEqual(['1', '2', '3', '4', '5']);
+    expect(result.products.items.map((item) => item.productId)).toEqual(['1', '2', '3', '4', '5']);
+    expect(result.projects.items.map((item) => item.hpInfoId)).toEqual(['1', '2', '3', '4', '5']);
+  });
+
   it('keeps successful groups when one category fails', async () => {
     const request = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'company.list') return Promise.resolve(companyResponse());

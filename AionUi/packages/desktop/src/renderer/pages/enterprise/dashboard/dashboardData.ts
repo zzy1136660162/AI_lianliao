@@ -32,6 +32,8 @@ export type DashboardSearchState = {
   retry: () => void;
 };
 
+const DASHBOARD_SEARCH_RESULT_LIMIT = 5;
+
 /** Stable renderer search error that never carries remote response text. */
 export class DashboardDataError extends Error {
   declare readonly code: EnterpriseIpcErrorCode;
@@ -91,7 +93,7 @@ export const isDashboardSearchQueryReady = (query: string): boolean =>
 
 const settledGroup = <T>(result: PromiseSettledResult<{ list: T[] }>): DashboardSearchGroup<T> =>
   result.status === 'fulfilled'
-    ? { items: result.value.list, errorCode: null }
+    ? { items: result.value.list.slice(0, DASHBOARD_SEARCH_RESULT_LIMIT), errorCode: null }
     : { items: [], errorCode: safeErrorCode(result.reason) };
 
 /** Runs the three strict catalog loaders concurrently and preserves independently successful groups. */

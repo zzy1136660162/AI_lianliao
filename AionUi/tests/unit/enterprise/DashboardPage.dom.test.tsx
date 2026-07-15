@@ -222,6 +222,25 @@ describe('enterprise dashboard', () => {
     });
   });
 
+  it('does not expose combobox popup relationships while search results are loading', async () => {
+    const pendingSearch = deferred<EnterpriseResponse>();
+    const request = vi.fn<EnterpriseClient['request']>((operation) => {
+      if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
+      if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
+      return pendingSearch.promise;
+    });
+    renderDashboard(createClient(request));
+    const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
+
+    fireEvent.change(input, { target: { value: 'pump' } });
+    expect(await screen.findByText('enterprise.dashboard.search.loading')).toBeVisible();
+
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(input).not.toHaveAttribute('aria-controls');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+    expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull();
+  });
+
   it('keeps partial results, reports the failed group and routes clicks to real details', async () => {
     const request = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
@@ -252,11 +271,14 @@ describe('enterprise dashboard', () => {
     fireEvent.change(input, { target: { value: 'pump' } });
     await screen.findByRole('option', { name: /Search company/ });
 
+    const listbox = screen.getByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' });
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(input).toHaveAttribute('aria-controls', listbox.id);
+
     fireEvent.keyDown(input, { key: 'ArrowUp' });
-    expect(screen.getByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    const selectedProject = screen.getByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
+    expect(selectedProject).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveAttribute('aria-activedescendant', selectedProject.id);
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     expect(screen.getByRole('option', { name: /Search company/ })).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(input, { key: 'ArrowDown' });
@@ -298,11 +320,16 @@ describe('enterprise dashboard', () => {
       } as EnterpriseResponse);
     });
     renderDashboard(createClient(request));
-    fireEvent.change(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), {
+    const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
+    fireEvent.change(input, {
       target: { value: 'none' },
     });
 
     expect(await screen.findByText('enterprise.dashboard.search.empty')).toBeVisible();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(input).not.toHaveAttribute('aria-controls');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+    expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull();
   });
 
   it('discards stale search results when the query changes during a request', async () => {
@@ -339,11 +366,16 @@ describe('enterprise dashboard', () => {
       return Promise.reject(new Error('raw-openid-secret'));
     });
     const { container } = renderDashboard(createClient(request));
-    fireEvent.change(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), {
+    const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
+    fireEvent.change(input, {
       target: { value: 'pump' },
     });
 
     expect(await screen.findByText('enterprise.dashboard.search.totalError')).toBeVisible();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(input).not.toHaveAttribute('aria-controls');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+    expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull();
     expect(container).not.toHaveTextContent('raw-openid-secret');
   });
 

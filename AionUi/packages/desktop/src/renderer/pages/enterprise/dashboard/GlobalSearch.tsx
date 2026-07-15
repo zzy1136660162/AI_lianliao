@@ -127,7 +127,8 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
     search.result !== null &&
     search.result.errorCode === null &&
     groups.every((group) => group.errorCode === null && group.options.length === 0);
-  const showsListbox = !search.isLoading && !search.result?.errorCode && !showEmpty;
+  const showsListbox =
+    resultsOpen && search.result !== null && !search.isLoading && !search.result.errorCode && !showEmpty;
 
   return (
     <section className={styles.searchSection} aria-labelledby='enterprise-global-search-title'>
@@ -150,9 +151,11 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
           aria-label={t('enterprise.dashboard.search.ariaLabel')}
           role='combobox'
           aria-autocomplete='list'
-          aria-expanded={resultsOpen}
-          aria-controls='enterprise-global-search-results'
-          aria-activedescendant={activeIndex >= 0 ? `enterprise-search-${options[activeIndex]?.id}` : undefined}
+          aria-expanded={showsListbox}
+          aria-controls={showsListbox ? 'enterprise-global-search-results' : undefined}
+          aria-activedescendant={
+            showsListbox && activeIndex >= 0 ? `enterprise-search-${options[activeIndex]?.id}` : undefined
+          }
           onFocus={() => {
             if (ready) setOpen(true);
           }}
