@@ -121,7 +121,7 @@
   "routes": {
     "dashboard": {
       "title": "企业工作台",
-      "description": "企业实时总览与统一搜索将在企业、产品和项目页面完成后接入。"
+      "description": "在同一企业身份工作台中检索可信企业、产品与实时项目采购信号。"
     },
     "companies": {
       "title": "企业库",
@@ -162,6 +162,50 @@
     "emptyDescription": "请调整当前筛选条件后重试。",
     "errorTitle": "暂时无法加载企业数据",
     "errorDescription": "企业服务暂时不可用，请重试。"
+  },
+  "dashboard": {
+    "eyebrow": "辽宁产业身份工作台",
+    "heroIndex": "辽 / 实时",
+    "search": {
+      "index": "01 / 统一检索",
+      "eyebrow": "跨域产业情报",
+      "title": "统一检索企业、产品与项目",
+      "description": "一次输入并行查询三个可信数据域；单个服务不可用时，其他分组仍可继续使用。",
+      "placeholder": "请输入至少两个字符",
+      "ariaLabel": "检索企业、产品与在建项目",
+      "resultsLabel": "企业统一检索分组结果",
+      "minimumHint": "输入至少两个字符后开始检索。",
+      "loading": "正在检索可信产业数据",
+      "totalError": "统一检索暂时不可用，请重试。",
+      "groupError": "该分组暂时无法加载。",
+      "empty": "企业、产品与项目库中均未找到匹配结果。",
+      "groupEmpty": "该分组暂无匹配记录。",
+      "groups": {
+        "companies": "企业",
+        "products": "产品",
+        "projects": "在建项目"
+      }
+    },
+    "identity": {
+      "index": "02 / 当前身份",
+      "companyLabel": "当前企业",
+      "userLabel": "登录用户",
+      "levelLabel": "会员等级"
+    },
+    "quick": {
+      "index": "03 / 快捷入口",
+      "title": "可信数据入口",
+      "description": "直接进入真实企业库、产品库或在建项目雷达。",
+      "ariaLabel": "企业工作台快捷入口"
+    },
+    "radar": {
+      "eyebrow": "04 / 项目采购雷达",
+      "title": "实时项目采购信号",
+      "loading": "正在加载实时项目采购信号",
+      "errorTitle": "暂时无法加载项目采购信号",
+      "errorDescription": "看板服务暂时不可用，当前身份与数据入口仍可继续使用。",
+      "viewAll": "打开项目雷达"
+    }
   },
   "companies": {
     "eyebrow": "辽宁产业企业索引",

@@ -32,6 +32,7 @@ const ProductListPage = React.lazy(() => import('@renderer/pages/enterprise/prod
 const ProductDetailPage = React.lazy(() => import('@renderer/pages/enterprise/products/ProductDetailPage'));
 const ProjectPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectPage'));
 const ProjectDetailPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectDetailPage'));
+const DashboardPage = React.lazy(() => import('@renderer/pages/enterprise/dashboard/DashboardPage'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -92,7 +93,6 @@ type EnterprisePlaceholderPageProps = {
 };
 
 const ENTERPRISE_PLACEHOLDER_ROUTES = [
-  ['dashboard', 'enterprise.routes.dashboard.title', 'enterprise.routes.dashboard.description'],
   ['favorites', 'enterprise.routes.favorites.title', 'enterprise.routes.favorites.description'],
   ['leads', 'enterprise.routes.leads.title', 'enterprise.routes.leads.description'],
 ] as const;
@@ -130,6 +130,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
         <Route path='/enterprise/login' element={<EnterpriseLoginRoute />} />
         <Route path='/enterprise' element={<EnterpriseProtectedLayout />}>
           <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
+          <Route path='dashboard' element={withRouteFallback(DashboardPage)} />
           <Route path='companies' element={withRouteFallback(CompanyListPage)} />
           <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
           <Route path='products' element={withRouteFallback(ProductListPage)} />

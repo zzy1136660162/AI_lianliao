@@ -197,8 +197,9 @@ describe('enterprise desktop routing', () => {
   it('keeps identity and assistant controls available to compact-window users', async () => {
     renderAt('/enterprise/dashboard');
 
-    expect(await screen.findByText('辽宁测试企业')).toBeVisible();
-    expect(screen.getByText('测试用户')).toBeVisible();
+    const companyIdentity = await screen.findAllByText('辽宁测试企业');
+    companyIdentity.forEach((element) => expect(element).toBeVisible());
+    screen.getAllByText('测试用户').forEach((element) => expect(element).toBeVisible());
     expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.hide' })).toBeVisible();
   });
 

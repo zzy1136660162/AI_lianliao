@@ -121,7 +121,7 @@
   "routes": {
     "dashboard": {
       "title": "Enterprise workbench",
-      "description": "The live enterprise overview and unified search will be connected after the company, product and project pages are complete."
+      "description": "Search verified companies, products and live project procurement signals from one authenticated workbench."
     },
     "companies": {
       "title": "Company directory",
@@ -162,6 +162,50 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "dashboard": {
+    "eyebrow": "Authenticated industrial desk / Liaoning",
+    "heroIndex": "LN / LIVE",
+    "search": {
+      "index": "01 / SEARCH",
+      "eyebrow": "Cross-domain intelligence",
+      "title": "Search companies, products and projects",
+      "description": "One query runs across three verified catalogs. Each group remains available when another service is unavailable.",
+      "placeholder": "Enter at least two characters",
+      "ariaLabel": "Search enterprise companies, products and projects",
+      "resultsLabel": "Grouped enterprise search results",
+      "minimumHint": "Enter at least two characters to search.",
+      "loading": "Searching verified enterprise catalogs",
+      "totalError": "Unified search is temporarily unavailable. Try again.",
+      "groupError": "This result group could not be loaded.",
+      "empty": "No results were found across the enterprise catalogs.",
+      "groupEmpty": "No matching records in this group.",
+      "groups": {
+        "companies": "Companies",
+        "products": "Products",
+        "projects": "Projects"
+      }
+    },
+    "identity": {
+      "index": "02 / IDENTITY",
+      "companyLabel": "Current enterprise",
+      "userLabel": "Signed-in user",
+      "levelLabel": "Membership level"
+    },
+    "quick": {
+      "index": "03 / ACCESS",
+      "title": "Verified catalog entrances",
+      "description": "Continue directly to the live company, product or project directories.",
+      "ariaLabel": "Enterprise catalog shortcuts"
+    },
+    "radar": {
+      "eyebrow": "04 / PROCUREMENT RADAR",
+      "title": "Live project procurement signals",
+      "loading": "Loading live project procurement signals",
+      "errorTitle": "Project procurement signals could not be loaded",
+      "errorDescription": "The dashboard service is temporarily unavailable. Your identity and catalog shortcuts remain available.",
+      "viewAll": "Open project radar"
+    }
   },
   "companies": {
     "eyebrow": "Industrial company index / Liaoning",
