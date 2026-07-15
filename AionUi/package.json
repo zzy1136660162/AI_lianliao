@@ -41,6 +41,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "i18n:types": "node scripts/generate-i18n-types.js",
+    "typecheck:enterprise-tests": "tsc --project tsconfig.enterprise-tests.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

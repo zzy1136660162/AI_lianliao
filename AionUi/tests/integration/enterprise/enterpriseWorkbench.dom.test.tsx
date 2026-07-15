@@ -220,7 +220,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('@/renderer/components/layout/WindowControls', () => ({ default: () => null }));
+vi.mock('@/renderer/components/layout/WindowControls', () => ({ default: (): null => null }));
 
 // The legacy guide owns a separate, deeply integrated AI workspace. This test verifies
 // that the production route remains reachable without re-testing the guide itself.
@@ -236,23 +236,50 @@ type PanelRoutesComponent = (typeof import('@/renderer/components/layout/Router'
 let AuthProvider: AuthProviderComponent;
 let EnterpriseAuthProvider: EnterpriseAuthProviderComponent;
 let PanelRoutes: PanelRoutesComponent;
+let originalElectronApiDescriptor: PropertyDescriptor | undefined;
+let originalMatchMediaDescriptor: PropertyDescriptor | undefined;
+
+const restoreWindowOwnProperty = (
+  property: 'electronAPI' | 'matchMedia',
+  descriptor: PropertyDescriptor | undefined
+): void => {
+  if (descriptor) {
+    Object.defineProperty(window, property, descriptor);
+    return;
+  }
+  Reflect.deleteProperty(window, property);
+};
 
 const activeSensitiveObservers = new Set<MutationObserver>();
 
 const beginSensitiveDomAudit = (sensitiveValues: readonly string[]) => {
-  const textHistory: string[] = [];
-  const captureNodeText = (node: Node): void => {
-    const text = node.textContent;
-    if (text) textHistory.push(text);
+  const matchedSensitiveValues = new Set<string>();
+  const scanValue = (value: string | null): void => {
+    if (!value) return;
+    for (const sensitiveValue of sensitiveValues) {
+      if (value.includes(sensitiveValue)) matchedSensitiveValues.add(sensitiveValue);
+    }
+  };
+  const scanNode = (node: Node): void => {
+    scanValue(node instanceof Element ? node.outerHTML : node.textContent);
   };
   const captureRecords = (records: readonly MutationRecord[]): void => {
     for (const record of records) {
       if (record.type === 'characterData') {
-        if (record.oldValue) textHistory.push(record.oldValue);
-        captureNodeText(record.target);
+        scanValue(record.oldValue);
+        scanValue(record.target.textContent);
         continue;
       }
-      record.addedNodes.forEach(captureNodeText);
+      if (record.type === 'attributes') {
+        scanValue(record.oldValue);
+        if (record.target instanceof Element) {
+          scanValue(record.attributeName ? record.target.getAttribute(record.attributeName) : null);
+          scanValue(record.target.outerHTML);
+        }
+        continue;
+      }
+      record.addedNodes.forEach(scanNode);
+      record.removedNodes.forEach(scanNode);
     }
   };
   const observer = new MutationObserver(captureRecords);
@@ -261,25 +288,75 @@ const beginSensitiveDomAudit = (sensitiveValues: readonly string[]) => {
     subtree: true,
     characterData: true,
     characterDataOldValue: true,
+    attributes: true,
+    attributeOldValue: true,
   });
   activeSensitiveObservers.add(observer);
 
   const assertNeverObserved = (container: HTMLElement): void => {
     captureRecords(observer.takeRecords());
-    captureNodeText(container);
-    const observedText = textHistory.join('\n');
-    for (const sensitiveValue of sensitiveValues) expect(observedText).not.toContain(sensitiveValue);
+    scanValue(container.outerHTML);
+    for (const sensitiveValue of sensitiveValues) expect(matchedSensitiveValues).not.toContain(sensitiveValue);
   };
 
   return {
     assertNeverObserved,
     stop(container: HTMLElement): void {
-      assertNeverObserved(container);
+      const pendingRecords = observer.takeRecords();
       observer.disconnect();
       activeSensitiveObservers.delete(observer);
+      captureRecords(pendingRecords);
+      scanValue(container.outerHTML);
+      for (const sensitiveValue of sensitiveValues) expect(matchedSensitiveValues).not.toContain(sensitiveValue);
     },
   };
 };
+
+const expectSensitiveMutationDetected = (mutate: (host: HTMLElement, sensitiveValue: string) => void): void => {
+  const sensitiveValue = 'transient-sensitive-value';
+  const host = document.createElement('div');
+  document.body.append(host);
+  const audit = beginSensitiveDomAudit([sensitiveValue]);
+  try {
+    mutate(host, sensitiveValue);
+    expect(() => audit.stop(host)).toThrow();
+  } finally {
+    activeSensitiveObservers.forEach((observer) => observer.disconnect());
+    activeSensitiveObservers.clear();
+    host.remove();
+  }
+};
+
+describe('sensitive DOM audit helper', () => {
+  it('detects text appended and synchronously cleared before the observer callback', () => {
+    expectSensitiveMutationDetected((host, sensitiveValue) => {
+      const transient = document.createElement('span');
+      transient.textContent = sensitiveValue;
+      host.append(transient);
+      transient.textContent = '';
+    });
+  });
+
+  it('detects a sensitive node appended and removed before the observer callback', () => {
+    expectSensitiveMutationDetected((host, sensitiveValue) => {
+      const transient = document.createElement('span');
+      transient.textContent = sensitiveValue;
+      host.append(transient);
+      transient.remove();
+    });
+  });
+
+  it('detects transient title, aria, and data attributes after they are deleted', () => {
+    expectSensitiveMutationDetected((host, sensitiveValue) => {
+      host.setAttribute('title', sensitiveValue);
+      host.removeAttribute('title');
+      host.setAttribute('aria-label', sensitiveValue);
+      host.removeAttribute('aria-label');
+      host.setAttribute('data-private-value', sensitiveValue);
+      host.removeAttribute('data-private-value');
+    });
+  });
+});
 
 const RouteProbe: React.FC = () => {
   const location = useLocation();
@@ -293,16 +370,22 @@ const RouteProbe: React.FC = () => {
 
 describe('enterprise desktop core workbench', () => {
   beforeAll(async () => {
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-      matches: false,
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })) as typeof window.matchMedia;
+    originalElectronApiDescriptor = Object.getOwnPropertyDescriptor(window, 'electronAPI');
+    originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as typeof window.matchMedia,
+    });
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
       writable: true,
@@ -334,11 +417,10 @@ describe('enterprise desktop core workbench', () => {
   });
 
   afterAll(() => {
-    Object.defineProperty(window, 'electronAPI', {
-      configurable: true,
-      writable: true,
-      value: undefined,
-    });
+    restoreWindowOwnProperty('electronAPI', originalElectronApiDescriptor);
+    restoreWindowOwnProperty('matchMedia', originalMatchMediaDescriptor);
+    expect(Object.getOwnPropertyDescriptor(window, 'electronAPI')).toEqual(originalElectronApiDescriptor);
+    expect(Object.getOwnPropertyDescriptor(window, 'matchMedia')).toEqual(originalMatchMediaDescriptor);
   });
 
   it('restores the session and completes the protected cross-page workflow before logout', async () => {

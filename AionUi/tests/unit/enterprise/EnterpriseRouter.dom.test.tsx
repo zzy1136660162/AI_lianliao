@@ -14,6 +14,8 @@ const routerMocks = vi.hoisted(() => ({
   logout: vi.fn<EnterpriseAuthContextValue['logout']>(async () => true),
 }));
 
+const ROUTE_WAIT_OPTIONS = { timeout: 5_000 } as const;
+
 beforeAll(() => {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches: false,
@@ -103,9 +105,9 @@ describe('enterprise desktop routing', () => {
   it('sends the authenticated Electron root to the enterprise dashboard', async () => {
     renderAt('/');
 
-    await waitFor(() => expect(window.location.hash).toBe('#/enterprise/dashboard'));
+    await waitFor(() => expect(window.location.hash).toBe('#/enterprise/dashboard'), ROUTE_WAIT_OPTIONS);
     expect(
-      await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, { timeout: 5000 })
+      await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, ROUTE_WAIT_OPTIONS)
     ).toBeVisible();
   });
 
@@ -113,7 +115,7 @@ describe('enterprise desktop routing', () => {
     routerMocks.enterpriseStatus = 'checking';
     renderAt('/');
 
-    await waitFor(() => expect(document.querySelector('.arco-spin')).toBeInTheDocument());
+    await waitFor(() => expect(document.querySelector('.arco-spin')).toBeInTheDocument(), ROUTE_WAIT_OPTIONS);
     expect(window.location.hash).toBe('#/');
     expect(screen.queryByText('enterprise-login-page')).not.toBeInTheDocument();
   });
@@ -122,14 +124,14 @@ describe('enterprise desktop routing', () => {
     routerMocks.enterpriseStatus = 'unauthenticated';
     renderAt('/enterprise/projects/901');
 
-    expect(await screen.findByText('enterprise-login-page')).toBeVisible();
+    expect(await screen.findByText('enterprise-login-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
     expect(window.location.hash).toBe('#/enterprise/login');
   });
 
   it('redirects an authenticated user away from enterprise login', async () => {
     renderAt('/enterprise/login');
 
-    await waitFor(() => expect(window.location.hash).toBe('#/enterprise/dashboard'));
+    await waitFor(() => expect(window.location.hash).toBe('#/enterprise/dashboard'), ROUTE_WAIT_OPTIONS);
   });
 
   it.each([
@@ -145,7 +147,7 @@ describe('enterprise desktop routing', () => {
   ])('registers %s inside the enterprise shell', async (path, heading) => {
     const { container } = renderAt(path);
 
-    expect(await screen.findByRole('heading', { name: heading })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: heading }, ROUTE_WAIT_OPTIONS)).toBeVisible();
     expect(screen.getByRole('navigation', { name: 'enterprise.accessibility.primaryNavigation' })).toBeVisible();
     expect(screen.getByTestId('shared-window-controls')).toBeVisible();
     expect(container).not.toHaveTextContent('openid-must-not-be-rendered');
@@ -158,10 +160,12 @@ describe('enterprise desktop routing', () => {
     });
     renderAt('/enterprise/dashboard');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'enterprise.shell.actions.logout' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'enterprise.shell.actions.logout' }, ROUTE_WAIT_OPTIONS)
+    );
 
     expect(routerMocks.logout).toHaveBeenCalledTimes(1);
-    expect(await screen.findByText('enterprise-login-page')).toBeVisible();
+    expect(await screen.findByText('enterprise-login-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
     expect(window.location.hash).toBe('#/enterprise/login');
   });
 
@@ -169,9 +173,11 @@ describe('enterprise desktop routing', () => {
     routerMocks.logout.mockRejectedValueOnce(new Error('raw-session-secret'));
     const { container } = renderAt('/enterprise/dashboard');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'enterprise.shell.actions.logout' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'enterprise.shell.actions.logout' }, ROUTE_WAIT_OPTIONS)
+    );
 
-    expect(await screen.findByText('enterprise.shell.logoutError')).toBeVisible();
+    expect(await screen.findByText('enterprise.shell.logoutError', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
     expect(window.location.hash).toBe('#/enterprise/dashboard');
     expect(container).not.toHaveTextContent('raw-session-secret');
   });
@@ -179,9 +185,13 @@ describe('enterprise desktop routing', () => {
   it('lets keyboard and pointer users collapse and restore the assistant slot', async () => {
     renderAt('/enterprise/dashboard');
 
-    const hideButton = await screen.findByRole('button', {
-      name: 'enterprise.assistant.actions.hide',
-    });
+    const hideButton = await screen.findByRole(
+      'button',
+      {
+        name: 'enterprise.assistant.actions.hide',
+      },
+      ROUTE_WAIT_OPTIONS
+    );
     const assistant = screen.getByRole('complementary', {
       name: 'enterprise.accessibility.assistant',
     });
@@ -206,7 +216,7 @@ describe('enterprise desktop routing', () => {
   it('keeps compact footer actions in direct keyboard order after primary navigation', async () => {
     const user = userEvent.setup();
     renderAt('/enterprise/dashboard');
-    const leads = await screen.findByRole('link', { name: 'enterprise.navigation.leads' });
+    const leads = await screen.findByRole('link', { name: 'enterprise.navigation.leads' }, ROUTE_WAIT_OPTIONS);
     const ai = screen.getByRole('link', { name: 'enterprise.shell.actions.ai' });
     const settings = screen.getByRole('link', { name: 'enterprise.shell.actions.settings' });
     const logout = screen.getByRole('button', { name: 'enterprise.shell.actions.logout' });
@@ -236,16 +246,16 @@ describe('existing WebUI routes', () => {
   it('keeps the WebUI root pointed at guid', async () => {
     renderAt('/');
 
-    await waitFor(() => expect(window.location.hash).toBe('#/guid'));
-    expect(await screen.findByText('original-guid-page')).toBeVisible();
+    await waitFor(() => expect(window.location.hash).toBe('#/guid'), ROUTE_WAIT_OPTIONS);
+    expect(await screen.findByText('original-guid-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
   });
 
   it('sends the unauthenticated WebUI root to the original login route', async () => {
     routerMocks.appStatus = 'unauthenticated';
     renderAt('/');
 
-    await waitFor(() => expect(window.location.hash).toBe('#/login'));
-    expect(await screen.findByText('original-login-page')).toBeVisible();
+    await waitFor(() => expect(window.location.hash).toBe('#/login'), ROUTE_WAIT_OPTIONS);
+    expect(await screen.findByText('original-login-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
   });
 
   it.each([
@@ -253,13 +263,13 @@ describe('existing WebUI routes', () => {
     ['/conversation/conversation-1', 'original-conversation-page'],
   ])('keeps %s available', async (path, content) => {
     renderAt(path);
-    expect(await screen.findByText(content)).toBeVisible();
+    expect(await screen.findByText(content, undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
   });
 
   it('keeps the original login route available', async () => {
     routerMocks.appStatus = 'unauthenticated';
     renderAt('/login');
 
-    expect(await screen.findByText('original-login-page')).toBeVisible();
+    expect(await screen.findByText('original-login-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
   });
 });

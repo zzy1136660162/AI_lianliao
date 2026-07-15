@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "tests/vitest.dom.setup.ts",
+    "tests/integration/enterprise/**/*.ts",
+    "tests/integration/enterprise/**/*.tsx",
+    "packages/desktop/src/renderer/types.d.ts"
+  ]
+}
