@@ -16,6 +16,7 @@ import type {
   EnterpriseResponse,
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
+import { isEnterpriseEntityId } from '@/common/enterprise/entityId';
 import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
@@ -260,8 +261,6 @@ const normalizeUntrustedText = (value: unknown): string | undefined => {
   return normalized;
 };
 
-const isRealIdentifier = (value: unknown): value is string => typeof value === 'string' && /^[1-9][0-9]*$/.test(value);
-
 const isRegisteredContext = (
   context: EnterpriseUserContext,
   expectedOpenId?: string
@@ -271,8 +270,8 @@ const isRegisteredContext = (
     context?.registered === true &&
     openId !== undefined &&
     (expectedOpenId === undefined || openId === expectedOpenId) &&
-    isRealIdentifier(context.userId) &&
-    isRealIdentifier(context.companyId)
+    isEnterpriseEntityId(context.userId) &&
+    isEnterpriseEntityId(context.companyId)
   );
 };
 

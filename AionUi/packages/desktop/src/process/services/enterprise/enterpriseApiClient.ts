@@ -8,6 +8,7 @@ import type {
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
 import { ENTERPRISE_REGISTRATION_URL } from '@/common/enterprise/constants';
+import { isEnterpriseEntityId } from '@/common/enterprise/entityId';
 import {
   commonResultSchema,
   enterpriseRequestSchema,
@@ -633,10 +634,8 @@ export class EnterpriseApiClient {
       const hasRealIdentity =
         userContext.registered === true &&
         userContext.openId === parsed.data.openId &&
-        typeof userContext.userId === 'string' &&
-        /^[1-9][0-9]*$/.test(userContext.userId) &&
-        typeof userContext.companyId === 'string' &&
-        /^[1-9][0-9]*$/.test(userContext.companyId);
+        isEnterpriseEntityId(userContext.userId) &&
+        isEnterpriseEntityId(userContext.companyId);
       if (!hasRealIdentity) throw apiError('INVALID_RESPONSE');
       return { status: 'AUTHENTICATED', openId: parsed.data.openId, userContext };
     }

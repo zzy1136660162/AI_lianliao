@@ -76,6 +76,13 @@ const USER_CONTEXT: EnterpriseUserContext = {
   userName: 'User',
   companyName: 'Company',
 };
+const SIGNED_USER_CONTEXT: EnterpriseUserContext = {
+  registered: true,
+  openId: OPEN_ID,
+  userId: '-60',
+  companyId: '-2001',
+  roleId: '-7',
+};
 const OLD_USER_CONTEXT: EnterpriseUserContext = {
   registered: true,
   openId: OLD_OPEN_ID,
@@ -435,6 +442,21 @@ describe('enterprise bridge', () => {
     expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OPEN_ID);
   });
 
+  it('persists an authenticated poll identity with signed non-zero entity IDs', async () => {
+    const result: EnterpriseLoginPollResult = {
+      status: 'AUTHENTICATED',
+      openId: OPEN_ID,
+      userContext: SIGNED_USER_CONTEXT,
+    };
+    const apiClient = makeApiClient();
+    apiClient.pollLoginSession.mockResolvedValue(result);
+    const sessionStore = makeSessionStore();
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_POLL, LOGIN_KEY)).resolves.toEqual(result);
+    expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OPEN_ID);
+  });
+
   it.each([123, 'valid-login-key', ` ${LOGIN_KEY}`, `${LOGIN_KEY} `])(
     'rejects an inexact poll argument before session or API access: %j',
     async (loginKey) => {
@@ -477,6 +499,19 @@ describe('enterprise bridge', () => {
     await expect(
       invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, ` ${OPEN_ID} `)
     ).resolves.toEqual(USER_CONTEXT);
+    expect(apiClient.getUserContext).toHaveBeenCalledWith(OPEN_ID);
+    expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OPEN_ID);
+  });
+
+  it('completes registration with signed non-zero entity IDs', async () => {
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValue(SIGNED_USER_CONTEXT);
+    const sessionStore = makeSessionStore();
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID)).resolves.toEqual(
+      SIGNED_USER_CONTEXT
+    );
     expect(apiClient.getUserContext).toHaveBeenCalledWith(OPEN_ID);
     expect(sessionStore.saveOpenId).toHaveBeenCalledWith(OPEN_ID);
   });
@@ -781,7 +816,7 @@ describe('enterprise bridge', () => {
     expect(apiClient.request).not.toHaveBeenCalled();
   });
 
-  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+  it.each(['project-7', '0', '-0', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
     'rejects the noncanonical project detail identity %s before session hydration',
     async (hpInfoId) => {
       const apiClient = makeApiClient();

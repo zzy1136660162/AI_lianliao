@@ -296,7 +296,7 @@ describe('EnterpriseApiClient request boundary', () => {
     });
   });
 
-  it.each(['project-7', '0', '-1', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
+  it.each(['project-7', '0', '-0', '1.2', '901?phone=13800000000', '1'.repeat(32)])(
     'rejects the noncanonical project detail identity %s before transport',
     async (hpInfoId) => {
       let calls = 0;
@@ -1828,6 +1828,39 @@ describe('EnterpriseApiClient QR authentication', () => {
         companyName: 'Acme',
         companyLevel: 3,
         roleId: '7',
+      },
+    });
+  });
+
+  it('accepts signed non-zero entity IDs in an authenticated context', async () => {
+    const openId = 'openid-signed-identity-42';
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        jsonResponse({
+          success: true,
+          data: {
+            status: 'AUTHENTICATED',
+            openId,
+            userContext: {
+              registered: true,
+              openId,
+              userId: '-60',
+              companyId: '-2001',
+              roleId: '-7',
+            },
+          },
+        }),
+    });
+
+    await expect(client.pollLoginSession(loginKey)).resolves.toEqual({
+      status: 'AUTHENTICATED',
+      openId,
+      userContext: {
+        registered: true,
+        openId,
+        userId: '-60',
+        companyId: '-2001',
+        roleId: '-7',
       },
     });
   });
