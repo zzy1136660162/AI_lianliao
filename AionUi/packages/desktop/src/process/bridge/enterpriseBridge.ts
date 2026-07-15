@@ -19,6 +19,7 @@ import type {
 import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
+import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
 
 type EnterpriseIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<EnterpriseIpcResult<unknown>>;
@@ -357,7 +358,8 @@ const enqueueSessionMutation = <T>(kind: EnterpriseSessionOperationKind, operati
 export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies = {}): void {
   const epoch = lifecycleEpoch + 1;
   lifecycleEpoch = epoch;
-  const apiClient = dependencies.apiClient ?? new EnterpriseApiClient();
+  const apiClient =
+    dependencies.apiClient ?? new EnterpriseApiClient(resolveEnterpriseApiClientOptions(app.isPackaged));
   const sessionStore = dependencies.sessionStore ?? getDefaultSessionStore();
   const ipcMain = dependencies.ipcMain ?? (electronIpcMain as EnterpriseIpcMain);
   const senderGuard = dependencies.senderGuard ?? isTrustedEnterpriseSender;
