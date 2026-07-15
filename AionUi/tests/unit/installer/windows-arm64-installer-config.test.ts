@@ -26,7 +26,8 @@ describe('Windows ARM64 installer hardening', () => {
     expect(arm64NsisScript).toContain('AIONUI_VERIFY_REQUIRED_FILE');
     expect(arm64NsisScript).toContain('AIONUI_VERIFY_BUNDLED_AIONCORE_RESOURCES "win32-arm64"');
     expect(arm64NsisScript).toContain('verify-bundled-aioncore-install.ps1');
-    expect(arm64NsisScript).toContain('$INSTDIR\\AionUi.exe');
+    expect(arm64NsisScript).toContain('$INSTDIR\\${APP_EXECUTABLE_FILENAME}');
+    expect(arm64NsisScript).toContain('"${APP_EXECUTABLE_FILENAME}"');
     expect(arm64NsisScript).toContain('$INSTDIR\\ffmpeg.dll');
     expect(arm64NsisScript).toContain('$INSTDIR\\vulkan-1.dll');
     expect(arm64NsisScript).toContain('Bundled AionCore resources are incomplete after installation.');

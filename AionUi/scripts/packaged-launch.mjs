@@ -4,6 +4,10 @@ import path from 'node:path';
 import process from 'node:process';
 import { spawn } from 'node:child_process';
 
+const LEGACY_WINDOWS_EXECUTABLE_NAME = 'AionUi.exe';
+const LEGACY_EXECUTABLE_NAME = 'AionUi';
+const LEGACY_LINUX_EXECUTABLE_NAME = 'aionui';
+
 function parseArgs(argv) {
   const flags = new Set(argv.filter((x) => x.startsWith('--')));
   const values = argv.filter((x) => !x.startsWith('--'));
@@ -24,14 +28,21 @@ function killProcessByName(name) {
   });
 }
 
-function resolvePackagedApp(projectRoot) {
+function readProductName(projectRoot) {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+  return packageJson.productName || packageJson.name;
+}
+
+function resolvePackagedApp(projectRoot, productName) {
   const outDir = path.join(projectRoot, 'out');
   if (!fs.existsSync(outDir)) return null;
 
   if (process.platform === 'win32') {
     for (const dir of ['win-unpacked', 'win-x64-unpacked', 'win-arm64-unpacked']) {
-      const exe = path.join(outDir, dir, 'AionUi.exe');
-      if (fs.existsSync(exe)) return { executablePath: exe, cwd: path.join(outDir, dir) };
+      for (const name of [`${productName}.exe`, LEGACY_WINDOWS_EXECUTABLE_NAME]) {
+        const exe = path.join(outDir, dir, name);
+        if (fs.existsSync(exe)) return { executablePath: exe, cwd: path.join(outDir, dir) };
+      }
     }
   } else if (process.platform === 'darwin') {
     for (const dir of ['mac-arm64', 'mac-x64', 'mac', 'mac-universal']) {
@@ -39,14 +50,27 @@ function resolvePackagedApp(projectRoot) {
       if (!fs.existsSync(macDir)) continue;
       const appBundle = fs.readdirSync(macDir).find((f) => f.endsWith('.app'));
       if (!appBundle) continue;
-      const exe = path.join(macDir, appBundle, 'Contents', 'MacOS', 'AionUi');
-      if (fs.existsSync(exe)) return { executablePath: exe, cwd: macDir };
+      const brandedExecutable = path.join(macDir, appBundle, 'Contents', 'MacOS', productName);
+      if (fs.existsSync(brandedExecutable)) {
+        return { executablePath: brandedExecutable, cwd: macDir };
+      }
+      if (productName !== LEGACY_EXECUTABLE_NAME) {
+        const legacyExecutable = path.join(macDir, appBundle, 'Contents', 'MacOS', LEGACY_EXECUTABLE_NAME);
+        if (fs.existsSync(legacyExecutable)) {
+          return { executablePath: legacyExecutable, cwd: macDir };
+        }
+      }
     }
   } else {
     for (const dir of ['linux-unpacked', 'linux-x64-unpacked', 'linux-arm64-unpacked']) {
       const dirPath = path.join(outDir, dir);
       if (!fs.existsSync(dirPath)) continue;
-      for (const name of ['aionui', 'AionUi']) {
+      for (const name of [
+        productName,
+        productName.toLowerCase(),
+        LEGACY_LINUX_EXECUTABLE_NAME,
+        LEGACY_EXECUTABLE_NAME,
+      ]) {
         const exe = path.join(dirPath, name);
         if (fs.existsSync(exe)) return { executablePath: exe, cwd: dirPath };
       }
@@ -59,19 +83,26 @@ function resolvePackagedApp(projectRoot) {
 async function main() {
   const { flags, values } = parseArgs(process.argv.slice(2));
   const projectRoot = process.cwd();
+  const productName = readProductName(projectRoot);
   const dryRun = flags.has('--dry-run');
   const shouldClean = !flags.has('--no-clean');
   const passthroughArgs = values;
 
-  const packaged = resolvePackagedApp(projectRoot);
+  const packaged = resolvePackagedApp(projectRoot, productName);
   if (!packaged) {
     console.error('[packaged-launch] No unpacked app found under out/. Run `just build-package` first.');
     process.exit(1);
   }
 
   if (shouldClean) {
-    await killProcessByName('AionUi.exe');
-    await killProcessByName('AionUi');
+    await killProcessByName(`${productName}.exe`);
+    await killProcessByName(productName);
+    if (`${productName}.exe` !== LEGACY_WINDOWS_EXECUTABLE_NAME) {
+      await killProcessByName(LEGACY_WINDOWS_EXECUTABLE_NAME);
+    }
+    if (productName !== LEGACY_EXECUTABLE_NAME) {
+      await killProcessByName(LEGACY_EXECUTABLE_NAME);
+    }
     await killProcessByName('electron.exe');
     await killProcessByName('electron');
   }

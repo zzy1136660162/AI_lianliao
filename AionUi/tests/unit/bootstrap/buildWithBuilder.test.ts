@@ -17,7 +17,8 @@ describe('build-with-builder', () => {
     const script = readFileSync(resolve(repoRoot, `resources/windows-installer-${arch}.nsh`), 'utf8');
 
     expect(script).toContain('!macro customCheckAppRunning');
-    expect(script).toContain('${AIONUI_APP_EXECUTABLE_FILENAME}');
+    expect(script).toContain('${APP_EXECUTABLE_FILENAME}');
+    expect(script).not.toContain('${AIONUI_APP_EXECUTABLE_FILENAME}');
     expect(script).toContain('Join-Path $$instDir');
     expect(script).toContain('[System.IO.Path]::GetFullPath($$path)');
     expect(script).not.toContain("StartsWith('$INSTDIR'");

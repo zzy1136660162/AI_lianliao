@@ -1,10 +1,10 @@
 appId: com.aionui.app
-productName: AionUi
-executableName: AionUi
+productName: 链辽AI
+executableName: 链辽AI
 copyright: Copyright © 2024 AionUi
 
 protocols:
-  - name: AionUi Protocol
+  - name: 链辽AI Protocol
     schemes:
       - aionui
 
@@ -144,6 +144,7 @@ mac:
   entitlementsInherit: entitlements.plist
 
 dmg:
+  writeUpdateInfo: false
   # Use UDZO format which is more reliable on CI
   format: UDZO
   # Disable internet-enabled DMG to avoid network issues
@@ -171,15 +172,16 @@ linux:
   icon: resources/app.png
   artifactName: ${productName}-${version}-${os}-${arch}.${ext}
   category: Utility
+  syncDesktopName: true
   maintainer: aionui
   vendor: aionui
   synopsis: ${description}
   description: ${description}
   desktop:
     entry:
-      Name: AionUi
+      Name: 链辽AI
       Comment: ${description}
-      Icon: AionUi
+      Icon: 链辽AI
       Categories: Office;Utility;
       MimeType: x-scheme-handler/aionui;
 

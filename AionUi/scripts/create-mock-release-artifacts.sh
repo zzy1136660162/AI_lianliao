@@ -12,72 +12,121 @@ mkdir -p "$ARTIFACTS_DIR/macos-build-arm64"
 mkdir -p "$ARTIFACTS_DIR/linux-build-x64"
 mkdir -p "$ARTIFACTS_DIR/linux-build-arm64"
 
+write_mock_artifact() {
+  local artifact_path="$1"
+  local content="$2"
+  printf '%s' "$content" > "$artifact_path"
+}
+
+WIN_X64_ARTIFACT="$ARTIFACTS_DIR/windows-build-x64/链辽AI-1.0.0-win-x64.exe"
+WIN_ARM64_ARTIFACT="$ARTIFACTS_DIR/windows-build-arm64/链辽AI-1.0.0-win-arm64.exe"
+MAC_X64_DMG="$ARTIFACTS_DIR/macos-build-x64/链辽AI-1.0.0-mac-x64.dmg"
+MAC_X64_ZIP="$ARTIFACTS_DIR/macos-build-x64/链辽AI-1.0.0-mac-x64.zip"
+MAC_ARM64_DMG="$ARTIFACTS_DIR/macos-build-arm64/链辽AI-1.0.0-mac-arm64.dmg"
+MAC_ARM64_ZIP="$ARTIFACTS_DIR/macos-build-arm64/链辽AI-1.0.0-mac-arm64.zip"
+LINUX_X64_ARTIFACT="$ARTIFACTS_DIR/linux-build-x64/链辽AI-1.0.0.deb"
+LINUX_ARM64_ARTIFACT="$ARTIFACTS_DIR/linux-build-arm64/链辽AI-1.0.0-arm64.deb"
+
+write_mock_artifact "$WIN_X64_ARTIFACT" 'mock-windows-x64-installer'
+write_mock_artifact "$WIN_ARM64_ARTIFACT" 'mock-windows-arm64-installer'
+write_mock_artifact "$MAC_X64_DMG" 'mock-macos-x64-dmg'
+write_mock_artifact "$MAC_X64_ZIP" 'mock-macos-x64-zip'
+write_mock_artifact "$MAC_ARM64_DMG" 'mock-macos-arm64-dmg'
+write_mock_artifact "$MAC_ARM64_ZIP" 'mock-macos-arm64-zip'
+write_mock_artifact "$LINUX_X64_ARTIFACT" 'mock-linux-x64-deb'
+write_mock_artifact "$LINUX_ARM64_ARTIFACT" 'mock-linux-arm64-deb'
+
+UPDATER_ARTIFACTS=(
+  "$WIN_X64_ARTIFACT"
+  "$WIN_ARM64_ARTIFACT"
+  "$MAC_X64_ZIP"
+  "$MAC_ARM64_ZIP"
+  "$LINUX_X64_ARTIFACT"
+  "$LINUX_ARM64_ARTIFACT"
+)
+ARTIFACT_SHA512=()
+ARTIFACT_SIZE=()
+while IFS=$'\t' read -r sha512 size; do
+  ARTIFACT_SHA512+=("$sha512")
+  ARTIFACT_SIZE+=("$size")
+done < <(node - "${UPDATER_ARTIFACTS[@]}" <<'NODE'
+const { createHash } = require('node:crypto');
+const { readFileSync, statSync } = require('node:fs');
+
+for (const artifactPath of process.argv.slice(2)) {
+  const sha512 = createHash('sha512').update(readFileSync(artifactPath)).digest('base64');
+  process.stdout.write(`${sha512}\t${statSync(artifactPath).size}\n`);
+}
+NODE
+)
+
+if [ "${#ARTIFACT_SHA512[@]}" -ne "${#UPDATER_ARTIFACTS[@]}" ]; then
+  echo "Failed to calculate mock artifact metadata" >&2
+  exit 1
+fi
+
 # Windows x64
-touch "$ARTIFACTS_DIR/windows-build-x64/AionUi-1.0.0-win-x64.exe"
-cat > "$ARTIFACTS_DIR/windows-build-x64/latest.yml" <<'EOF'
+cat > "$ARTIFACTS_DIR/windows-build-x64/latest.yml" <<EOF
 version: 1.0.0
 files:
-  - url: AionUi-1.0.0-win-x64.exe
-    sha512: fake-sha512-x64
-    size: 100000
-path: AionUi-1.0.0-win-x64.exe
-sha512: fake-sha512-x64
+  - url: AionUi-Setup-1.0.0.exe
+    sha512: ${ARTIFACT_SHA512[0]}
+    size: ${ARTIFACT_SIZE[0]}
+path: AionUi-Setup-1.0.0.exe
+sha512: ${ARTIFACT_SHA512[0]}
 releaseDate: '2025-01-01'
 EOF
 
 # Windows arm64
-touch "$ARTIFACTS_DIR/windows-build-arm64/AionUi-1.0.0-win-arm64.exe"
-cat > "$ARTIFACTS_DIR/windows-build-arm64/latest.yml" <<'EOF'
+cat > "$ARTIFACTS_DIR/windows-build-arm64/latest.yml" <<EOF
 version: 1.0.0
 files:
-  - url: AionUi-1.0.0-win-arm64.exe
-    sha512: fake-sha512-arm64
-    size: 100000
-path: AionUi-1.0.0-win-arm64.exe
-sha512: fake-sha512-arm64
+  - url: AionUi-Setup-1.0.0-arm64.exe
+    sha512: ${ARTIFACT_SHA512[1]}
+    size: ${ARTIFACT_SIZE[1]}
+path: AionUi-Setup-1.0.0-arm64.exe
+sha512: ${ARTIFACT_SHA512[1]}
 releaseDate: '2025-01-01'
 EOF
 
 # macOS x64
-touch "$ARTIFACTS_DIR/macos-build-x64/AionUi-1.0.0-mac-x64.dmg"
-touch "$ARTIFACTS_DIR/macos-build-x64/AionUi-1.0.0-mac-x64.zip"
-cat > "$ARTIFACTS_DIR/macos-build-x64/latest-mac.yml" <<'EOF'
+cat > "$ARTIFACTS_DIR/macos-build-x64/latest-mac.yml" <<EOF
 version: 1.0.0
 files:
-  - url: AionUi-1.0.0-mac-x64.dmg
-    sha512: fake-sha512-mac-x64
-    size: 200000
+  - url: AionUi-1.0.0-mac.zip
+    sha512: ${ARTIFACT_SHA512[2]}
+    size: ${ARTIFACT_SIZE[2]}
+path: AionUi-1.0.0-mac.zip
+sha512: ${ARTIFACT_SHA512[2]}
 EOF
 
 # macOS arm64
-touch "$ARTIFACTS_DIR/macos-build-arm64/AionUi-1.0.0-mac-arm64.dmg"
-touch "$ARTIFACTS_DIR/macos-build-arm64/AionUi-1.0.0-mac-arm64.zip"
-cat > "$ARTIFACTS_DIR/macos-build-arm64/latest-mac.yml" <<'EOF'
+cat > "$ARTIFACTS_DIR/macos-build-arm64/latest-mac.yml" <<EOF
 version: 1.0.0
 files:
-  - url: AionUi-1.0.0-mac-arm64.dmg
-    sha512: fake-sha512-mac-arm64
-    size: 200000
+  - url: AionUi-1.0.0-arm64-mac.zip
+    sha512: ${ARTIFACT_SHA512[3]}
+    size: ${ARTIFACT_SIZE[3]}
+path: AionUi-1.0.0-arm64-mac.zip
+sha512: ${ARTIFACT_SHA512[3]}
 EOF
 
 # Linux x64
-touch "$ARTIFACTS_DIR/linux-build-x64/AionUi-1.0.0.deb"
-cat > "$ARTIFACTS_DIR/linux-build-x64/latest-linux.yml" <<'EOF'
+cat > "$ARTIFACTS_DIR/linux-build-x64/latest-linux.yml" <<EOF
 version: 1.0.0
 files:
-  - url: AionUi-1.0.0.deb
-    sha512: fake-sha512-linux
-    size: 300000
+  - url: AionUi-1.0.0-amd64.deb
+    sha512: ${ARTIFACT_SHA512[4]}
+    size: ${ARTIFACT_SIZE[4]}
 EOF
 
 # Linux arm64
-touch "$ARTIFACTS_DIR/linux-build-arm64/AionUi-1.0.0-arm64.deb"
-cat > "$ARTIFACTS_DIR/linux-build-arm64/latest-linux-arm64.yml" <<'EOF'
+cat > "$ARTIFACTS_DIR/linux-build-arm64/latest-linux-arm64.yml" <<EOF
 version: 1.0.0
 files:
   - url: AionUi-1.0.0-arm64.deb
-    sha512: fake-sha512-linux-arm64
-    size: 300000
+    sha512: ${ARTIFACT_SHA512[5]}
+    size: ${ARTIFACT_SIZE[5]}
 EOF
 
 # Web-CLI tarballs (5 platforms)

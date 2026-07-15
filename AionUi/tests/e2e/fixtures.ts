@@ -5,7 +5,7 @@
  *
  * Two modes:
  *   1. **Packaged mode** (CI default): Launches from electron-builder's unpacked output
- *      (e.g. out/linux-unpacked/aionui, out/mac-arm64/AionUi.app, out/win-unpacked/AionUi.exe).
+ *      (e.g. out/linux-unpacked/<productName>, out/mac-arm64/*.app, out/win-unpacked/<productName>.exe).
  *      This validates that packaged resources are intact.
  *   2. **Dev mode** (local default): Launches via `electron .` from project root with
  *      the Vite dev server (electron-vite dev).
@@ -22,6 +22,14 @@ type Fixtures = {
   electronApp: ElectronApplication;
   page: Page;
 };
+
+const projectRoot = path.resolve(__dirname, '../..');
+const rootPackage = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8')) as {
+  name: string;
+  productName?: string;
+};
+const productName = rootPackage.productName || rootPackage.name;
+const legacyProductName = 'AionUi';
 
 // Singleton – one app per test worker
 let app: ElectronApplication | null = null;
@@ -62,36 +70,44 @@ async function resolveMainWindow(electronApp: ElectronApplication): Promise<Page
  * Returns { executablePath, cwd } or null if not found.
  */
 function resolvePackagedApp(): { executablePath: string; cwd: string } | null {
-  const projectRoot = path.resolve(__dirname, '../..');
   const outDir = path.join(projectRoot, 'out');
   if (!fs.existsSync(outDir)) return null;
 
   const platform = process.platform;
 
   if (platform === 'win32') {
-    // out/win-unpacked/AionUi.exe  or  out/win-x64-unpacked/AionUi.exe
+    // out/win-unpacked/<productName>.exe or out/win-x64-unpacked/<productName>.exe
     for (const dir of ['win-unpacked', 'win-x64-unpacked', 'win-arm64-unpacked']) {
-      const exe = path.join(outDir, dir, 'AionUi.exe');
-      if (fs.existsSync(exe)) return { executablePath: exe, cwd: path.join(outDir, dir) };
+      for (const name of [`${productName}.exe`, `${legacyProductName}.exe`]) {
+        const exe = path.join(outDir, dir, name);
+        if (fs.existsSync(exe)) return { executablePath: exe, cwd: path.join(outDir, dir) };
+      }
     }
   } else if (platform === 'darwin') {
-    // out/mac-arm64/AionUi.app/Contents/MacOS/AionUi  or  out/mac/AionUi.app/...
+    // The bundle name may vary, but Contents/MacOS follows package productName.
     for (const dir of ['mac-arm64', 'mac-x64', 'mac', 'mac-universal']) {
       const macDir = path.join(outDir, dir);
       if (!fs.existsSync(macDir)) continue;
       const appBundle = fs.readdirSync(macDir).find((f) => f.endsWith('.app'));
       if (appBundle) {
-        const exe = path.join(macDir, appBundle, 'Contents', 'MacOS', 'AionUi');
-        if (fs.existsSync(exe)) return { executablePath: exe, cwd: macDir };
+        const brandedExecutable = path.join(macDir, appBundle, 'Contents', 'MacOS', productName);
+        if (fs.existsSync(brandedExecutable)) {
+          return { executablePath: brandedExecutable, cwd: macDir };
+        }
+        if (productName !== legacyProductName) {
+          const legacyExecutable = path.join(macDir, appBundle, 'Contents', 'MacOS', legacyProductName);
+          if (fs.existsSync(legacyExecutable)) {
+            return { executablePath: legacyExecutable, cwd: macDir };
+          }
+        }
       }
     }
   } else {
-    // Linux: out/linux-unpacked/aionui  (lowercase executable name)
+    // Linux executable names can be case-sensitive, so prefer productName before legacy fallbacks.
     for (const dir of ['linux-unpacked', 'linux-x64-unpacked', 'linux-arm64-unpacked']) {
       const dirPath = path.join(outDir, dir);
       if (!fs.existsSync(dirPath)) continue;
-      // Try common executable names
-      for (const name of ['aionui', 'AionUi']) {
+      for (const name of [productName, productName.toLowerCase(), legacyProductName.toLowerCase(), legacyProductName]) {
         const exe = path.join(dirPath, name);
         if (fs.existsSync(exe)) return { executablePath: exe, cwd: dirPath };
       }
@@ -109,7 +125,6 @@ function shouldUsePackagedMode(): boolean {
 }
 
 async function launchApp(): Promise<ElectronApplication> {
-  const projectRoot = path.resolve(__dirname, '../..');
   const usePackaged = shouldUsePackagedMode();
 
   const commonEnv = {

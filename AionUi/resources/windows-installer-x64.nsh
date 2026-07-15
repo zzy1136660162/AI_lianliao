@@ -5,7 +5,6 @@
 
 !ifndef AIONUI_APP_PROCESS_CHECK_DEFINED
 !define AIONUI_APP_PROCESS_CHECK_DEFINED
-!define AIONUI_APP_EXECUTABLE_FILENAME "AionUi.exe"
 !define AIONUI_PROCESS_CHECK_LOG "aionui-installer-process-check.log"
 
 !ifndef BUILD_UNINSTALLER
@@ -45,7 +44,7 @@
     CopyFiles /SILENT "$AionUiBundledUninstaller" "$AionUiInstalledUninstaller"
     ${If} ${Errors}
       !insertmacro AIONUI_LOG_UNINSTALLER_REPAIR "copy-failed"
-      MessageBox MB_OK|MB_ICONEXCLAMATION "AionUi cannot update because the existing uninstaller is locked.$\r$\n$\r$\nPlease close AionUi completely and try again. If it still fails, restart Windows and run this installer again.$\r$\n$\r$\nIf the problem continues, uninstall the old AionUi from Windows Settings, then run this installer again."
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${PRODUCT_NAME} cannot update because the existing uninstaller is locked.$\r$\n$\r$\nPlease close ${PRODUCT_NAME} completely and try again. If it still fails, restart Windows and run this installer again.$\r$\n$\r$\nIf the problem continues, uninstall the old ${PRODUCT_NAME} from Windows Settings, then run this installer again."
       SetErrorLevel 2
       Quit
     ${Else}
@@ -119,7 +118,7 @@
     $$ErrorActionPreference = 'SilentlyContinue'; \
     $$log = Join-Path $$env:TEMP '${AIONUI_PROCESS_CHECK_LOG}'; \
     $$instDir = '$INSTDIR'; \
-    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${AIONUI_APP_EXECUTABLE_FILENAME}')); \
+    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${APP_EXECUTABLE_FILENAME}')); \
     $$psProc = @(Get-CimInstance -ClassName Win32_Process | Where-Object { $$_.ProcessId -eq $$PID })[0]; \
     $$installerPid = $$psProc.ParentProcessId; \
     $$hits = @(Get-CimInstance -ClassName Win32_Process | Where-Object { \
@@ -127,7 +126,7 @@
       $$cmd = $$_.CommandLine; \
       if (-not $$path) { $$path = $$_.Path } \
       $$_.ProcessId -ne $$installerPid -and \
-      $$_.Name -ieq '${AIONUI_APP_EXECUTABLE_FILENAME}' -and \
+      $$_.Name -ieq '${APP_EXECUTABLE_FILENAME}' -and \
       $$path -and \
       $$cmd -notmatch '--type=' -and \
       [string]::Equals([System.IO.Path]::GetFullPath($$path), $$target, [System.StringComparison]::CurrentCultureIgnoreCase) \
@@ -144,7 +143,7 @@
     $$ErrorActionPreference = 'SilentlyContinue'; \
     $$log = Join-Path $$env:TEMP '${AIONUI_PROCESS_CHECK_LOG}'; \
     $$instDir = '$INSTDIR'; \
-    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${AIONUI_APP_EXECUTABLE_FILENAME}')); \
+    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${APP_EXECUTABLE_FILENAME}')); \
     $$psProc = @(Get-CimInstance -ClassName Win32_Process | Where-Object { $$_.ProcessId -eq $$PID })[0]; \
     $$installerPid = $$psProc.ParentProcessId; \
     $$all = @(Get-CimInstance -ClassName Win32_Process); \
@@ -153,7 +152,7 @@
       $$cmd = $$_.CommandLine; \
       if (-not $$path) { $$path = $$_.Path } \
       $$_.ProcessId -ne $$installerPid -and \
-      $$_.Name -ieq '${AIONUI_APP_EXECUTABLE_FILENAME}' -and \
+      $$_.Name -ieq '${APP_EXECUTABLE_FILENAME}' -and \
       $$path -and \
       $$cmd -notmatch '--type=' -and \
       [string]::Equals([System.IO.Path]::GetFullPath($$path), $$target, [System.StringComparison]::CurrentCultureIgnoreCase) \
@@ -310,7 +309,7 @@ Function .onVerifyInstDir
   ${IfNot} ${RunningX64}
     MessageBox MB_OK|MB_ICONSTOP \
       "Installation package architecture mismatch$\n$\n\
-      This AionUi installer is designed for x64 architecture.$\n$\n\
+      This ${PRODUCT_NAME} installer is designed for x64 architecture.$\n$\n\
       Your system is 32-bit architecture. Please download the appropriate version for your architecture.$\n$\n\
       Download: https://github.com/iOfficeAI/AionUi/releases"
     Quit
@@ -320,7 +319,7 @@ Function .onVerifyInstDir
   ${If} ${IsNativeARM64}
     MessageBox MB_OK|MB_ICONSTOP \
       "Installation package architecture mismatch$\n$\n\
-      This AionUi installer is designed for x64 architecture.$\n$\n\
+      This ${PRODUCT_NAME} installer is designed for x64 architecture.$\n$\n\
       Your system is ARM64 architecture. Please download the ARM64 version.$\n$\n\
       Download: https://github.com/iOfficeAI/AionUi/releases"
     Quit

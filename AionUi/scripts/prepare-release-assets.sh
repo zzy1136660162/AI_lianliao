@@ -113,12 +113,193 @@ echo "==> Writing architecture-specific updater metadata ..."
 [ -n "$MAC_ARM64_LATEST" ]  && cp -f "$MAC_ARM64_LATEST"  "$OUTPUT_DIR/latest-arm64-mac.yml"
 
 # ---------------------------------------------------------------------------
+# 4b) Materialize updater-safe aliases referenced by metadata
+# ---------------------------------------------------------------------------
+echo "==> Materializing updater artifact aliases ..."
+
+MISSING=0
+
+materialize_metadata_aliases() {
+  local metadata_file="$1"
+  if [ -z "$metadata_file" ]; then
+    return
+  fi
+
+  if ! node - "$metadata_file" "$OUTPUT_DIR" <<'NODE'
+const { createHash } = require('node:crypto');
+const { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync } = require('node:fs');
+const { basename, dirname, extname, isAbsolute, join } = require('node:path');
+
+const [metadataPath, outputDir] = process.argv.slice(2);
+
+function parseScalar(value) {
+  const trimmed = value.trim();
+  const first = trimmed[0];
+  if ((first === '"' || first === "'") && trimmed.at(-1) === first) {
+    return trimmed.slice(1, -1);
+  }
+  return trimmed;
+}
+
+function validateReference(reference) {
+  const isSafeAsciiBasename =
+    /^[0-9A-Za-z._-]+$/.test(reference) &&
+    !reference.includes('..') &&
+    basename(reference) === reference &&
+    !isAbsolute(reference);
+  if (!isSafeAsciiBasename) {
+    throw new Error(`Unsafe updater artifact reference in ${metadataPath}: ${reference}`);
+  }
+}
+
+function parseFileEntries(content) {
+  const entries = [];
+  let currentEntry;
+  let inFiles = false;
+
+  const finishEntry = () => {
+    if (currentEntry) entries.push(currentEntry);
+    currentEntry = undefined;
+  };
+
+  for (const line of content.split(/\r?\n/)) {
+    if (/^files:\s*$/.test(line)) {
+      inFiles = true;
+      continue;
+    }
+    if (!inFiles) continue;
+
+    const urlMatch = line.match(/^\s*-\s*url:\s*(.+)$/);
+    if (urlMatch) {
+      finishEntry();
+      currentEntry = { reference: parseScalar(urlMatch[1]) };
+      continue;
+    }
+    if (/^\S/.test(line)) {
+      finishEntry();
+      inFiles = false;
+      continue;
+    }
+    if (!currentEntry) continue;
+
+    const sha512Match = line.match(/^\s+sha512:\s*(.+)$/);
+    if (sha512Match) {
+      currentEntry.sha512 = parseScalar(sha512Match[1]);
+      continue;
+    }
+    const sizeMatch = line.match(/^\s+size:\s*(.+)$/);
+    if (sizeMatch) currentEntry.size = Number(parseScalar(sizeMatch[1]));
+  }
+  finishEntry();
+
+  if (entries.length === 0) {
+    throw new Error(`Updater metadata has no files[].url entries: ${metadataPath}`);
+  }
+
+  const entriesByReference = new Map();
+  for (const entry of entries) {
+    validateReference(entry.reference);
+    if (!entry.sha512 || !Number.isSafeInteger(entry.size) || entry.size < 0) {
+      throw new Error(`Updater metadata entry is missing valid sha512/size: ${metadataPath} -> ${entry.reference}`);
+    }
+
+    const existingEntry = entriesByReference.get(entry.reference);
+    if (existingEntry && (existingEntry.sha512 !== entry.sha512 || existingEntry.size !== entry.size)) {
+      throw new Error(`Updater metadata contains conflicting entries for ${entry.reference}: ${metadataPath}`);
+    }
+    entriesByReference.set(entry.reference, entry);
+  }
+
+  const topLevelPath = content.match(/^path:\s*(.+)$/m)?.[1];
+  if (topLevelPath) {
+    const reference = parseScalar(topLevelPath);
+    validateReference(reference);
+    if (!entriesByReference.has(reference)) {
+      throw new Error(`Updater metadata path has no matching files[] entry: ${metadataPath} -> ${reference}`);
+    }
+  }
+
+  return [...entriesByReference.values()];
+}
+
+async function fileSha512(filePath) {
+  const hash = createHash('sha512');
+  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  return hash.digest('base64');
+}
+
+async function fileMatchesMetadata(filePath, entry) {
+  if (statSync(filePath).size !== entry.size) return false;
+  return (await fileSha512(filePath)) === entry.sha512;
+}
+
+async function materializeAliases() {
+  const content = readFileSync(metadataPath, 'utf8');
+  const entries = parseFileEntries(content);
+  const artifactDir = dirname(metadataPath);
+
+  for (const entry of entries) {
+    const aliasPath = join(outputDir, entry.reference);
+    if (existsSync(aliasPath)) {
+      if (!(await fileMatchesMetadata(aliasPath, entry))) {
+        throw new Error(`Existing updater alias failed sha512/size validation: ${entry.reference}`);
+      }
+      console.log(`Validated updater alias: ${entry.reference}`);
+      continue;
+    }
+
+    const extension = extname(entry.reference).toLowerCase();
+    if (!extension) {
+      throw new Error(`Updater metadata reference has no file extension: ${metadataPath} -> ${entry.reference}`);
+    }
+
+    const candidateArtifacts = readdirSync(artifactDir, { withFileTypes: true })
+      .filter((item) => item.isFile() && extname(item.name).toLowerCase() === extension)
+      .map((item) => join(artifactDir, item.name));
+    const matchingArtifacts = [];
+    for (const filePath of candidateArtifacts) {
+      if (await fileMatchesMetadata(filePath, entry)) matchingArtifacts.push(filePath);
+    }
+
+    if (matchingArtifacts.length !== 1) {
+      throw new Error(
+        `Expected exactly one ${extension} source artifact matching sha512/size for ${entry.reference} beside ${metadataPath}; found ${matchingArtifacts.length}`
+      );
+    }
+
+    mkdirSync(outputDir, { recursive: true });
+    copyFileSync(matchingArtifacts[0], aliasPath);
+    if (!(await fileMatchesMetadata(aliasPath, entry))) {
+      throw new Error(`Created updater alias failed sha512/size validation: ${entry.reference}`);
+    }
+    console.log(`Created updater alias: ${entry.reference} <- ${basename(matchingArtifacts[0])}`);
+  }
+}
+
+materializeAliases().catch((error) => {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`::error::${message}`);
+  process.exitCode = 1;
+});
+NODE
+  then
+    MISSING=1
+  fi
+}
+
+materialize_metadata_aliases "$WIN_X64_LATEST"
+materialize_metadata_aliases "$WIN_ARM64_LATEST"
+materialize_metadata_aliases "$MAC_X64_LATEST"
+materialize_metadata_aliases "$MAC_ARM64_LATEST"
+materialize_metadata_aliases "$LINUX_X64_LATEST"
+materialize_metadata_aliases "$LINUX_ARM64_LATEST"
+
+# ---------------------------------------------------------------------------
 # 5) Hard validation for required updater metadata
 # ---------------------------------------------------------------------------
 echo "==> Validating required metadata ..."
 
 VERSION="${MOCK_VERSION:-$(node -p "require('./package.json').version")}"
-MISSING=0
 for required in latest.yml latest-mac.yml latest-linux.yml latest-linux-arm64.yml; do
   if [ ! -f "$OUTPUT_DIR/$required" ]; then
     echo "::error::Missing required updater metadata: $required"
@@ -133,7 +314,7 @@ echo "==> Validating desktop release assets ..."
 
 for arch in x64 arm64; do
   for ext in dmg zip; do
-    asset="AionUi-${VERSION}-mac-${arch}.${ext}"
+    asset="链辽AI-${VERSION}-mac-${arch}.${ext}"
     if [ ! -f "$OUTPUT_DIR/$asset" ]; then
       if [ "$ext" = "zip" ]; then
         echo "::error::Missing macOS zip artifact: $asset"

@@ -5,7 +5,6 @@
 
 !ifndef AIONUI_APP_PROCESS_CHECK_DEFINED
 !define AIONUI_APP_PROCESS_CHECK_DEFINED
-!define AIONUI_APP_EXECUTABLE_FILENAME "AionUi.exe"
 !define AIONUI_PROCESS_CHECK_LOG "aionui-installer-process-check.log"
 
 !ifndef BUILD_UNINSTALLER
@@ -45,7 +44,7 @@
     CopyFiles /SILENT "$AionUiBundledUninstaller" "$AionUiInstalledUninstaller"
     ${If} ${Errors}
       !insertmacro AIONUI_LOG_UNINSTALLER_REPAIR "copy-failed"
-      MessageBox MB_OK|MB_ICONEXCLAMATION "AionUi cannot update because the existing uninstaller is locked.$\r$\n$\r$\nPlease close AionUi completely and try again. If it still fails, restart Windows and run this installer again.$\r$\n$\r$\nIf the problem continues, uninstall the old AionUi from Windows Settings, then run this installer again."
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${PRODUCT_NAME} cannot update because the existing uninstaller is locked.$\r$\n$\r$\nPlease close ${PRODUCT_NAME} completely and try again. If it still fails, restart Windows and run this installer again.$\r$\n$\r$\nIf the problem continues, uninstall the old ${PRODUCT_NAME} from Windows Settings, then run this installer again."
       SetErrorLevel 2
       Quit
     ${Else}
@@ -119,7 +118,7 @@
     $$ErrorActionPreference = 'SilentlyContinue'; \
     $$log = Join-Path $$env:TEMP '${AIONUI_PROCESS_CHECK_LOG}'; \
     $$instDir = '$INSTDIR'; \
-    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${AIONUI_APP_EXECUTABLE_FILENAME}')); \
+    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${APP_EXECUTABLE_FILENAME}')); \
     $$psProc = @(Get-CimInstance -ClassName Win32_Process | Where-Object { $$_.ProcessId -eq $$PID })[0]; \
     $$installerPid = $$psProc.ParentProcessId; \
     $$hits = @(Get-CimInstance -ClassName Win32_Process | Where-Object { \
@@ -127,7 +126,7 @@
       $$cmd = $$_.CommandLine; \
       if (-not $$path) { $$path = $$_.Path } \
       $$_.ProcessId -ne $$installerPid -and \
-      $$_.Name -ieq '${AIONUI_APP_EXECUTABLE_FILENAME}' -and \
+      $$_.Name -ieq '${APP_EXECUTABLE_FILENAME}' -and \
       $$path -and \
       $$cmd -notmatch '--type=' -and \
       [string]::Equals([System.IO.Path]::GetFullPath($$path), $$target, [System.StringComparison]::CurrentCultureIgnoreCase) \
@@ -144,7 +143,7 @@
     $$ErrorActionPreference = 'SilentlyContinue'; \
     $$log = Join-Path $$env:TEMP '${AIONUI_PROCESS_CHECK_LOG}'; \
     $$instDir = '$INSTDIR'; \
-    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${AIONUI_APP_EXECUTABLE_FILENAME}')); \
+    $$target = [System.IO.Path]::GetFullPath((Join-Path $$instDir '${APP_EXECUTABLE_FILENAME}')); \
     $$psProc = @(Get-CimInstance -ClassName Win32_Process | Where-Object { $$_.ProcessId -eq $$PID })[0]; \
     $$installerPid = $$psProc.ParentProcessId; \
     $$all = @(Get-CimInstance -ClassName Win32_Process); \
@@ -153,7 +152,7 @@
       $$cmd = $$_.CommandLine; \
       if (-not $$path) { $$path = $$_.Path } \
       $$_.ProcessId -ne $$installerPid -and \
-      $$_.Name -ieq '${AIONUI_APP_EXECUTABLE_FILENAME}' -and \
+      $$_.Name -ieq '${APP_EXECUTABLE_FILENAME}' -and \
       $$path -and \
       $$cmd -notmatch '--type=' -and \
       [string]::Equals([System.IO.Path]::GetFullPath($$path), $$target, [System.StringComparison]::CurrentCultureIgnoreCase) \
@@ -212,10 +211,10 @@
   ${IfNot} ${FileExists} "${_PATH}"
     !insertmacro AIONUI_LOG_EVENT "verify-required-file missing label=${_LABEL} path=${_PATH}"
     MessageBox MB_OK|MB_ICONSTOP \
-      "AionUi installation is incomplete.$\n$\n\
+      "${PRODUCT_NAME} installation is incomplete.$\n$\n\
       Missing required file: ${_LABEL}$\n\
       Path: ${_PATH}$\n$\n\
-      Please reinstall AionUi or download a newer installer." \
+      Please reinstall ${PRODUCT_NAME} or download a newer installer." \
       /SD IDOK
     SetErrorLevel 3
     Quit
@@ -226,7 +225,7 @@
 
 !macro AIONUI_VERIFY_ARM64_APP_FILES
   !insertmacro AIONUI_LOG_EVENT "verify-install start instDir=$INSTDIR"
-  !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\AionUi.exe" "AionUi.exe"
+  !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "${APP_EXECUTABLE_FILENAME}"
   !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\ffmpeg.dll" "ffmpeg.dll"
   !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\libEGL.dll" "libEGL.dll"
   !insertmacro AIONUI_VERIFY_REQUIRED_FILE "$INSTDIR\libGLESv2.dll" "libGLESv2.dll"
@@ -342,7 +341,7 @@ Function .onVerifyInstDir
     ; System is not ARM64
     MessageBox MB_OK|MB_ICONSTOP \
       "Installation package architecture mismatch$\n$\n\
-      This AionUi installer is designed for ARM64 architecture.$\n$\n\
+      This ${PRODUCT_NAME} installer is designed for ARM64 architecture.$\n$\n\
       Your system does not support ARM64. Please download the appropriate version for your architecture.$\n$\n\
       Download: https://github.com/iOfficeAI/AionUi/releases"
     Quit
