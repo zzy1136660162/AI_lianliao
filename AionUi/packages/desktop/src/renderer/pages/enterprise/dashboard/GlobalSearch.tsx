@@ -1,6 +1,6 @@
 import { Alert, Button, Empty, Input, Spin } from '@arco-design/web-react';
 import { Box, BuildingFour, EngineeringBrand, Search } from '@icon-park/react';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
@@ -52,13 +52,16 @@ const groupIcon = {
   projects: EngineeringBrand,
 } as const;
 
+const optionDomId = (option: SearchOption, index: number): string => `enterprise-search-${option.kind}-${index}`;
+
 /** Keyboard-accessible, grouped search over the three verified enterprise catalogs. */
 const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [activeOptionState, setActiveOptionState] = useState({ index: -1, optionsIdentity: '' });
+  const optionElementsRef = useRef(new Map<string, HTMLButtonElement>());
   const search = useDashboardSearch(client, query, debounceMs);
   const ready = isDashboardSearchQueryReady(query);
 
@@ -94,32 +97,55 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
 
   const options = useMemo(() => groups.flatMap((group) => group.options), [groups]);
   const resultsOpen = open && ready;
+  const optionIdentityKey = useMemo(() => options.map((option) => `${option.kind}:${option.id}`).join('|'), [options]);
+  const activeIndex = activeOptionState.optionsIdentity === optionIdentityKey ? activeOptionState.index : -1;
+  const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined;
+  const activeOptionDomId = activeOption ? optionDomId(activeOption, activeIndex) : undefined;
+
+  useEffect(() => {
+    if (!resultsOpen || !activeOptionDomId) return;
+    optionElementsRef.current.get(activeOptionDomId)?.scrollIntoView({ block: 'nearest' });
+  }, [activeOptionDomId, resultsOpen]);
 
   const choose = (option: SearchOption) => {
     setOpen(false);
-    setActiveIndex(-1);
+    setActiveOptionState({ index: -1, optionsIdentity: optionIdentityKey });
     navigate(option.path);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Escape') {
       setOpen(false);
-      setActiveIndex(-1);
+      setActiveOptionState({ index: -1, optionsIdentity: optionIdentityKey });
       return;
     }
-    if (!resultsOpen || !options.length) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      const canNavigate =
+        search.result?.query === search.normalizedQuery &&
+        !search.isLoading &&
+        search.result.errorCode === null &&
+        options.length > 0;
+      if (!canNavigate) return;
       event.preventDefault();
+      setOpen(true);
       const direction = event.key === 'ArrowDown' ? 1 : -1;
-      setActiveIndex((current) => {
-        if (current < 0) return direction > 0 ? 0 : options.length - 1;
-        return (current + direction + options.length) % options.length;
+      setActiveOptionState((current) => {
+        const currentIndex = current.optionsIdentity === optionIdentityKey ? current.index : -1;
+        return {
+          index:
+            currentIndex < 0
+              ? direction > 0
+                ? 0
+                : options.length - 1
+              : (currentIndex + direction + options.length) % options.length,
+          optionsIdentity: optionIdentityKey,
+        };
       });
       return;
     }
-    if (event.key === 'Enter' && activeIndex >= 0) {
+    if (event.key === 'Enter' && resultsOpen && activeOption) {
       event.preventDefault();
-      choose(options[activeIndex]);
+      choose(activeOption);
     }
   };
 
@@ -153,16 +179,14 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
           aria-autocomplete='list'
           aria-expanded={showsListbox}
           aria-controls={showsListbox ? 'enterprise-global-search-results' : undefined}
-          aria-activedescendant={
-            showsListbox && activeIndex >= 0 ? `enterprise-search-${options[activeIndex]?.id}` : undefined
-          }
+          aria-activedescendant={showsListbox ? activeOptionDomId : undefined}
           onFocus={() => {
             if (ready) setOpen(true);
           }}
           onChange={(value) => {
             setQuery(value);
             setOpen(isDashboardSearchQueryReady(value));
-            setActiveIndex(-1);
+            setActiveOptionState({ index: -1, optionsIdentity: optionIdentityKey });
           }}
           onKeyDown={handleKeyDown}
         />
@@ -210,15 +234,23 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
                     <div className={styles.searchOptions}>
                       {group.options.map((option) => {
                         const optionIndex = options.findIndex((candidate) => candidate.id === option.id);
+                        const domId = optionDomId(option, optionIndex);
                         return (
                           <Button
-                            key={option.id}
-                            id={`enterprise-search-${option.id}`}
+                            key={`${option.kind}-${option.id}-${optionIndex}`}
+                            ref={(element: unknown) => {
+                              if (element instanceof HTMLButtonElement) optionElementsRef.current.set(domId, element);
+                              else optionElementsRef.current.delete(domId);
+                            }}
+                            id={domId}
                             className={styles.searchOption}
                             type='text'
                             role='option'
+                            tabIndex={-1}
                             aria-selected={optionIndex === activeIndex}
-                            onMouseEnter={() => setActiveIndex(optionIndex)}
+                            onMouseEnter={() =>
+                              setActiveOptionState({ index: optionIndex, optionsIdentity: optionIdentityKey })
+                            }
                             onClick={() => choose(option)}
                           >
                             <span>{option.label}</span>

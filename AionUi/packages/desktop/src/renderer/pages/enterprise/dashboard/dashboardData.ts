@@ -91,10 +91,23 @@ export const normalizeDashboardSearchQuery = (query: string): string => query.tr
 export const isDashboardSearchQueryReady = (query: string): boolean =>
   Array.from(normalizeDashboardSearchQuery(query)).length >= 2;
 
-const settledGroup = <T>(result: PromiseSettledResult<{ list: T[] }>): DashboardSearchGroup<T> =>
-  result.status === 'fulfilled'
-    ? { items: result.value.list.slice(0, DASHBOARD_SEARCH_RESULT_LIMIT), errorCode: null }
-    : { items: [], errorCode: safeErrorCode(result.reason) };
+const settledGroup = <T>(
+  result: PromiseSettledResult<{ list: T[] }>,
+  getBusinessId: (item: T) => string
+): DashboardSearchGroup<T> => {
+  if (result.status === 'rejected') return { items: [], errorCode: safeErrorCode(result.reason) };
+
+  const businessIds = new Set<string>();
+  const items: T[] = [];
+  for (const item of result.value.list) {
+    const businessId = getBusinessId(item);
+    if (businessIds.has(businessId)) continue;
+    businessIds.add(businessId);
+    items.push(item);
+    if (items.length === DASHBOARD_SEARCH_RESULT_LIMIT) break;
+  }
+  return { items, errorCode: null };
+};
 
 /** Runs the three strict catalog loaders concurrently and preserves independently successful groups. */
 export const loadDashboardSearch = async (
@@ -113,9 +126,9 @@ export const loadDashboardSearch = async (
   ]);
   throwIfAborted(signal);
 
-  const companies = settledGroup(companyResult);
-  const products = settledGroup(productResult);
-  const projects = settledGroup(projectResult);
+  const companies = settledGroup(companyResult, (company) => company.companyId);
+  const products = settledGroup(productResult, (product) => product.productId);
+  const projects = settledGroup(projectResult, (project) => project.hpInfoId);
   const allFailed = [companies, products, projects].every((group) => group.errorCode !== null);
   return {
     query,

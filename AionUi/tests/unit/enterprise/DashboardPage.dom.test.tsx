@@ -26,6 +26,8 @@ const deferred = <T,>(): Deferred<T> => {
   return { promise, resolve };
 };
 
+const scrollIntoView = vi.fn();
+
 vi.mock('@/renderer/hooks/context/EnterpriseAuthContext', () => ({
   useEnterpriseAuth: () => ({ user: authUser }),
 }));
@@ -47,6 +49,10 @@ beforeAll(() => {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })) as typeof window.matchMedia;
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoView,
+  });
 });
 
 const dashboardResponse = (): EnterpriseResponse => ({
@@ -145,19 +151,21 @@ const LocationProbe = () => {
   return <output aria-label='location'>{location.pathname}</output>;
 };
 
-const renderDashboard = (client = createClient(defaultRequest)) =>
-  render(
-    <MemoryRouter initialEntries={['/enterprise/dashboard']}>
-      <Routes>
-        <Route path='/enterprise/dashboard' element={<DashboardPage client={client} />} />
-        <Route path='*' element={<LocationProbe />} />
-      </Routes>
-    </MemoryRouter>
-  );
+const dashboardTree = (client: EnterpriseClient) => (
+  <MemoryRouter initialEntries={['/enterprise/dashboard']}>
+    <Routes>
+      <Route path='/enterprise/dashboard' element={<DashboardPage client={client} />} />
+      <Route path='*' element={<LocationProbe />} />
+    </Routes>
+  </MemoryRouter>
+);
+
+const renderDashboard = (client = createClient(defaultRequest)) => render(dashboardTree(client));
 
 describe('enterprise dashboard', () => {
   beforeEach(() => {
     defaultRequest.mockClear();
+    scrollIntoView.mockClear();
   });
 
   afterEach(() => {
@@ -294,6 +302,74 @@ describe('enterprise dashboard', () => {
     await waitFor(() =>
       expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull()
     );
+  });
+
+  it('keeps options out of the Tab order and scrolls only the keyboard-active option', async () => {
+    renderDashboard();
+    const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
+    fireEvent.change(input, { target: { value: 'pump' } });
+    const options = await screen.findAllByRole('option');
+
+    options.forEach((option) => expect(option).toHaveAttribute('tabindex', '-1'));
+    expect(new Set(options.map((option) => option.id)).size).toBe(options.length);
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' }));
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[0]);
+  });
+
+  it('reopens closed results from the focused input and selects the directional edge', async () => {
+    renderDashboard();
+    const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
+    fireEvent.change(input, { target: { value: 'pump' } });
+    await screen.findByRole('option', { name: /Search company/ });
+    act(() => input.focus());
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(document.activeElement).toBe(input);
+    expect(screen.queryByRole('listbox')).toBeNull();
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(await screen.findByRole('option', { name: /Search company/ })).toHaveAttribute('aria-selected', 'true');
+
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(
+      await screen.findByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('clears a stale active option when the same query receives a shorter result set', async () => {
+    const initialClient = createClient(defaultRequest);
+    const nextRequest = vi.fn<EnterpriseClient['request']>((operation) => {
+      if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
+      if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
+      if (operation.operation === 'company.list') return Promise.resolve(companyResponse('Only company'));
+      if (operation.operation === 'product.list') {
+        return Promise.resolve({
+          operation: 'product.list',
+          data: { list: [], pageNum: 1, pageSize: 5, pages: 0, total: 0 },
+        });
+      }
+      if (operation.operation === 'project.list') {
+        return Promise.resolve({
+          operation: 'project.list',
+          data: { list: [], pageNum: 1, pageSize: 5, pages: 0, total: 0 },
+        });
+      }
+      return Promise.reject(new Error('unexpected operation'));
+    });
+    const view = renderDashboard(initialClient);
+    const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
+    fireEvent.change(input, { target: { value: 'pump' } });
+    await screen.findByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(input).toHaveAttribute('aria-activedescendant');
+
+    view.rerender(dashboardTree(createClient(nextRequest)));
+    expect(await screen.findByRole('option', { name: /Only company/ })).toBeVisible();
+    await waitFor(() => expect(input).not.toHaveAttribute('aria-activedescendant'));
+    expect(input).not.toHaveAttribute('aria-activedescendant', 'enterprise-search-undefined');
+    expect(() => fireEvent.keyDown(input, { key: 'Enter' })).not.toThrow();
   });
 
   it('routes a protected project result by numeric identity without rendering its raw name', async () => {

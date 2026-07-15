@@ -167,6 +167,7 @@
 .searchTotalError {
   display: flex;
   min-height: 104px;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   justify-content: center;
@@ -174,7 +175,9 @@
 }
 
 .searchTotalError :global(.arco-alert) {
-  min-width: min(520px, 80%);
+  width: 100%;
+  min-width: 0;
+  max-width: 520px;
 }
 
 .searchGroup {
@@ -527,6 +530,15 @@
 
   .radarLink {
     margin-top: 12px;
+  }
+
+  .searchTotalError {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .searchTotalError :global(.arco-alert) {
+    max-width: none;
   }
 
   .radarMetrics,

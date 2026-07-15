@@ -169,6 +169,79 @@ describe('dashboard unified search loader', () => {
     expect(result.projects.items.map((item) => item.hpInfoId)).toEqual(['1', '2', '3', '4', '5']);
   });
 
+  it('keeps the first record for duplicate business ids before applying each group limit', async () => {
+    const request = vi.fn<EnterpriseClient['request']>((operation) => {
+      if (operation.operation === 'company.list') {
+        return Promise.resolve({
+          operation: 'company.list',
+          data: {
+            list: [
+              { companyId: '1', name: 'First company' },
+              { companyId: '1', name: 'Duplicate company' },
+              ...Array.from({ length: 5 }, (_, index) => ({
+                companyId: String(index + 2),
+                name: `Company ${index + 2}`,
+              })),
+            ],
+            pageNum: 1,
+            pageSize: 5,
+            pages: 2,
+            total: 7,
+          },
+        });
+      }
+      if (operation.operation === 'product.list') {
+        return Promise.resolve({
+          operation: 'product.list',
+          data: {
+            list: [
+              { productId: '1', companyId: '1', name: 'First product' },
+              { productId: '1', companyId: '1', name: 'Duplicate product' },
+              ...Array.from({ length: 5 }, (_, index) => ({
+                productId: String(index + 2),
+                companyId: '1',
+                name: `Product ${index + 2}`,
+              })),
+            ],
+            pageNum: 1,
+            pageSize: 5,
+            pages: 2,
+            total: 7,
+          },
+        });
+      }
+      if (operation.operation === 'project.list') {
+        return Promise.resolve({
+          operation: 'project.list',
+          data: {
+            list: [
+              { hpInfoId: '1', projectName: 'First project' },
+              { hpInfoId: '1', projectName: 'Duplicate project' },
+              ...Array.from({ length: 5 }, (_, index) => ({
+                hpInfoId: String(index + 2),
+                projectName: `Project ${index + 2}`,
+              })),
+            ],
+            pageNum: 1,
+            pageSize: 5,
+            pages: 2,
+            total: 7,
+          },
+        });
+      }
+      return Promise.reject(new Error('unexpected operation'));
+    });
+
+    const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
+
+    expect(result.companies.items.map((item) => item.companyId)).toEqual(['1', '2', '3', '4', '5']);
+    expect(result.companies.items[0]?.name).toBe('First company');
+    expect(result.products.items.map((item) => item.productId)).toEqual(['1', '2', '3', '4', '5']);
+    expect(result.products.items[0]?.name).toBe('First product');
+    expect(result.projects.items.map((item) => item.hpInfoId)).toEqual(['1', '2', '3', '4', '5']);
+    expect(result.projects.items[0]?.projectName).toBe('First project');
+  });
+
   it('keeps successful groups when one category fails', async () => {
     const request = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'company.list') return Promise.resolve(companyResponse());
