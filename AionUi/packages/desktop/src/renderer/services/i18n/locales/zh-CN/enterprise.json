@@ -95,7 +95,7 @@
     "leads": "商机跟进"
   },
   "shell": {
-    "brand": "企业码",
+    "brand": "链上辽宁·产业云城",
     "brandMark": "企",
     "brandCaption": "辽宁产业工作台",
     "eyebrow": "辽宁产业蓝图",
@@ -104,7 +104,7 @@
     "loggingOut": "正在退出…",
     "logoutError": "暂时无法清除企业会话，请重试。",
     "actions": {
-      "ai": "AI 工作区",
+      "ai": "进入链辽AI",
       "settings": "设置",
       "logout": "退出登录"
     }

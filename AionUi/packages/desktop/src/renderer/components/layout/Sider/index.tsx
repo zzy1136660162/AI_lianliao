@@ -8,6 +8,7 @@ import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { blurActiveElement } from '@renderer/utils/ui/focus';
 import { useThemeContext } from '@renderer/hooks/context/ThemeContext';
 import { SiderToolbar, SiderSearchEntry, SiderScheduledEntry } from './SiderNav';
+import SiderEnterpriseEntry from './SiderEnterpriseEntry';
 import SiderFooter from './SiderFooter';
 import TeamSiderSection from './TeamSiderSection';
 import siderStyles from './Sider.module.css';
@@ -86,6 +87,18 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
     closePreview();
     setIsBatchMode(false);
     Promise.resolve(navigate('/scheduled')).catch((error) => {
+      console.error('Navigation failed:', error);
+    });
+    if (onSessionClick) {
+      onSessionClick();
+    }
+  };
+
+  const handleEnterpriseClick = () => {
+    cleanupSiderTooltips();
+    blurActiveElement();
+    closePreview();
+    Promise.resolve(navigate('/enterprise/dashboard')).catch((error) => {
       console.error('Navigation failed:', error);
     });
     if (onSessionClick) {
@@ -201,6 +214,12 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
           </div>
         )}
       </div>
+      <SiderEnterpriseEntry
+        collapsed={collapsed}
+        isMobile={isMobile}
+        siderTooltipProps={siderTooltipProps}
+        onClick={handleEnterpriseClick}
+      />
       {/* Footer */}
       <SiderFooter
         isMobile={isMobile}

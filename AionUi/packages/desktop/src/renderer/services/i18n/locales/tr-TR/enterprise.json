@@ -95,7 +95,7 @@
     "leads": "Follow-ups"
   },
   "shell": {
-    "brand": "Enterprise Code",
+    "brand": "链上辽宁·产业云城",
     "brandMark": "EC",
     "brandCaption": "Liaoning industry desk",
     "eyebrow": "Liaoning industrial blueprint",
@@ -104,7 +104,7 @@
     "loggingOut": "Signing out…",
     "logoutError": "The enterprise session could not be cleared. Try again.",
     "actions": {
-      "ai": "AI workspace",
+      "ai": "进入链辽AI",
       "settings": "Settings",
       "logout": "Sign out"
     }
