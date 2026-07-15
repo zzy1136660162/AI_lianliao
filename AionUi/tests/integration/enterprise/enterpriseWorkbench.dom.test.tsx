@@ -13,6 +13,8 @@ import type {
   EnterpriseUserContext,
 } from '@/common/enterprise/contracts';
 import type { ElectronBridgeAPI } from '@/common/types/platform/electron';
+import { loadProjectDetail } from '@/renderer/pages/enterprise/projects/projectData';
+import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import type { EnterpriseRawBridge } from '@/renderer/services/enterprise/enterpriseClient';
 
 const AUTHENTICATED_USER: EnterpriseUserContext = {
@@ -38,6 +40,7 @@ const PRODUCT_NAME = 'Integration Industrial Pump';
 const PRIVATE_PROJECT_NAME = 'Private Alpha Expansion Project';
 const PRIVATE_PROJECT_OWNER = 'Private Project Owner';
 const PRIVATE_PROJECT_PHONE = '138********';
+const RAW_PRIVATE_PROJECT_PHONE = '13800000000';
 const PROJECT_ID = '93001';
 
 const success = <T,>(data: T): EnterpriseIpcResult<T> => ({ ok: true, data });
@@ -49,6 +52,10 @@ const page = <T,>(list: T[], pageNum: number, pageSize: number) => ({
   pages: list.length ? 1 : 0,
   total: list.length,
 });
+
+const assertNeverRequest = (_request: never): never => {
+  throw new Error('Unsupported enterprise fake operation');
+};
 
 const companySummary = {
   companyId: '101',
@@ -89,7 +96,7 @@ const productSummary = {
 const projectSummary = {
   hpInfoId: PROJECT_ID,
   projectName: PRIVATE_PROJECT_NAME,
-  constructionUnit: 'Private Construction Unit',
+  constructionUnit: PRIVATE_PROJECT_OWNER,
   province: 'Liaoning',
   city: 'Dalian',
   totalInvestment: 56000,
@@ -104,12 +111,15 @@ const projectSummary = {
 
 const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
   switch (request.operation) {
-    case 'company.list':
+    case 'company.list': {
+      expect(request.payload).toEqual({ keyword: 'Integration', pageNum: 1, pageSize: 5 });
       return {
         operation: request.operation,
         data: page([companySummary], request.payload.pageNum, request.payload.pageSize),
       };
+    }
     case 'company.detail':
+      expect(request.payload).toEqual({ companyId: companySummary.companyId });
       return {
         operation: request.operation,
         data: {
@@ -121,12 +131,19 @@ const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
           phone: '024-8***8888',
         },
       };
-    case 'product.list':
+    case 'product.list': {
+      expect(request.payload).toEqual(
+        request.payload.companyId
+          ? { companyId: companySummary.companyId, pageNum: 1, pageSize: 12 }
+          : { keyword: 'Integration', pageNum: 1, pageSize: 5 }
+      );
       return {
         operation: request.operation,
         data: page([productSummary], request.payload.pageNum, request.payload.pageSize),
       };
+    }
     case 'product.detail':
+      expect(request.payload).toEqual({ productId: productSummary.productId });
       return { operation: request.operation, data: productSummary };
     case 'project.dashboard':
       return {
@@ -151,12 +168,17 @@ const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
         operation: request.operation,
         data: [{ label: 'Equipment', dimension: 'l1', categoryL1: 'Equipment', projectCount: 12 }],
       };
-    case 'project.list':
+    case 'project.list': {
+      expect(request.payload).toEqual(
+        request.payload.keyword ? { keyword: 'Integration', pageNum: 1, pageSize: 5 } : { pageNum: 1, pageSize: 20 }
+      );
       return {
         operation: request.operation,
         data: page([projectSummary], request.payload.pageNum, request.payload.pageSize),
       };
+    }
     case 'project.detail':
+      expect(request.payload).toEqual({ hpInfoId: PROJECT_ID });
       return {
         operation: request.operation,
         data: {
@@ -180,6 +202,7 @@ const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
         },
       };
   }
+  return assertNeverRequest(request);
 };
 
 const rawBridge: EnterpriseRawBridge = {
@@ -213,6 +236,50 @@ type PanelRoutesComponent = (typeof import('@/renderer/components/layout/Router'
 let AuthProvider: AuthProviderComponent;
 let EnterpriseAuthProvider: EnterpriseAuthProviderComponent;
 let PanelRoutes: PanelRoutesComponent;
+
+const activeSensitiveObservers = new Set<MutationObserver>();
+
+const beginSensitiveDomAudit = (sensitiveValues: readonly string[]) => {
+  const textHistory: string[] = [];
+  const captureNodeText = (node: Node): void => {
+    const text = node.textContent;
+    if (text) textHistory.push(text);
+  };
+  const captureRecords = (records: readonly MutationRecord[]): void => {
+    for (const record of records) {
+      if (record.type === 'characterData') {
+        if (record.oldValue) textHistory.push(record.oldValue);
+        captureNodeText(record.target);
+        continue;
+      }
+      record.addedNodes.forEach(captureNodeText);
+    }
+  };
+  const observer = new MutationObserver(captureRecords);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+    characterDataOldValue: true,
+  });
+  activeSensitiveObservers.add(observer);
+
+  const assertNeverObserved = (container: HTMLElement): void => {
+    captureRecords(observer.takeRecords());
+    captureNodeText(container);
+    const observedText = textHistory.join('\n');
+    for (const sensitiveValue of sensitiveValues) expect(observedText).not.toContain(sensitiveValue);
+  };
+
+  return {
+    assertNeverObserved,
+    stop(container: HTMLElement): void {
+      assertNeverObserved(container);
+      observer.disconnect();
+      activeSensitiveObservers.delete(observer);
+    },
+  };
+};
 
 const RouteProbe: React.FC = () => {
   const location = useLocation();
@@ -260,7 +327,11 @@ describe('enterprise desktop core workbench', () => {
     vi.mocked(rawBridge.request).mockClear();
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    activeSensitiveObservers.forEach((observer) => observer.disconnect());
+    activeSensitiveObservers.clear();
+    cleanup();
+  });
 
   afterAll(() => {
     Object.defineProperty(window, 'electronAPI', {
@@ -272,6 +343,12 @@ describe('enterprise desktop core workbench', () => {
 
   it('restores the session and completes the protected cross-page workflow before logout', async () => {
     const user = userEvent.setup();
+    const sensitiveAudit = beginSensitiveDomAudit([
+      AUTHENTICATED_USER.openId,
+      PRIVATE_PROJECT_NAME,
+      PRIVATE_PROJECT_OWNER,
+      RAW_PRIVATE_PROJECT_PHONE,
+    ]);
     const { container } = render(
       <MemoryRouter initialEntries={['/']}>
         <AuthProvider>
@@ -287,6 +364,7 @@ describe('enterprise desktop core workbench', () => {
       await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, { timeout: 5000 })
     ).toBeVisible();
     expect(rawBridge.restoreSession).toHaveBeenCalledTimes(1);
+    sensitiveAudit.assertNeverObserved(container);
 
     await user.type(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), 'Integration');
     const searchResults = await screen.findByRole('listbox', {
@@ -295,25 +373,34 @@ describe('enterprise desktop core workbench', () => {
     const companyGroup = within(searchResults).getByRole('group', {
       name: 'enterprise.dashboard.search.groups.companies',
     });
+    sensitiveAudit.assertNeverObserved(container);
     await user.click(within(companyGroup).getByRole('option', { name: new RegExp(`^${COMPANY_NAME}`) }));
 
     expect(await screen.findByRole('heading', { name: COMPANY_NAME }, { timeout: 5000 })).toBeVisible();
+    sensitiveAudit.assertNeverObserved(container);
     await user.click(screen.getByRole('link', { name: new RegExp(PRODUCT_NAME) }));
     expect(await screen.findByRole('heading', { name: PRODUCT_NAME }, { timeout: 5000 })).toBeVisible();
+    sensitiveAudit.assertNeverObserved(container);
 
     await user.click(screen.getByRole('link', { name: 'enterprise.navigation.projects' }));
-    await user.click(
-      await screen.findByRole('button', { name: 'enterprise.projects.actions.viewDetails' }, { timeout: 5000 })
+    const viewProjectDetails = await screen.findByRole(
+      'button',
+      { name: 'enterprise.projects.actions.viewDetails' },
+      { timeout: 5000 }
     );
+    sensitiveAudit.assertNeverObserved(container);
+    await user.click(viewProjectDetails);
     await waitFor(
       () =>
         expect(screen.getByRole('heading', { name: /^enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible(),
       { timeout: 5000 }
     );
 
+    sensitiveAudit.assertNeverObserved(container);
     expect(container).not.toHaveTextContent(PRIVATE_PROJECT_NAME);
     expect(container).not.toHaveTextContent(PRIVATE_PROJECT_OWNER);
     expect(container).not.toHaveTextContent(PRIVATE_PROJECT_PHONE);
+    expect(container).not.toHaveTextContent(RAW_PRIVATE_PROJECT_PHONE);
     expect(container).not.toHaveTextContent(AUTHENTICATED_USER.openId);
 
     await user.click(screen.getByRole('button', { name: 'enterprise.shell.actions.logout' }));
@@ -325,5 +412,46 @@ describe('enterprise desktop core workbench', () => {
     await user.click(screen.getByRole('link', { name: 'open legacy guid' }));
     expect(await screen.findByRole('heading', { name: 'legacy-guid-route' }, { timeout: 5000 })).toBeVisible();
     expect(screen.getByRole('status', { name: 'current route' })).toHaveTextContent('/guid');
+    sensitiveAudit.stop(container);
   }, 30_000);
+
+  it('makes the fake bridge reject an unknown runtime operation instead of returning successful undefined data', async () => {
+    const unsafeRequest = {
+      operation: 'integration.unknown-operation',
+      payload: {},
+    } as unknown as EnterpriseRequest;
+
+    await expect(rawBridge.request(unsafeRequest)).rejects.toThrow('Unsupported enterprise fake operation');
+  });
+
+  it('rejects an unmasked unpurchased project at the renderer final boundary without exposing its phone to DOM', async () => {
+    vi.mocked(rawBridge.request).mockResolvedValueOnce(
+      success<EnterpriseResponse>({
+        operation: 'project.detail',
+        data: {
+          ...projectSummary,
+          contactName: PRIVATE_PROJECT_OWNER,
+          phone: RAW_PRIVATE_PROJECT_PHONE,
+          purchased: false,
+        },
+      })
+    );
+    const sensitiveAudit = beginSensitiveDomAudit([RAW_PRIVATE_PROJECT_PHONE]);
+
+    let failure: unknown;
+    try {
+      await loadProjectDetail(enterpriseClient, PROJECT_ID, new AbortController().signal);
+    } catch (error: unknown) {
+      failure = error;
+    }
+
+    sensitiveAudit.stop(document.body);
+    expect(failure).toMatchObject({
+      name: 'ProjectDataError',
+      code: 'INVALID_RESPONSE',
+      message: 'INVALID_RESPONSE',
+    });
+    expect(String(failure)).not.toContain(RAW_PRIVATE_PROJECT_PHONE);
+    expect(document.body).not.toHaveTextContent(RAW_PRIVATE_PROJECT_PHONE);
+  });
 });

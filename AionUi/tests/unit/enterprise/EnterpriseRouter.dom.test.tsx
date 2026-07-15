@@ -240,6 +240,14 @@ describe('existing WebUI routes', () => {
     expect(await screen.findByText('original-guid-page')).toBeVisible();
   });
 
+  it('sends the unauthenticated WebUI root to the original login route', async () => {
+    routerMocks.appStatus = 'unauthenticated';
+    renderAt('/');
+
+    await waitFor(() => expect(window.location.hash).toBe('#/login'));
+    expect(await screen.findByText('original-login-page')).toBeVisible();
+  });
+
   it.each([
     ['/guid', 'original-guid-page'],
     ['/conversation/conversation-1', 'original-conversation-page'],
