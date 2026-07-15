@@ -34,6 +34,7 @@ import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@process/services/i18n';
 import { setupApplicationMenu } from './process/utils/appMenu';
+import { attachDevToolsShortcutToWindow, isDevToolsEnabled } from './process/utils/devToolsPolicy';
 import { startWebHost } from '@aionui/web-host';
 import { initializeZoomFactor, setupZoomForWindow } from './process/utils/zoom';
 import { hydrateWindowsProcessPath } from './process/startup/windowsPath';
@@ -409,8 +410,10 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       webviewTag: true, // 启用 webview 标签用于 HTML 预览 / Enable webview tag for HTML preview
+      devTools: isDevToolsEnabled(app.isPackaged),
     },
   });
+  attachDevToolsShortcutToWindow(mainWindow, app.isPackaged);
   console.log(`[AionUi] Main window created (id=${mainWindow.id})`);
 
   scheduleStartupLogReport(mainWindow);
