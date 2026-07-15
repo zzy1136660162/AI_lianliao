@@ -9,22 +9,13 @@ import http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import os from 'os';
-import { getDevAppName } from '@/common/platform';
+import { configureUserDataPath } from '@/common/platform/userDataPath';
 import { applyGpuRecoveryFlags } from './gpuRecovery';
 
 // ============ Environment Separation ============
-// Set app name before any getPath() call so userData is isolated from production.
-// Note: getPlatformServices() auto-registration also applies this as a safety net
-// in case Rollup loads initStorage's chunk before this module runs.
-// 开发模式下设置独立 app 名称，userData 目录将与正式版隔离，允许同时运行
-if (!app.isPackaged) {
-  const devAppName = getDevAppName();
-  app.setName(devAppName);
-  // In Electron 28+, setName alone no longer updates userData path on macOS.
-  // Explicitly override userData to the dev directory.
-  const appSupportDir = path.dirname(app.getPath('userData'));
-  app.setPath('userData', path.join(appSupportDir, devAppName));
-}
+// Pin storage to a stable legacy sibling before any module can cache userData.
+const isMultiInstance = process.env.AIONUI_MULTI_INSTANCE === '1';
+configureUserDataPath(app, fs.mkdirSync, isMultiInstance);
 
 // app.disableHardwareAcceleration() must run before app is ready.
 applyGpuRecoveryFlags();

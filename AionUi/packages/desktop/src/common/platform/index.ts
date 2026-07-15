@@ -1,17 +1,13 @@
-import path from 'path';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { IPlatformServices } from './IPlatformServices';
 import { NodePlatformServices } from './NodePlatformServices';
+import { configureUserDataPath } from './userDataPath';
+
+export { configureUserDataPath, getDevAppName, resolveUserDataPath } from './userDataPath';
+export type { EnsureUserDataDirectory, UserDataPathApp, UserDataPathOptions } from './userDataPath';
 
 let _services: IPlatformServices | null = null;
-
-/**
- * Resolve the dev-mode app name for environment isolation.
- * Centralised so that every call-site stays in sync.
- */
-export function getDevAppName(): string {
-  const isMultiInstance = process.env.AIONUI_MULTI_INSTANCE === '1';
-  return isMultiInstance ? 'AionUi-Dev-2' : 'AionUi-Dev';
-}
 
 export function registerPlatformServices(services: IPlatformServices): void {
   _services = services;
@@ -36,14 +32,10 @@ export function getPlatformServices(): IPlatformServices {
       } else {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { app, net } = require('electron') as typeof import('electron');
-        // Dev isolation: set app name before any getPath('userData') call.
-        // Rollup may load this chunk before configureChromium.ts runs, so we
-        // must apply the dev name here as a safety net.
-        if (!app.isPackaged) {
-          const devAppName = getDevAppName();
-          app.setName(devAppName);
-          app.setPath('userData', path.join(path.dirname(app.getPath('userData')), devAppName));
-        }
+        // Rollup may load this chunk before configureChromium.ts runs, so apply
+        // the stable storage path here as a safety net for both build modes.
+        const isMultiInstance = process.env.AIONUI_MULTI_INSTANCE === '1';
+        configureUserDataPath(app, mkdirSync, isMultiInstance);
         // Typed as IPlatformPaths so tsc enforces completeness: any new method
         // added to the interface will cause a compile error here if omitted below.
         const paths: import('./IPlatformServices').IPlatformPaths = {
@@ -54,7 +46,7 @@ export function getPlatformServices(): IPlatformServices {
             try {
               return app.getPath('logs');
             } catch {
-              return path.join(app.getPath('userData'), 'logs');
+              return join(app.getPath('userData'), 'logs');
             }
           },
           getAppPath: () => app.getAppPath(),
