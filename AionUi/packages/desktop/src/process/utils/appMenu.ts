@@ -12,9 +12,7 @@ import { isDevToolsEnabled } from './devToolsPolicy';
 export const buildViewMenuItems = (isPackaged: boolean): MenuItemConstructorOptions[] => [
   { role: 'reload' },
   { role: 'forceReload' },
-  ...(isDevToolsEnabled(isPackaged)
-    ? ([{ role: 'toggleDevTools' }] as MenuItemConstructorOptions[])
-    : []),
+  ...(isDevToolsEnabled(isPackaged) ? ([{ role: 'toggleDevTools' }] as MenuItemConstructorOptions[]) : []),
   { type: 'separator' },
   { role: 'resetZoom' },
   { role: 'zoomIn' },

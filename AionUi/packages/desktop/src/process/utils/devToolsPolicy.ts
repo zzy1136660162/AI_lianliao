@@ -14,13 +14,7 @@ export const handleDevToolsShortcut = (
   isPackaged: boolean
 ): boolean => {
   const isF12 = input.key === 'F12' || input.code === 'F12';
-  if (
-    !isDevToolsEnabled(isPackaged) ||
-    input.type !== 'keyDown' ||
-    input.isAutoRepeat ||
-    input.isComposing ||
-    !isF12
-  ) {
+  if (!isDevToolsEnabled(isPackaged) || input.type !== 'keyDown' || input.isAutoRepeat || input.isComposing || !isF12) {
     return false;
   }
 
