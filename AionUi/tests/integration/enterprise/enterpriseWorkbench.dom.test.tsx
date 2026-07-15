@@ -347,6 +347,7 @@ describe('enterprise desktop core workbench', () => {
       AUTHENTICATED_USER.openId,
       PRIVATE_PROJECT_NAME,
       PRIVATE_PROJECT_OWNER,
+      PRIVATE_PROJECT_PHONE,
       RAW_PRIVATE_PROJECT_PHONE,
     ]);
     const { container } = render(
