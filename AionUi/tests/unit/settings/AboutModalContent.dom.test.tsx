@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   updateCheckMock: vi.fn(),
   messageInfoMock: vi.fn(),
   messageErrorMock: vi.fn(),
+  openExternalUrlMock: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -51,7 +52,7 @@ vi.mock('@/common', () => ({
 
 vi.mock('@/renderer/utils/platform', () => ({
   isElectronDesktop: () => true,
-  openExternalUrl: vi.fn(),
+  openExternalUrl: mocks.openExternalUrlMock,
 }));
 
 vi.mock('@/renderer/components/settings/SettingsModal/settingsViewContext', () => ({
@@ -81,6 +82,18 @@ describe('AboutModalContent update ready state', () => {
     cleanup();
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('shows the Chain Liao AI heading and preserves the upstream help link', async () => {
+    mocks.openExternalUrlMock.mockResolvedValue(undefined);
+    render(<AboutModalContent />);
+
+    expect(screen.getByRole('heading', { name: '链辽AI' })).toBeInTheDocument();
+    fireEvent.click(screen.getByText('settings.helpDocumentation'));
+
+    await waitFor(() => {
+      expect(mocks.openExternalUrlMock).toHaveBeenCalledWith('https://github.com/iOfficeAI/AionUi/wiki');
+    });
   });
 
   it('replaces check update with ready-to-install when an update package is ready', async () => {

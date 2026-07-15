@@ -82,7 +82,7 @@ vi.mock('@/common', () => ({
 }));
 
 // Trim Layout's collaborators to keep this a focused brand-behaviour test.
-vi.mock('@/common/config/constants', () => ({ TEAM_MODE_ENABLED: false }));
+vi.mock('@/common/config/constants', () => ({ AI_PRODUCT_NAME: '链辽AI', TEAM_MODE_ENABLED: false }));
 vi.mock('@/renderer/components/layout/PwaPullToRefresh', () => ({ default: () => null }));
 vi.mock('@/renderer/components/layout/Titlebar', () => ({ default: () => null }));
 vi.mock('@/renderer/components/settings/UpdateModal', () => ({ default: () => null }));
@@ -221,7 +221,7 @@ describe('Layout sider brand Home button', () => {
 
     // No actionable role/label in chat routes.
     expect(screen.queryByLabelText(BACK_KEY)).toBeNull();
-    const wordmark = screen.getByText('AionUi');
+    const wordmark = screen.getByText('链辽AI');
     fireEvent.click(wordmark);
     expect(navigate).not.toHaveBeenCalled();
   });
@@ -230,7 +230,7 @@ describe('Layout sider brand Home button', () => {
     currentPathname = '/conversation/xyz';
     renderLayout();
 
-    fireEvent.click(screen.getByText('AionUi'));
+    fireEvent.click(screen.getByText('链辽AI'));
     expect(navigate).not.toHaveBeenCalled();
   });
 

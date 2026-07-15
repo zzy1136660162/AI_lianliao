@@ -5,7 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
-import { TEAM_MODE_ENABLED } from '@/common/config/constants';
+import { AI_PRODUCT_NAME, TEAM_MODE_ENABLED } from '@/common/config/constants';
 import PwaPullToRefresh from '@/renderer/components/layout/PwaPullToRefresh';
 import Titlebar from '@/renderer/components/layout/Titlebar';
 import { Layout as ArcoLayout, Tooltip } from '@arco-design/web-react';
@@ -393,11 +393,11 @@ const Layout: React.FC<{
                         }
                       }}
                     >
-                      AionUi
+                      {AI_PRODUCT_NAME}
                     </div>
                   </Tooltip>
                 ) : (
-                  <div className='text-16px text-t-primary collapsed-hidden font-semibold'>AionUi</div>
+                  <div className='text-16px text-t-primary collapsed-hidden font-semibold'>{AI_PRODUCT_NAME}</div>
                 )}
                 {isMobile && !collapsed && (
                   <button

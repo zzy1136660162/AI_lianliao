@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { WEBUI_DEFAULT_PORT } from '@/common/config/constants';
+import { AI_PRODUCT_NAME, WEBUI_DEFAULT_PORT } from '@/common/config/constants';
 import { shell, webui, type IWebUIStatus } from '@/common/adapter/ipcBridge';
 import { isBackendHttpError } from '@/common/adapter/httpBridge';
 import { configService } from '@/common/config/configService';
@@ -667,8 +667,7 @@ const WebuiModalContent: React.FC = () => {
                   onClick={() =>
                     void talkToButler({
                       prompt: t('settings.talkToButler.prompt.setupRemote', {
-                        defaultValue:
-                          'Help me set up remote access so I can open AionUi from my phone or over the internet.',
+                        defaultValue: `Help me set up remote access so I can open ${AI_PRODUCT_NAME} from my phone or over the internet.`,
                       }),
                     })
                   }

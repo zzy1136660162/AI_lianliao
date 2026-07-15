@@ -5,6 +5,7 @@
  */
 
 import ModalWrapper from '@renderer/components/base/ModalWrapper';
+import { AI_PRODUCT_NAME } from '@/common/config/constants';
 import { FEEDBACK_MODULES } from './feedbackModules';
 import { useTalkToButler } from '@/renderer/hooks/assistant/useTalkToButler';
 import { uploadFileViaHttp } from '@/renderer/services/FileService';
@@ -195,8 +196,7 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
 
       const moduleLabel = t(selectedModule?.i18nKey ?? 'settings.bugReportModuleOther');
       const prompt = t('settings.talkToButler.prompt.diagnose', {
-        defaultValue:
-          'I ran into a problem with AionUi, please help me diagnose it.\n\n[Module] {{module}}\n[Description] {{description}}\n[Attachments] see the screenshots in the input.\n\nPlease diagnose the cause and tell me how to fix it.',
+        defaultValue: `I ran into a problem with ${AI_PRODUCT_NAME}, please help me diagnose it.\n\n[Module] {{module}}\n[Description] {{description}}\n[Attachments] see the screenshots in the input.\n\nPlease diagnose the cause and tell me how to fix it.`,
         module: moduleLabel,
         description: description.trim(),
       });

@@ -13,6 +13,7 @@ import {
 } from '@/common/electronSafe';
 import * as path from 'path';
 import { ipcBridge } from '@/common';
+import { AI_PRODUCT_NAME } from '@/common/config/constants';
 import i18n from '@process/services/i18n';
 
 let tray: TrayInstance | null = null;
@@ -243,7 +244,7 @@ export const createOrUpdateTray = (): void => {
   try {
     const icon = getTrayIcon();
     tray = new Tray(icon);
-    tray.setToolTip('AionUi');
+    tray.setToolTip(AI_PRODUCT_NAME);
     void buildTrayContextMenu().then((menu) => tray?.setContextMenu(menu));
 
     tray.on('double-click', () => {
