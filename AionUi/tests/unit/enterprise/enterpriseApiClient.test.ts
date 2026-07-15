@@ -1310,16 +1310,20 @@ describe('EnterpriseApiClient QR authentication', () => {
     await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
   });
 
-  it('rejects a QR response with an empty final URL', async () => {
+  it('accepts an empty final URL from Electron net.fetch when redirects are rejected', async () => {
     let calls = 0;
     const client = new EnterpriseApiClient({
-      transport: async () => {
+      transport: async (_url, init) => {
         calls += 1;
+        expect(init.redirect).toBe('error');
         return calls === 1 ? createResponse() : new Response(pngBytes, { status: 200 });
       },
     });
 
-    await expectApiError(client.createLoginSession(), 'INVALID_RESPONSE');
+    const session = await client.createLoginSession();
+
+    expect(session.qrDataUrl).toBe(`data:image/png;base64,${Buffer.from(pngBytes).toString('base64')}`);
+    expect(calls).toBe(2);
   });
 
   it.each([

@@ -678,7 +678,9 @@ export class EnterpriseApiClient {
         signal,
       });
       if (!response.ok) throw apiError('HTTP');
-      if (response.url !== url) throw apiError('INVALID_RESPONSE');
+      // Electron net.fetch may omit Response.url even when a non-redirected request succeeds.
+      // Redirects are still rejected by redirect: 'error'; reject every non-empty mismatch.
+      if (response.url !== '' && response.url !== url) throw apiError('INVALID_RESPONSE');
 
       parseQrContentLength(response.headers.get('Content-Length'));
       const bytes = await readBoundedQrBody(response, signal);
