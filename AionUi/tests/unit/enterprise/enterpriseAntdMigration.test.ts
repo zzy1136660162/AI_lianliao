@@ -37,4 +37,10 @@ describe('enterprise Ant Design and ECharts migration contract', () => {
     const rendererEntry = readFileSync(resolve('packages/desktop/src/renderer/main.tsx'), 'utf8');
     expect(rendererEntry).not.toContain('antd/dist/reset.css');
   });
+
+  it('provides the shared enterprise pagination scroll hook', () => {
+    const hookPath = resolve('packages/desktop/src/renderer/pages/enterprise/layout/useEnterprisePaginationScroll.ts');
+
+    expect(existsSync(hookPath), 'useEnterprisePaginationScroll.ts should exist').toBe(true);
+  });
 });
