@@ -170,6 +170,13 @@ git commit -m "功能(企业会员): 封装 H5 等级映射"
 - Modify: `packages/desktop/src/renderer/services/i18n/locales/zh-TW/enterprise.json`
 - Modify: `packages/desktop/src/renderer/services/i18n/locales/en-US/enterprise.json`
 - Modify: `packages/desktop/src/renderer/services/i18n/locales/ru-RU/enterprise.json`
+- Modify: `packages/desktop/src/renderer/services/i18n/locales/de-DE/enterprise.json`
+- Modify: `packages/desktop/src/renderer/services/i18n/locales/ja-JP/enterprise.json`
+- Modify: `packages/desktop/src/renderer/services/i18n/locales/ko-KR/enterprise.json`
+- Modify: `packages/desktop/src/renderer/services/i18n/locales/pt-BR/enterprise.json`
+- Modify: `packages/desktop/src/renderer/services/i18n/locales/tr-TR/enterprise.json`
+- Modify: `packages/desktop/src/renderer/services/i18n/locales/uk-UA/enterprise.json`
+- Regenerate: `packages/desktop/src/renderer/services/i18n/i18n-keys.d.ts`
 - Test: `tests/unit/enterprise/CompanyMembershipBadge.dom.test.tsx`
 
 - [ ] **Step 1: Write failing component tests**
@@ -217,14 +224,15 @@ Extend each locale's existing `companies.memberLevel` object with these keys whi
 
 Use these exact values:
 
-| Locale  | verified          | ordinary        | vip        | fourStar      | fiveStar      | flagship       | fallback                     |
-| ------- | ----------------- | --------------- | ---------- | ------------- | ------------- | -------------- | ---------------------------- |
-| `zh-CN` | 实名认证          | 普通会员        | VIP 会员   | 4 星会员      | 5 星会员      | 旗舰店         | 会员等级 `{{level}}`         |
-| `zh-TW` | 實名認證          | 普通會員        | VIP 會員   | 4 星會員      | 5 星會員      | 旗艦店         | 會員等級 `{{level}}`         |
-| `en-US` | Verified business | Standard member | VIP member | 4-star member | 5-star member | Flagship store | Membership level `{{level}}` |
-| `ru-RU` | Verified business | Standard member | VIP member | 4-star member | 5-star member | Flagship store | Membership level `{{level}}` |
+| Locale                  | verified          | ordinary        | vip        | fourStar      | fiveStar      | flagship       | fallback                     |
+| ----------------------- | ----------------- | --------------- | ---------- | ------------- | ------------- | -------------- | ---------------------------- |
+| `zh-CN`                 | 实名认证          | 普通会员        | VIP 会员   | 4 星会员      | 5 星会员      | 旗舰店         | 会员等级 `{{level}}`         |
+| `zh-TW`                 | 實名認證          | 普通會員        | VIP 會員   | 4 星會員      | 5 星會員      | 旗艦店         | 會員等級 `{{level}}`         |
+| `en-US`                 | Verified business | Standard member | VIP member | 4-star member | 5-star member | Flagship store | Membership level `{{level}}` |
+| `ru-RU`                 | Verified business | Standard member | VIP member | 4-star member | 5-star member | Flagship store | Membership level `{{level}}` |
+| Other supported locales | Verified business | Standard member | VIP member | 4-star member | 5-star member | Flagship store | Membership level `{{level}}` |
 
-`ru-RU` intentionally follows that file's existing English enterprise copy instead of introducing a partial Russian translation in this focused change.
+All non-Chinese enterprise locale files intentionally follow their existing English copy instead of introducing partial translations in this focused change. Regenerate the typed key union after updating all locale files.
 
 - [ ] **Step 4: Implement the component and CSS module**
 

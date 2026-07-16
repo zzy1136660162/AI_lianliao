@@ -250,7 +250,14 @@
     "memberLevel": {
       "vipAggregate": "All VIP companies",
       "value": "Level {{level}}",
-      "unknown": "Not classified"
+      "unknown": "Not classified",
+      "verified": "Verified business",
+      "ordinary": "Standard member",
+      "vip": "VIP member",
+      "fourStar": "4-star member",
+      "fiveStar": "5-star member",
+      "flagship": "Flagship store",
+      "fallback": "Membership level {{level}}"
     },
     "quickView": {
       "label": "Company quick view",
