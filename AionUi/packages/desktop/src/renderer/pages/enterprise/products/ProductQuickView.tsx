@@ -1,5 +1,5 @@
-import { Button, Tag } from '@arco-design/web-react';
 import { ArrowRight, BuildingFour, CloseSmall } from '@icon-park/react';
+import { Button, Tag } from 'antd';
 import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -81,7 +81,7 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
 
       <p className={styles.quickViewHint}>{t('enterprise.products.quickView.hint')}</p>
       <div className={styles.quickViewActions}>
-        <Button type='primary' long icon={<ArrowRight />} onClick={() => onViewDetails(product)}>
+        <Button type='primary' block icon={<ArrowRight />} onClick={() => onViewDetails(product)}>
           {t('enterprise.products.actions.viewDetails')}
         </Button>
         <Link className={styles.companyLink} to={`/enterprise/companies/${encodeURIComponent(product.companyId)}`}>

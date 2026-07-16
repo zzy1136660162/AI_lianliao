@@ -68,11 +68,11 @@
   box-shadow: var(--enterprise-shadow-card);
 }
 
-.filterForm :global(.arco-form-item) {
+.filterForm :global(.ll-ant-form-item) {
   margin: 0;
 }
 
-.filterForm :global(.arco-form-label-item) {
+.filterForm :global(.ll-ant-form-item-label > label) {
   color: var(--text-secondary);
   font-size: 11px;
 }
@@ -419,17 +419,17 @@
   gap: 14px;
 }
 
-.detailBody :global(.arco-card) {
+.detailBody :global(.ll-ant-card) {
   border-color: var(--border-base);
   border-radius: 2px;
   background: color-mix(in srgb, var(--bg-2) 86%, transparent);
 }
 
-.detailBody :global(.arco-card-header) {
+.detailBody :global(.ll-ant-card-head) {
   border-bottom-color: var(--border-light);
 }
 
-.detailBody :global(.arco-card-header-title) {
+.detailBody :global(.ll-ant-card-head-title) {
   font-family: var(--enterprise-font-ui);
   font-size: 15px;
 }
@@ -518,7 +518,7 @@
     flex-direction: column;
   }
 
-  .filterActions > :global(.arco-btn) {
+  .filterActions > :global(.ll-ant-btn) {
     flex: 1;
   }
 

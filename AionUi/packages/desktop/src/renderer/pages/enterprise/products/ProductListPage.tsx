@@ -1,11 +1,12 @@
-import { Button, Form, Input, Pagination, Tag } from '@arco-design/web-react';
 import { ArrowRight, Refresh, Search } from '@icon-park/react';
+import { Button, Form, Input, Pagination, Tag } from 'antd';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import type { EnterpriseProductSummary } from '@/common/enterprise/contracts';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
+import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
@@ -78,6 +79,7 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
   const catalog = useProductCatalog(client);
   const [draftFilters, setDraftFilters] = useState<ProductFilters>({});
   const [selectedProduct, setSelectedProduct] = useState<EnterpriseProductSummary | null>(null);
+  const { targetRef, scrollToTarget } = useEnterprisePaginationScroll<HTMLDivElement>();
 
   const viewDetails = (product: EnterpriseProductSummary) => {
     navigate(`/enterprise/products/${encodeURIComponent(product.productId)}`);
@@ -91,9 +93,10 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
     setSelectedProduct(null);
     catalog.applyFilters({});
   };
-  const changePage = (pageNum: number, pageSize?: number) => {
+  const changePage = (pageNum: number, pageSize: number) => {
     setSelectedProduct(null);
     catalog.changePage(pageNum, pageSize);
+    scrollToTarget();
   };
 
   const renderContent = () => {
@@ -121,7 +124,7 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
     }
     return (
       <div className={selectedProduct ? styles.catalogWithPreview : styles.catalog}>
-        <div className={styles.gridPanel}>
+        <div ref={targetRef} className={styles.gridPanel}>
           <div className={styles.productGrid} aria-live='polite' aria-busy={catalog.isLoading}>
             {catalog.data.list.map((product) => (
               <ProductCard
@@ -139,10 +142,9 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
               pageSize={catalog.query.pageSize}
               total={catalog.data.total}
               size='small'
-              showJumper
-              showTotal
-              sizeCanChange
-              sizeOptions={[10, 20, 50]}
+              showQuickJumper
+              showSizeChanger
+              pageSizeOptions={[10, 20, 50]}
               onChange={changePage}
             />
           </div>
@@ -159,7 +161,7 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
   };
 
   return (
-    <section className={styles.page} aria-labelledby='product-catalog-title'>
+    <section className={`enterprise-product-list ${styles.page}`} aria-labelledby='product-catalog-title'>
       <header className={styles.pageHeader}>
         <div>
           <span className={styles.eyebrow}>{t('enterprise.products.eyebrow')}</span>
@@ -169,14 +171,14 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
         <div className={styles.headerRule} aria-hidden='true' />
       </header>
 
-      <Form className={styles.filterForm} layout='vertical' onSubmit={submitFilters}>
+      <Form className={styles.filterForm} layout='vertical' onFinish={submitFilters}>
         {(['keyword', 'industry', 'province', 'city', 'district'] as const).map((field) => (
           <Form.Item key={field} label={t(`enterprise.products.filters.${field}Label`)}>
             <Input
               value={draftFilters[field]}
               allowClear
               placeholder={t(`enterprise.products.filters.${field}Placeholder`)}
-              onChange={(value) => setDraftFilters((current) => ({ ...current, [field]: value }))}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, [field]: event.target.value }))}
             />
           </Form.Item>
         ))}

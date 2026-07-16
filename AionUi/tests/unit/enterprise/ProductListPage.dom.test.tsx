@@ -1,10 +1,11 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 import type { EnterpriseResponse } from '@/common/enterprise/contracts';
+import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
 import ProductDetailPage, { DetailImage } from '@/renderer/pages/enterprise/products/ProductDetailPage';
 import ProductListPage from '@/renderer/pages/enterprise/products/ProductListPage';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
@@ -28,13 +29,29 @@ const createMatchMedia = (compact = false) =>
     ...(compact && query === '(max-width: 820px)' ? { matches: true } : {}),
   })) as typeof window.matchMedia;
 
+let animationFrameCallbacks: FrameRequestCallback[] = [];
+const requestAnimationFrameMock = vi.fn((callback: FrameRequestCallback) => {
+  animationFrameCallbacks.push(callback);
+  return animationFrameCallbacks.length;
+});
+const flushAnimationFrame = () => {
+  const callbacks = animationFrameCallbacks.splice(0);
+  callbacks.forEach((callback) => callback(0));
+};
+
 beforeAll(() => {
   window.matchMedia = createMatchMedia();
+  window.requestAnimationFrame = requestAnimationFrameMock;
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
     writable: true,
     value: vi.fn(),
   });
+});
+
+beforeEach(() => {
+  animationFrameCallbacks = [];
+  requestAnimationFrameMock.mockClear();
 });
 
 type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void };
@@ -87,13 +104,15 @@ const LocationProbe = () => {
 
 const renderList = (client: EnterpriseClient) =>
   render(
-    <MemoryRouter initialEntries={['/enterprise/products']}>
-      <Routes>
-        <Route path='/enterprise/products' element={<ProductListPage client={client} />} />
-        <Route path='/enterprise/products/:productId' element={<LocationProbe />} />
-        <Route path='/enterprise/companies/:companyId' element={<LocationProbe />} />
-      </Routes>
-    </MemoryRouter>
+    <EnterpriseAntdProvider>
+      <MemoryRouter initialEntries={['/enterprise/products']}>
+        <Routes>
+          <Route path='/enterprise/products' element={<ProductListPage client={client} />} />
+          <Route path='/enterprise/products/:productId' element={<LocationProbe />} />
+          <Route path='/enterprise/companies/:companyId' element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </EnterpriseAntdProvider>
   );
 
 const replaceInput = async (user: ReturnType<typeof userEvent.setup>, placeholder: string, value: string) => {
@@ -115,6 +134,8 @@ describe('product catalog interactions', () => {
     const { container } = renderList(createClient(request));
 
     expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
+    expect(container.querySelector('.enterprise-product-list .ll-ant-pagination')).toBeInTheDocument();
+    expect(container.querySelector('.enterprise-product-list [class*="arco-"]')).not.toBeInTheDocument();
     await replaceInput(user, 'enterprise.products.filters.keywordPlaceholder', ' pump ');
     await replaceInput(user, 'enterprise.products.filters.industryPlaceholder', ' Equipment ');
     await replaceInput(user, 'enterprise.products.filters.provincePlaceholder', ' Liaoning ');
@@ -150,22 +171,19 @@ describe('product catalog interactions', () => {
       .mockResolvedValueOnce(page('Page one pump', '9', 1, 45))
       .mockReturnValueOnce(stalePage.promise)
       .mockReturnValueOnce(pageTwo.promise);
-    const { container } = renderList(createClient(request));
+    renderList(createClient(request));
 
     const card = (await screen.findByRole('heading', { name: 'Page one pump' })).closest('article') as HTMLElement;
     fireEvent.click(within(card).getByRole('button', { name: 'enterprise.products.actions.quickPreview' }));
     expect(screen.getByRole('complementary', { name: 'enterprise.products.quickView.label' })).toBeVisible();
-    const pageTwoButton = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
-      (item) => item.textContent === '2'
-    );
-    fireEvent.click(pageTwoButton as HTMLElement);
+    fireEvent.click(screen.getByTitle('2'));
+    flushAnimationFrame();
     expect(screen.getByRole('heading', { name: 'Page one pump' })).toBeVisible();
     expect(screen.queryByRole('complementary', { name: 'enterprise.products.quickView.label' })).toBeNull();
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
 
-    const pageThreeButton = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
-      (item) => item.textContent === '3'
-    );
-    fireEvent.click(pageThreeButton as HTMLElement);
+    fireEvent.click(screen.getByTitle('3'));
+    flushAnimationFrame();
     await waitFor(() => expect(request).toHaveBeenCalledTimes(3));
     pageTwo.resolve(page('Latest page pump', '11', 3, 45));
     expect(await screen.findByRole('heading', { name: 'Latest page pump' })).toBeVisible();
@@ -268,12 +286,14 @@ describe('product detail', () => {
 
   const renderDetail = (client: EnterpriseClient, productId = '9') =>
     render(
-      <MemoryRouter initialEntries={[`/enterprise/products/${productId}`]}>
-        <Routes>
-          <Route path='/enterprise/products/:productId' element={<ProductDetailPage client={client} />} />
-          <Route path='/enterprise/companies/:companyId' element={<LocationProbe />} />
-        </Routes>
-      </MemoryRouter>
+      <EnterpriseAntdProvider>
+        <MemoryRouter initialEntries={[`/enterprise/products/${productId}`]}>
+          <Routes>
+            <Route path='/enterprise/products/:productId' element={<ProductDetailPage client={client} />} />
+            <Route path='/enterprise/companies/:companyId' element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </EnterpriseAntdProvider>
     );
 
   it('maps H5-backed fields as plain text and never offers dialing or unlocking', async () => {
@@ -298,6 +318,7 @@ describe('product detail', () => {
     expect(screen.getByText('Machinery')).toBeVisible();
     expect(screen.getByText('1380000****')).toBeVisible();
     expect(screen.getByText('<script>window.stolen=true</script>High pressure')).toBeVisible();
+    expect(container.querySelector('.ll-ant-card')).toBeInTheDocument();
     expect(container.querySelector('script')).toBeNull();
     expect(screen.getByRole('link', { name: 'Alpha Hydraulics' })).toHaveAttribute('href', '/enterprise/companies/42');
     expect(container.querySelector("a[href^='tel:']")).toBeNull();

@@ -1,5 +1,5 @@
-import { Button, Card, Tag } from '@arco-design/web-react';
 import { CubeFive, Left } from '@icon-park/react';
+import { Button, Card, Tag } from 'antd';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -94,7 +94,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
         </section>
 
         <div className={styles.detailColumns}>
-          <Card title={t('enterprise.productDetail.sections.profile')} bordered>
+          <Card title={t('enterprise.productDetail.sections.profile')} variant='outlined'>
             <dl className={styles.detailFacts}>
               <div>
                 <dt>{t('enterprise.products.fields.company')}</dt>
@@ -120,7 +120,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
               </div>
             </dl>
           </Card>
-          <Card title={t('enterprise.productDetail.sections.contact')} bordered>
+          <Card title={t('enterprise.productDetail.sections.contact')} variant='outlined'>
             <dl className={styles.detailFacts}>
               <div>
                 <dt>{t('enterprise.products.fields.contactName')}</dt>
@@ -134,7 +134,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
             <p className={styles.permissionNote}>{t('enterprise.productDetail.contactPermissionNote')}</p>
           </Card>
         </div>
-        <Card title={t('enterprise.productDetail.sections.summary')} bordered>
+        <Card title={t('enterprise.productDetail.sections.summary')} variant='outlined'>
           <p className={styles.plainText}>{product.summary || missing}</p>
         </Card>
       </div>
