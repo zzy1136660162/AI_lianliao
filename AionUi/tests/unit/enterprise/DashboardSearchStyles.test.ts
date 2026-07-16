@@ -9,6 +9,17 @@ const dashboardStyles = readFileSync(
 );
 
 describe('enterprise dashboard search styles', () => {
+  it('uses the shared bright card surface for the main dashboard panels', () => {
+    const searchAndRadarRule = dashboardStyles.match(/\.searchSection,\s*\.radarSection\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const identityAndQuickRule = dashboardStyles.match(/\.identityCard,\s*\.quickCard\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    [searchAndRadarRule, identityAndQuickRule].forEach((rule) => {
+      expect(rule).toMatch(/background:\s*var\(--enterprise-surface\)/);
+      expect(rule).toMatch(/border-radius:\s*var\(--enterprise-radius-card\)/);
+      expect(rule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-card\)/);
+    });
+  });
+
   it('keeps total search errors usable in narrow layouts', () => {
     expect(dashboardStyles).toMatch(/\.searchTotalError\s*\{[^}]*flex-wrap:\s*wrap;/s);
     expect(dashboardStyles).toMatch(

@@ -78,8 +78,10 @@
   position: relative;
   min-width: 0;
   padding: 18px;
-  border: 1px solid var(--border-base);
-  background: color-mix(in srgb, var(--bg-1) 95%, transparent);
+  background: var(--enterprise-surface);
+  border: 1px solid var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
 }
 
 .searchSection::before,
@@ -260,8 +262,10 @@
 .identityCard,
 .quickCard {
   min-width: 0;
-  border-radius: 0;
-  background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+  background: var(--enterprise-surface);
+  border: 1px solid var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
 }
 
 .cardHeading {
