@@ -213,15 +213,34 @@ describe('product catalog interactions', () => {
     expect(within(quickView).getByText('Alpha Hydraulics')).toBeVisible();
     expect(within(card).getByText('Equipment')).toBeVisible();
     expect(within(card).queryByText('Machinery')).toBeNull();
-    await user.click(within(quickView).getByRole('link', { name: 'enterprise.products.actions.viewCompany' }));
-    expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/42');
+    expect(within(quickView).queryByText(/enterprise\.products\.quickView\.index|0009/)).toBeNull();
+    expect(within(quickView).getByText('enterprise.products.quickView.title')).toBeVisible();
+    expect(within(quickView).getByText('enterprise.products.quickView.hint')).toBeVisible();
+    expect(within(quickView).getByRole('button', { name: 'enterprise.products.quickView.action' })).toBeVisible();
+
+    await user.click(within(quickView).getByRole('button', { name: 'enterprise.products.quickView.action' }));
+    expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/products/9');
 
     unmount();
-    renderList(createClient(request));
-    const secondCard = (await screen.findByRole('heading', { name: 'Industrial pump' })).closest(
+    const companyRender = renderList(createClient(request));
+    const companyCard = (await screen.findByRole('heading', { name: 'Industrial pump' })).closest(
       'article'
     ) as HTMLElement;
-    await user.click(within(secondCard).getByRole('button', { name: 'enterprise.products.actions.viewDetails' }));
+    await user.click(
+      within(companyCard).getByRole('button', {
+        name: 'enterprise.products.actions.quickPreview',
+      })
+    );
+    const companyQuickView = screen.getByRole('complementary', { name: 'enterprise.products.quickView.label' });
+    await user.click(within(companyQuickView).getByRole('link', { name: 'enterprise.products.actions.viewCompany' }));
+    expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/42');
+
+    companyRender.unmount();
+    renderList(createClient(request));
+    const detailCard = (await screen.findByRole('heading', { name: 'Industrial pump' })).closest(
+      'article'
+    ) as HTMLElement;
+    await user.click(within(detailCard).getByRole('button', { name: 'enterprise.products.actions.viewDetails' }));
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/products/9');
   });
 

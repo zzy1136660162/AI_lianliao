@@ -41,9 +41,6 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
       tabIndex={-1}
       aria-label={t('enterprise.products.quickView.label')}
     >
-      <div className={styles.quickViewIndex}>
-        {t('enterprise.products.quickView.index', { index: product.productId.slice(-4).padStart(4, '0') })}
-      </div>
       <Button
         className={styles.quickViewClose}
         type='text'
@@ -82,7 +79,7 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
       <p className={styles.quickViewHint}>{t('enterprise.products.quickView.hint')}</p>
       <div className={styles.quickViewActions}>
         <Button type='primary' block icon={<ArrowRight />} onClick={() => onViewDetails(product)}>
-          {t('enterprise.products.actions.viewDetails')}
+          {t('enterprise.products.quickView.action')}
         </Button>
         <Link className={styles.companyLink} to={`/enterprise/companies/${encodeURIComponent(product.companyId)}`}>
           <BuildingFour aria-hidden='true' />
