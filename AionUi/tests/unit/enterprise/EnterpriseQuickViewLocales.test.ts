@@ -7,7 +7,6 @@ const LOCALES = ['de-DE', 'en-US', 'ja-JP', 'ko-KR', 'pt-BR', 'ru-RU', 'tr-TR', 
 
 type QuickViewCopy = {
   label: string;
-  index?: string;
   title: string;
   hint: string;
   action?: string;
@@ -71,5 +70,8 @@ describe('enterprise quick-view locale copy', () => {
     expect(messages.companies.quickView).toMatchObject(expected.companies);
     expect(messages.products.quickView).toMatchObject(expected.products);
     expect(messages.projects.quickView).toMatchObject(expected.projects);
+    expect(messages.companies.quickView).not.toHaveProperty('index');
+    expect(messages.products.quickView).not.toHaveProperty('index');
+    expect(messages.projects.quickView).not.toHaveProperty('index');
   });
 });

@@ -261,7 +261,6 @@
     },
     "quickView": {
       "label": "Company overview",
-      "index": "Company / {{index}}",
       "title": "Company overview",
       "hint": "Open the full company profile to learn more about the business, related products, and available contact details.",
       "action": "Open company profile"
@@ -355,7 +354,6 @@
     },
     "quickView": {
       "label": "Product overview",
-      "index": "Product / {{index}}",
       "title": "Product overview",
       "hint": "Open the full product profile to review product information, its company, and available contact details.",
       "action": "Open product profile"
@@ -473,7 +471,6 @@
     },
     "quickView": {
       "label": "Project overview",
-      "index": "Project / {{index}}",
       "title": "Project overview",
       "hint": "Open the full project profile to review the construction unit, procurement needs, and contact-access status.",
       "action": "Open project profile"
