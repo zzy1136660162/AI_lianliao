@@ -37,7 +37,7 @@ describe('enterprise visual theme contract', () => {
     expect(themeCss).not.toMatch(/(?:^|\n)\s*(?:html|body|:root)\s*\{/);
   });
 
-  it('pins shared and Arco variables to the enterprise light palette', () => {
+  it('pins shared and Ant variables to the enterprise light palette', () => {
     const enterpriseScope = themeCss.match(/\.enterprise-shell,\s*\.enterprise-login\s*\{([^}]*)\}/s)?.[1] ?? '';
 
     expect(enterpriseScope).toMatch(/--bg-base:\s*var\(--enterprise-page-bg\)/);
@@ -48,10 +48,10 @@ describe('enterprise visual theme contract', () => {
     expect(enterpriseScope).toMatch(/--text-secondary:\s*var\(--enterprise-text-secondary\)/);
     expect(enterpriseScope).toMatch(/--border-base:\s*var\(--enterprise-border\)/);
     expect(enterpriseScope).toMatch(/--primary:\s*var\(--enterprise-primary\)/);
-    expect(enterpriseScope).toMatch(/--color-text-1:\s*var\(--enterprise-text-primary\)/);
-    expect(enterpriseScope).toMatch(/--color-bg-1:\s*var\(--enterprise-surface\)/);
-    expect(enterpriseScope).toMatch(/--color-fill-1:\s*var\(--enterprise-surface-soft\)/);
-    expect(enterpriseScope).toMatch(/--color-border-2:\s*var\(--enterprise-border\)/);
+    expect(enterpriseScope).toMatch(/--ll-ant-font-family:\s*var\(--enterprise-font-ui\)/);
+    expect(enterpriseScope).not.toMatch(/--color-(?:bg|text|fill|border|primary)/);
+    expect(themeCss).toMatch(/\.enterprise-shell\s+:where\([^)]*\.ll-ant-btn[^)]*\.ll-ant-table[^)]*\)/s);
+    expect(themeCss).toMatch(/\.enterprise-login\s+:where\([^)]*\.ll-ant-btn[^)]*\.ll-ant-alert[^)]*\)/s);
   });
 
   it.each(enterprisePageStyles)('uses the shared enterprise typeface in %s', (stylePath) => {
