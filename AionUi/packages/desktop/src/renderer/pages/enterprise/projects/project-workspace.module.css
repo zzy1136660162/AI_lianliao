@@ -68,8 +68,10 @@
   gap: 10px;
   align-items: end;
   padding: 14px;
-  border: 1px solid var(--border-base);
-  background: color-mix(in srgb, var(--bg-2) 92%, transparent);
+  background: var(--enterprise-surface);
+  border: 1px solid var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
 }
 
 .filterForm :global(.arco-form-item) {
@@ -100,16 +102,21 @@
 .workspace > :global(.enterprise-page-state),
 .detailContent > :global(.enterprise-page-state) {
   min-height: min(430px, calc(100vh - 320px));
-  border: 1px solid var(--border-base);
-  background: var(--bg-1);
+  background: var(--enterprise-surface);
+  border: 1px solid var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
 }
 
 .dashboard,
 .catalogSection,
 .detailContent {
   min-width: 0;
-  border: 1px solid var(--border-base);
-  background: color-mix(in srgb, var(--bg-1) 95%, transparent);
+  overflow: hidden;
+  background: var(--enterprise-surface);
+  border: 1px solid var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
 }
 
 .dashboard,
