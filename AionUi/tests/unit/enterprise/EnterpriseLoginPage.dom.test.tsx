@@ -92,7 +92,7 @@ describe('EnterpriseLoginPage', () => {
       },
       remainingSeconds: 65,
     });
-    render(<EnterpriseLoginPage />);
+    const { container } = render(<EnterpriseLoginPage />);
 
     expect(screen.getByRole('img', { name: translations['enterprise.login.qrAlt'] })).toHaveAttribute(
       'src',
@@ -101,6 +101,7 @@ describe('EnterpriseLoginPage', () => {
     expect(screen.getByText('01:05')).toBeVisible();
     expect(screen.getByText('01:05').closest('[aria-live]')).toBeNull();
     expect(screen.getByText(translations['enterprise.login.autoChecking'])).toBeVisible();
+    expect(container.querySelector('.enterprise-login__blueprint')).not.toBeInTheDocument();
   });
 
   it('maps every stable IPC error code to an explicit translation key', () => {

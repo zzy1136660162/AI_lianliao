@@ -37,4 +37,19 @@ describe('enterprise login theme contract', () => {
       expect(darkDefinitions, `${token} must exist in the dark theme`).toContain(token);
     }
   });
+
+  it('uses the bright enterprise surface and shared card treatment without a blueprint layer', () => {
+    const loginCss = readFileSync(LOGIN_CSS_PATH, 'utf8');
+    const rootRule = loginCss.match(/\.enterprise-login\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const stageRule =
+      [...loginCss.matchAll(/\.enterprise-login__stage-card\s*\{([^}]*)\}/gs)]
+        .map((match) => match[1])
+        .find((rule) => rule.includes('align-self')) ?? '';
+
+    expect(rootRule).toMatch(/background:\s*var\(--enterprise-page-bg\)/);
+    expect(stageRule).toMatch(/background:\s*var\(--enterprise-surface\)\s*!important/);
+    expect(stageRule).toMatch(/border-radius:\s*var\(--enterprise-radius-card\)\s*!important/);
+    expect(stageRule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-card\)/);
+    expect(loginCss).not.toContain('.enterprise-login__blueprint');
+  });
 });

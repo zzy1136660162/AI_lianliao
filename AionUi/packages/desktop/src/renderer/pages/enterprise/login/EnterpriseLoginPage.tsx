@@ -148,7 +148,6 @@ const EnterpriseLoginPage: React.FC = () => {
 
   return (
     <main className='enterprise-login'>
-      <div className='enterprise-login__blueprint' aria-hidden='true' />
       <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
       <section className='enterprise-login__story' aria-labelledby='enterprise-login-brand-title'>
         <div className='enterprise-login__brand-mark' aria-hidden='true'>
