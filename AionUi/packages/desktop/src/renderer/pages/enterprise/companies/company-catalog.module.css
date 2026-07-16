@@ -36,8 +36,7 @@
   line-height: 1.65;
 }
 
-.eyebrow,
-.quickViewIndex {
+.eyebrow {
   color: var(--primary);
   font-family: var(--enterprise-font-ui);
   font-size: 10px;
@@ -211,7 +210,8 @@
 }
 
 .quickViewHeading {
-  margin: 30px 0 22px;
+  margin: 0 0 22px;
+  padding-right: 32px;
 }
 
 .quickViewHeading > span {

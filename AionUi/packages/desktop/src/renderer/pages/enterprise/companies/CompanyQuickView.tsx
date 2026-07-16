@@ -24,11 +24,6 @@ const CompanyQuickView: React.FC<CompanyQuickViewProps> = ({ company, onClose, o
 
   return (
     <aside className={styles.quickView} role='complementary' aria-label={t('enterprise.companies.quickView.label')}>
-      <div className={styles.quickViewIndex}>
-        {t('enterprise.companies.quickView.index', {
-          index: company.companyId.slice(-4).padStart(4, '0'),
-        })}
-      </div>
       <Button
         className={styles.quickViewClose}
         type='text'
@@ -60,7 +55,7 @@ const CompanyQuickView: React.FC<CompanyQuickViewProps> = ({ company, onClose, o
 
       <p className={styles.quickViewHint}>{t('enterprise.companies.quickView.hint')}</p>
       <Button type='primary' block icon={<ArrowRight />} onClick={() => onViewDetails(company)}>
-        {t('enterprise.companies.actions.viewDetails')}
+        {t('enterprise.companies.quickView.action')}
       </Button>
     </aside>
   );
