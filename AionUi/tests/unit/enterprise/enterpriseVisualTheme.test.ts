@@ -37,6 +37,23 @@ describe('enterprise visual theme contract', () => {
     expect(themeCss).not.toMatch(/(?:^|\n)\s*(?:html|body|:root)\s*\{/);
   });
 
+  it('pins shared and Arco variables to the enterprise light palette', () => {
+    const enterpriseScope = themeCss.match(/\.enterprise-shell,\s*\.enterprise-login\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(enterpriseScope).toMatch(/--bg-base:\s*var\(--enterprise-page-bg\)/);
+    expect(enterpriseScope).toMatch(/--bg-1:\s*var\(--enterprise-surface\)/);
+    expect(enterpriseScope).toMatch(/--bg-2:\s*var\(--enterprise-surface-soft\)/);
+    expect(enterpriseScope).toMatch(/--bg-hover:\s*var\(--enterprise-primary-soft\)/);
+    expect(enterpriseScope).toMatch(/--text-primary:\s*var\(--enterprise-text-primary\)/);
+    expect(enterpriseScope).toMatch(/--text-secondary:\s*var\(--enterprise-text-secondary\)/);
+    expect(enterpriseScope).toMatch(/--border-base:\s*var\(--enterprise-border\)/);
+    expect(enterpriseScope).toMatch(/--primary:\s*var\(--enterprise-primary\)/);
+    expect(enterpriseScope).toMatch(/--color-text-1:\s*var\(--enterprise-text-primary\)/);
+    expect(enterpriseScope).toMatch(/--color-bg-1:\s*var\(--enterprise-surface\)/);
+    expect(enterpriseScope).toMatch(/--color-fill-1:\s*var\(--enterprise-surface-soft\)/);
+    expect(enterpriseScope).toMatch(/--color-border-2:\s*var\(--enterprise-border\)/);
+  });
+
   it.each(enterprisePageStyles)('uses the shared enterprise typeface in %s', (stylePath) => {
     const css = readFileSync(resolve(stylePath), 'utf8');
 

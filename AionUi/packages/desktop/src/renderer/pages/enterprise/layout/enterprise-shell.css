@@ -303,7 +303,7 @@
   min-height: 0;
   overflow: auto;
   padding: clamp(20px, 3vw, 38px);
-  background: var(--enterprise-surface);
+  background: var(--enterprise-page-bg);
 }
 
 .enterprise-assistant {
@@ -455,6 +455,14 @@
   .enterprise-sider__nav-group {
     min-width: max-content;
     flex: 0 0 auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .enterprise-sider__nav-group-label {
+    display: none;
   }
 
   .enterprise-sider__nav-group-items {

@@ -10,11 +10,56 @@
   --enterprise-primary-soft: #eaf3ff;
   --enterprise-text-primary: #102a43;
   --enterprise-text-secondary: #6b7f93;
+  --enterprise-text-disabled: #9aabba;
+  --enterprise-border-soft: #eaf1f8;
   --enterprise-radius-card: 15px;
   --enterprise-radius-control: 10px;
   --enterprise-shadow-card: 0 8px 24px rgba(36, 92, 145, 0.08);
   --enterprise-shadow-hover: 0 12px 30px rgba(36, 92, 145, 0.13);
   --enterprise-content-gap: 14px;
+
+  /*
+   * Enterprise pages intentionally stay bright even when the AI workspace uses
+   * the dark application theme. Map the shared aliases locally so legacy page
+   * rules and inline Arco controls cannot inherit dark text or surface colors.
+   */
+  --bg-base: var(--enterprise-page-bg);
+  --bg-1: var(--enterprise-surface);
+  --bg-2: var(--enterprise-surface-soft);
+  --bg-3: var(--enterprise-border);
+  --bg-hover: var(--enterprise-primary-soft);
+  --bg-active: #dceaff;
+  --text-primary: var(--enterprise-text-primary);
+  --text-secondary: var(--enterprise-text-secondary);
+  --text-disabled: var(--enterprise-text-disabled);
+  --border-base: var(--enterprise-border);
+  --border-light: var(--enterprise-border-soft);
+  --primary: var(--enterprise-primary);
+  --fill: var(--enterprise-surface-soft);
+  --fill-0: var(--enterprise-surface);
+  --dialog-fill-0: var(--enterprise-surface);
+  --fill-white-to-black: var(--enterprise-surface);
+  --text-0: var(--enterprise-text-primary);
+
+  /* Arco Design aliases used by forms, cards and loading/error states. */
+  --color-bg-1: var(--enterprise-surface);
+  --color-bg-2: var(--enterprise-surface-soft);
+  --color-bg-3: var(--enterprise-border-soft);
+  --color-bg-popup: var(--enterprise-surface);
+  --color-text-1: var(--enterprise-text-primary);
+  --color-text-2: #435b72;
+  --color-text-3: var(--enterprise-text-secondary);
+  --color-text-4: var(--enterprise-text-disabled);
+  --color-fill-1: var(--enterprise-surface-soft);
+  --color-fill-2: #f0f6fd;
+  --color-fill-3: #e7f0fa;
+  --color-fill-4: #dce8f5;
+  --color-border-1: var(--enterprise-border-soft);
+  --color-border-2: var(--enterprise-border);
+  --color-border-3: #c8daec;
+  --color-border-4: #abc6e1;
+  --color-primary-6: var(--enterprise-primary);
+  --color-primary-light-1: var(--enterprise-primary-soft);
 
   color: var(--enterprise-text-primary);
   font-family: var(--enterprise-font-ui);

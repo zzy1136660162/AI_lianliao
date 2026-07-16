@@ -21,6 +21,7 @@ describe('enterprise desktop shell CSS contract', () => {
     const mainRule = css.match(/\.enterprise-shell__main\s*\{([^}]*)\}/s)?.[1] ?? '';
 
     expect(mainRule).toMatch(/overflow:\s*auto/);
+    expect(mainRule).toMatch(/background:\s*var\(--enterprise-page-bg\)/);
   });
 
   it('keeps navigation and assistant content independently scrollable in short windows', () => {
@@ -83,6 +84,17 @@ describe('enterprise compact shell CSS contract', () => {
     expect(compactCss).not.toMatch(/\.enterprise-sider__identity\s*\{[^}]*display:\s*none/s);
     expect(compactCss).not.toMatch(/\.enterprise-header__assistant-toggle\s*\{[^}]*display:\s*none/s);
     expect(compactCss).not.toMatch(/\.enterprise-assistant[^,{]*[,{][^}]*display:\s*none/s);
+  });
+
+  it('reduces navigation group chrome so long localized labels do not widen compact navigation', () => {
+    const groupRule = compactCss.match(/\.enterprise-sider__nav-group\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const labelRule = compactCss.match(/\.enterprise-sider__nav-group-label\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(groupRule).toMatch(/padding:\s*0/);
+    expect(groupRule).toMatch(/border:\s*0/);
+    expect(groupRule).toMatch(/border-radius:\s*0/);
+    expect(groupRule).toMatch(/box-shadow:\s*none/);
+    expect(labelRule).toMatch(/display:\s*none/);
   });
 
   it('keeps compact assistant transitions covered by reduced-motion rules', () => {
