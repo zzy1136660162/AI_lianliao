@@ -175,6 +175,8 @@ describe('enterprise desktop routing', () => {
     });
 
     expect(container.querySelectorAll('.enterprise-sider__nav-group')).toHaveLength(3);
+    expect(container.querySelector('.enterprise-shell .ll-ant-btn')).toBeInTheDocument();
+    expect(container.querySelector('.enterprise-shell .arco-btn')).not.toBeInTheDocument();
     ['overview', 'resources', 'collaboration'].forEach((group) => {
       expect(within(navigation).getByText(`enterprise.navigationGroups.${group}`)).toBeVisible();
     });

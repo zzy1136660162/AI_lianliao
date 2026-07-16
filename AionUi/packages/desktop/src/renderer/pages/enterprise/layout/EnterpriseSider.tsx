@@ -9,7 +9,7 @@ import {
   SettingTwo,
   Star,
 } from '@icon-park/react';
-import { Button } from '@arco-design/web-react';
+import { Button } from 'antd';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate } from 'react-router-dom';

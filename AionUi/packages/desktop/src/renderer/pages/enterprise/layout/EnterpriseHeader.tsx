@@ -1,5 +1,5 @@
 import { Left, Right } from '@icon-park/react';
-import { Button } from '@arco-design/web-react';
+import { Button } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';

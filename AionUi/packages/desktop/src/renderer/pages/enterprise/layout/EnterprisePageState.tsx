@@ -1,4 +1,4 @@
-import { Alert, Button, Empty, Spin } from '@arco-design/web-react';
+import { Alert, Button, Empty, Spin } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,7 +21,7 @@ const EnterprisePageState: React.FC<EnterprisePageStateProps> = ({ state, title,
   if (state === 'loading') {
     return (
       <section className='enterprise-page-state enterprise-page-state--loading' role='status' aria-label={title}>
-        <Spin dot />
+        <Spin size='large' />
         <p>{title}</p>
       </section>
     );
@@ -30,7 +30,7 @@ const EnterprisePageState: React.FC<EnterprisePageStateProps> = ({ state, title,
   if (state === 'error') {
     return (
       <section className='enterprise-page-state enterprise-page-state--error'>
-        <Alert type='error' showIcon title={title} content={description} />
+        <Alert type='error' showIcon title={title} description={description} />
         {onRetry ? (
           <Button type='primary' onClick={onRetry}>
             {t('enterprise.actions.retry')}
