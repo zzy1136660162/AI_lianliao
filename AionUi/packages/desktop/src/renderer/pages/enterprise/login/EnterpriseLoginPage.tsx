@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import type { EnterpriseIpcErrorCode } from '@/common/enterprise/contracts';
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 import type { I18nKey } from '@/renderer/services/i18n';
+import EnterpriseAntdProvider from '../layout/EnterpriseAntdProvider';
 import EnterpriseWindowChrome from '../layout/EnterpriseWindowChrome';
 import EnterpriseRegistrationPanel from './EnterpriseRegistrationPanel';
 import './enterprise-login.css';
@@ -147,38 +148,40 @@ const EnterpriseLoginPage: React.FC = () => {
   };
 
   return (
-    <main className='enterprise-login'>
-      <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
-      <section className='enterprise-login__story' aria-labelledby='enterprise-login-brand-title'>
-        <div className='enterprise-login__brand-mark' aria-hidden='true'>
-          <BuildingFour size={29} />
-        </div>
-        <p className='enterprise-login__brand-eyebrow'>{t('enterprise.brand.eyebrow')}</p>
-        <h1 id='enterprise-login-brand-title'>{t('enterprise.brand.title')}</h1>
-        <p className='enterprise-login__brand-description'>{t('enterprise.brand.description')}</p>
+    <EnterpriseAntdProvider>
+      <main className='enterprise-login'>
+        <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
+        <section className='enterprise-login__story' aria-labelledby='enterprise-login-brand-title'>
+          <div className='enterprise-login__brand-mark' aria-hidden='true'>
+            <BuildingFour size={29} />
+          </div>
+          <p className='enterprise-login__brand-eyebrow'>{t('enterprise.brand.eyebrow')}</p>
+          <h1 id='enterprise-login-brand-title'>{t('enterprise.brand.title')}</h1>
+          <p className='enterprise-login__brand-description'>{t('enterprise.brand.description')}</p>
 
-        <ol className='enterprise-login__steps'>
-          {(['scan', 'identify', 'work'] as const).map((step, index) => (
-            <li key={step}>
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <div>
-                <strong>{t(`enterprise.steps.${step}.title`)}</strong>
-                <p>{t(`enterprise.steps.${step}.description`)}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+          <ol className='enterprise-login__steps'>
+            {(['scan', 'identify', 'work'] as const).map((step, index) => (
+              <li key={step}>
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <div>
+                  <strong>{t(`enterprise.steps.${step}.title`)}</strong>
+                  <p>{t(`enterprise.steps.${step}.description`)}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
 
-        <div className='enterprise-login__security-note'>
-          <Shield size={18} />
-          <span>{t('enterprise.brand.security')}</span>
-        </div>
-      </section>
+          <div className='enterprise-login__security-note'>
+            <Shield size={18} />
+            <span>{t('enterprise.brand.security')}</span>
+          </div>
+        </section>
 
-      <Card className='enterprise-login__stage-card' bordered>
-        {renderStage()}
-      </Card>
-    </main>
+        <Card className='enterprise-login__stage-card' bordered>
+          {renderStage()}
+        </Card>
+      </main>
+    </EnterpriseAntdProvider>
   );
 };
 

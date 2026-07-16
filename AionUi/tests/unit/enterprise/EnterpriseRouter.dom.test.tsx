@@ -14,7 +14,9 @@ const routerMocks = vi.hoisted(() => ({
   logout: vi.fn<EnterpriseAuthContextValue['logout']>(async () => true),
 }));
 
-const ROUTE_WAIT_OPTIONS = { timeout: 5_000 } as const;
+// Ant Design's CSS-in-JS modules make the first lazy enterprise chunk slower to
+// transform in Vitest than the already-running application route transition.
+const ROUTE_WAIT_OPTIONS = { timeout: 15_000 } as const;
 
 beforeAll(() => {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
