@@ -178,6 +178,13 @@ describe('enterprise desktop routing', () => {
     });
   });
 
+  it('does not render the legacy blueprint decoration in the bright workspace shell', async () => {
+    const { container } = renderAt('/enterprise/dashboard');
+
+    await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, ROUTE_WAIT_OPTIONS);
+    expect(container.querySelector('.enterprise-shell__blueprint')).not.toBeInTheDocument();
+  });
+
   it('clears the enterprise session and returns to enterprise login', async () => {
     routerMocks.logout.mockImplementationOnce(async () => {
       routerMocks.enterpriseStatus = 'unauthenticated';

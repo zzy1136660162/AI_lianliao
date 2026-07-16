@@ -21,7 +21,6 @@ const EnterpriseShell: React.FC = () => {
 
   return (
     <div className={`enterprise-shell${assistantOpen ? '' : ' enterprise-shell--assistant-closed'}`}>
-      <div className='enterprise-shell__blueprint' aria-hidden='true' />
       <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
       <EnterpriseSider />
       <div className='enterprise-shell__workspace'>

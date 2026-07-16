@@ -38,6 +38,26 @@ describe('enterprise desktop shell CSS contract', () => {
     expect(groupRule).toMatch(/border-radius:\s*var\(--enterprise-radius-card\)/);
     expect(groupRule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-card\)/);
   });
+
+  it('uses the bright page background and independent white shell cards', () => {
+    const shellRule = css.match(/\.enterprise-shell\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const siderRule =
+      [...css.matchAll(/\.enterprise-sider\s*\{([^}]*)\}/gs)]
+        .map((match) => match[1])
+        .find((rule) => rule.includes('background')) ?? '';
+    const workspaceRule =
+      [...css.matchAll(/\.enterprise-shell__workspace\s*\{([^}]*)\}/gs)]
+        .map((match) => match[1])
+        .find((rule) => rule.includes('background')) ?? '';
+
+    expect(shellRule).toMatch(/background:\s*var\(--enterprise-page-bg\)/);
+    [siderRule, workspaceRule].forEach((rule) => {
+      expect(rule).toMatch(/background:\s*var\(--enterprise-surface\)/);
+      expect(rule).toMatch(/border-radius:\s*var\(--enterprise-radius-card\)/);
+      expect(rule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-card\)/);
+    });
+    expect(css).not.toContain('.enterprise-shell__blueprint');
+  });
 });
 
 describe('enterprise compact shell CSS contract', () => {
