@@ -371,23 +371,23 @@
   border: 1px solid var(--border-light);
 }
 
-.radarMetrics > :global(.arco-statistic) {
+.radarMetrics > :global(.ll-ant-statistic) {
   min-width: 0;
   padding: 14px;
   border-right: 1px solid var(--border-light);
 }
 
-.radarMetrics > :global(.arco-statistic:last-child) {
+.radarMetrics > :global(.ll-ant-statistic:last-child) {
   border-right: 0;
 }
 
-.radarMetrics :global(.arco-statistic-title) {
+.radarMetrics :global(.ll-ant-statistic-title) {
   min-height: 30px;
   color: var(--text-secondary);
   font-size: 10px;
 }
 
-.radarMetrics :global(.arco-statistic-value) {
+.radarMetrics :global(.ll-ant-statistic-content) {
   color: var(--text-primary);
   font-family: var(--enterprise-font-ui);
   font-size: 24px;
@@ -412,55 +412,49 @@
   font-size: 12px;
 }
 
-.radarDistributions ol {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.chartFrame,
+.categoryChartFrame {
+  position: relative;
+  width: 100%;
+  min-width: 0;
 }
 
-.radarDistributions li > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 4px;
-  font-size: 11px;
+.chartFrame {
+  height: 220px;
 }
 
-.radarDistributions strong {
-  font-family: var(--enterprise-font-ui);
+.categoryChartFrame {
+  height: 240px;
 }
 
-.radarDistributions :global(.arco-progress-line-bar) {
-  background: var(--primary);
-}
-
-.radarDistributions section > p,
-.radarCategories small {
-  color: var(--text-secondary);
-  font-size: 11px;
+.chartFrame :global(.enterprise-chart),
+.categoryChartFrame :global(.enterprise-chart) {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
 }
 
 .radarCategories {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
   margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border-light);
+  padding: 14px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-2);
 }
 
-.radarCategories > span {
-  flex: 0 0 auto;
-  color: var(--text-secondary);
-  font-size: 11px;
+.radarCategories h3 {
+  margin: 0 0 12px;
+  font-size: 12px;
 }
 
-.radarCategories > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+:global(.enterprise-chart__data) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .page a:focus-visible,
@@ -480,11 +474,11 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .radarMetrics > :global(.arco-statistic:nth-child(2)) {
+  .radarMetrics > :global(.ll-ant-statistic:nth-child(2)) {
     border-right: 0;
   }
 
-  .radarMetrics > :global(.arco-statistic:nth-child(-n + 2)) {
+  .radarMetrics > :global(.ll-ant-statistic:nth-child(-n + 2)) {
     border-bottom: 1px solid var(--border-light);
   }
 }
@@ -523,21 +517,13 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .radarMetrics > :global(.arco-statistic) {
+  .radarMetrics > :global(.ll-ant-statistic) {
     border-right: 0;
     border-bottom: 1px solid var(--border-light);
   }
 
-  .radarMetrics > :global(.arco-statistic:last-child) {
+  .radarMetrics > :global(.ll-ant-statistic:last-child) {
     border-bottom: 0;
-  }
-
-  .radarCategories {
-    display: block;
-  }
-
-  .radarCategories > div {
-    margin-top: 8px;
   }
 }
 

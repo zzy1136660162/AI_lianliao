@@ -1,10 +1,15 @@
-import { Card, Progress, Statistic, Tag } from '@arco-design/web-react';
 import { ArrowRight, Box, BuildingFour, ChartHistogram, EngineeringBrand, RadarChart, User } from '@icon-park/react';
-import React from 'react';
+import { Card, Empty, Statistic } from 'antd';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
+import EnterpriseChart from '@/renderer/pages/enterprise/charts/EnterpriseChart';
+import {
+  buildCategoryComparisonOption,
+  buildDistributionBarOption,
+} from '@/renderer/pages/enterprise/charts/projectChartOptions';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import { useProjectDashboard } from '@/renderer/pages/enterprise/projects/projectData';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
@@ -26,6 +31,15 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
   const { t } = useTranslation();
   const { user } = useEnterpriseAuth();
   const radar = useProjectDashboard(client);
+  const reducedMotion = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, []);
+  const radarCharts = useMemo(() => {
+    if (!radar.data) return null;
+    return {
+      region: buildDistributionBarOption(radar.data.dashboard.regionDistribution, reducedMotion),
+      material: buildDistributionBarOption(radar.data.dashboard.materialTop, reducedMotion),
+      category: buildCategoryComparisonOption(radar.data.drillItems, reducedMotion),
+    };
+  }, [radar.data, reducedMotion]);
 
   const renderRadar = () => {
     if (radar.errorCode) {
@@ -43,16 +57,20 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
     }
 
     const { dashboard, drillItems } = radar.data;
+    const emptyDistribution = t('enterprise.projects.dashboard.distributionEmpty');
+    const emptyCategory = t('enterprise.projects.dashboard.categoryEmpty');
     const distributions = [
       {
         key: 'regions',
         title: t('enterprise.projects.dashboard.regionTitle'),
         items: dashboard.regionDistribution,
+        option: radarCharts?.region ?? null,
       },
       {
         key: 'materials',
         title: t('enterprise.projects.dashboard.materialTitle'),
         items: dashboard.materialTop,
+        option: radarCharts?.material ?? null,
       },
     ];
     return (
@@ -80,43 +98,37 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
           />
         </div>
         <div className={styles.radarDistributions}>
-          {distributions.map(({ key, title, items }) => {
-            const maximum = Math.max(0, ...items.map((item) => item.value));
-            return (
-              <section key={key} aria-label={title}>
-                <h3>{title}</h3>
-                {items.length ? (
-                  <ol>
-                    {items.slice(0, 4).map((item) => (
-                      <li key={`${item.label}-${item.dimension ?? ''}`}>
-                        <div>
-                          <span>{item.label}</span>
-                          <strong>{item.value}</strong>
-                        </div>
-                        <Progress
-                          percent={maximum === 0 ? 0 : (item.value / maximum) * 100}
-                          showText={false}
-                          size='small'
-                        />
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p>{t('enterprise.projects.dashboard.distributionEmpty')}</p>
-                )}
-              </section>
-            );
-          })}
+          {distributions.map(({ key, title, items, option }) => (
+            <section key={key} aria-label={title}>
+              <h3>{title}</h3>
+              {option ? (
+                <div className={styles.chartFrame}>
+                  <EnterpriseChart ariaLabel={title} option={option} rows={items} fallback={emptyDistribution} />
+                </div>
+              ) : (
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyDistribution} />
+              )}
+            </section>
+          ))}
         </div>
-        <div className={styles.radarCategories}>
-          <span>{t('enterprise.projects.dashboard.categoryTitle')}</span>
-          <div>
-            {drillItems.slice(0, 5).map((item) => (
-              <Tag key={`${item.dimension}-${item.label}`}>{item.label}</Tag>
-            ))}
-            {!drillItems.length ? <small>{t('enterprise.projects.dashboard.categoryEmpty')}</small> : null}
-          </div>
-        </div>
+        <section className={styles.radarCategories} aria-label={t('enterprise.projects.dashboard.categoryTitle')}>
+          <h3>{t('enterprise.projects.dashboard.categoryTitle')}</h3>
+          {radarCharts?.category ? (
+            <div className={styles.categoryChartFrame}>
+              <EnterpriseChart
+                ariaLabel={t('enterprise.projects.dashboard.categoryTitle')}
+                option={radarCharts.category}
+                rows={drillItems.map((item) => ({
+                  label: item.label,
+                  value: `${item.projectCount} / ${item.materialNameCount ?? 0}`,
+                }))}
+                fallback={emptyCategory}
+              />
+            </div>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyCategory} />
+          )}
+        </section>
       </div>
     );
   };
@@ -137,7 +149,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
       <GlobalSearch client={client} />
 
       <div className={styles.overviewGrid}>
-        <Card className={styles.identityCard} bordered>
+        <Card className={styles.identityCard} variant='outlined'>
           <div className={styles.cardHeading}>
             <span>{t('enterprise.dashboard.identity.index')}</span>
             <User aria-hidden='true' />
@@ -163,7 +175,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
           </dl>
         </Card>
 
-        <Card className={styles.quickCard} bordered>
+        <Card className={styles.quickCard} variant='outlined'>
           <div className={styles.cardHeading}>
             <span>{t('enterprise.dashboard.quick.index')}</span>
             <ChartHistogram aria-hidden='true' />

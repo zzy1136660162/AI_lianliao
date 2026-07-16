@@ -9,6 +9,16 @@ import DashboardPage from '@/renderer/pages/enterprise/dashboard/DashboardPage';
 import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
+const chartMocks = vi.hoisted(() => ({
+  init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+  use: vi.fn(),
+}));
+
+vi.mock('echarts/core', () => ({ init: chartMocks.init, use: chartMocks.use }));
+vi.mock('echarts/charts', () => ({ BarChart: {} }));
+vi.mock('echarts/components', () => ({ GridComponent: {}, LegendComponent: {}, TooltipComponent: {} }));
+vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }));
+
 const authUser: EnterpriseUserContext = {
   registered: true,
   openId: 'openid-must-never-appear',
@@ -190,6 +200,9 @@ describe('enterprise dashboard', () => {
     expect(container.querySelector('.ll-ant-select-auto-complete')).toBeInTheDocument();
     expect(screen.getByText('Chen Wei')).toBeVisible();
     expect(await screen.findByText('128')).toBeVisible();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.regionTitle' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.materialTitle' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeVisible();
     expect(screen.getByText('Shenyang')).toBeVisible();
     expect(screen.getByText('Industrial pumps')).toBeVisible();
     expect(container).not.toHaveTextContent('openid-must-never-appear');

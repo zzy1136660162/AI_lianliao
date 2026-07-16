@@ -1,38 +1,36 @@
-import { Card, Progress, Statistic } from 'antd';
-import React from 'react';
+import { Card, Empty, Statistic } from 'antd';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { EnterpriseDashboardDistributionItem } from '@/common/enterprise/contracts';
+import EnterpriseChart from '@/renderer/pages/enterprise/charts/EnterpriseChart';
+import {
+  buildCategoryComparisonOption,
+  buildDistributionBarOption,
+} from '@/renderer/pages/enterprise/charts/projectChartOptions';
 
 import type { ProjectDashboardBundle } from './projectData';
 import styles from './project-workspace.module.css';
 
 export type ProjectDashboardProps = { data: ProjectDashboardBundle };
 
-const DistributionList: React.FC<{
-  items: EnterpriseDashboardDistributionItem[];
-  emptyText: string;
-}> = ({ items, emptyText }) => {
-  const maximum = Math.max(0, ...items.map((item) => item.value));
-  if (!items.length) return <p className={styles.distributionEmpty}>{emptyText}</p>;
-  return (
-    <ol className={styles.distributionList}>
-      {items.slice(0, 8).map((item) => (
-        <li key={`${item.label}-${item.dimension ?? ''}`}>
-          <div>
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-          </div>
-          <Progress percent={maximum === 0 ? 0 : (item.value / maximum) * 100} showInfo={false} size='small' />
-        </li>
-      ))}
-    </ol>
-  );
-};
-
 const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
   const { t } = useTranslation();
   const { dashboard, drillItems } = data;
+  const reducedMotion = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, []);
+  const regionOption = useMemo(
+    () => buildDistributionBarOption(dashboard.regionDistribution, reducedMotion),
+    [dashboard.regionDistribution, reducedMotion]
+  );
+  const materialOption = useMemo(
+    () => buildDistributionBarOption(dashboard.materialTop, reducedMotion),
+    [dashboard.materialTop, reducedMotion]
+  );
+  const categoryOption = useMemo(
+    () => buildCategoryComparisonOption(drillItems, reducedMotion),
+    [drillItems, reducedMotion]
+  );
+  const emptyDistribution = t('enterprise.projects.dashboard.distributionEmpty');
+  const emptyCategory = t('enterprise.projects.dashboard.categoryEmpty');
   const metrics = [
     ['projects', dashboard.projectCount],
     ['categoryL1', dashboard.categoryL1Count],
@@ -68,41 +66,50 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
 
       <div className={styles.insightGrid}>
         <Card title={t('enterprise.projects.dashboard.regionTitle')} variant='outlined'>
-          <DistributionList
-            items={dashboard.regionDistribution}
-            emptyText={t('enterprise.projects.dashboard.distributionEmpty')}
-          />
+          {regionOption ? (
+            <div className={styles.chartFrame}>
+              <EnterpriseChart
+                ariaLabel={t('enterprise.projects.dashboard.regionTitle')}
+                option={regionOption}
+                rows={dashboard.regionDistribution}
+                fallback={emptyDistribution}
+              />
+            </div>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyDistribution} />
+          )}
         </Card>
         <Card title={t('enterprise.projects.dashboard.materialTitle')} variant='outlined'>
-          <DistributionList
-            items={dashboard.materialTop}
-            emptyText={t('enterprise.projects.dashboard.distributionEmpty')}
-          />
+          {materialOption ? (
+            <div className={styles.chartFrame}>
+              <EnterpriseChart
+                ariaLabel={t('enterprise.projects.dashboard.materialTitle')}
+                option={materialOption}
+                rows={dashboard.materialTop}
+                fallback={emptyDistribution}
+              />
+            </div>
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyDistribution} />
+          )}
         </Card>
       </div>
 
       <Card className={styles.drillCard} title={t('enterprise.projects.dashboard.categoryTitle')} variant='outlined'>
-        {drillItems.length ? (
-          <div className={styles.drillGrid}>
-            {drillItems.slice(0, 8).map((item, index) => (
-              <article key={`${item.dimension}-${item.label}`}>
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <h3>{item.label}</h3>
-                <dl>
-                  <div>
-                    <dt>{t('enterprise.projects.dashboard.projectCount')}</dt>
-                    <dd>{item.projectCount}</dd>
-                  </div>
-                  <div>
-                    <dt>{t('enterprise.projects.dashboard.materialCount')}</dt>
-                    <dd>{item.materialNameCount ?? 0}</dd>
-                  </div>
-                </dl>
-              </article>
-            ))}
+        {categoryOption ? (
+          <div className={styles.chartFrame}>
+            <EnterpriseChart
+              ariaLabel={t('enterprise.projects.dashboard.categoryTitle')}
+              option={categoryOption}
+              rows={drillItems.map((item) => ({
+                label: item.label,
+                value: `${item.projectCount} / ${item.materialNameCount ?? 0}`,
+              }))}
+              fallback={emptyCategory}
+            />
           </div>
         ) : (
-          <p className={styles.distributionEmpty}>{t('enterprise.projects.dashboard.categoryEmpty')}</p>
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyCategory} />
         )}
       </Card>
     </section>

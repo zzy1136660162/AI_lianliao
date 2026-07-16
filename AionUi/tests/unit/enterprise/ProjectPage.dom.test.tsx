@@ -10,6 +10,16 @@ import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/Enterpris
 import ProjectDetailPage from '@/renderer/pages/enterprise/projects/ProjectDetailPage';
 import ProjectPage from '@/renderer/pages/enterprise/projects/ProjectPage';
 
+const chartMocks = vi.hoisted(() => ({
+  init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+  use: vi.fn(),
+}));
+
+vi.mock('echarts/core', () => ({ init: chartMocks.init, use: chartMocks.use }));
+vi.mock('echarts/charts', () => ({ BarChart: {} }));
+vi.mock('echarts/components', () => ({ GridComponent: {}, LegendComponent: {}, TooltipComponent: {} }));
+vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }));
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) => (values ? `${key}:${Object.values(values).join(',')}` : key),
@@ -161,10 +171,42 @@ describe('project dashboard and catalog', () => {
     expect(container.querySelector('[class*="arco-"]')).not.toBeInTheDocument();
     expect(screen.getByText('128')).toBeVisible();
     expect(container).toHaveTextContent('36.5');
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.regionTitle' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.materialTitle' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeVisible();
     expect(screen.getByText('Shenyang')).toBeVisible();
     expect(screen.getByText('Building materials')).toBeVisible();
     expect(screen.getByText('<strong>Steel and cement</strong>')).toBeVisible();
     expect(container.querySelector('strong strong')).toBeNull();
+  });
+
+  it('shows localized empty states instead of mounting charts without data', async () => {
+    const request = vi.fn<EnterpriseClient['request']>((operation) => {
+      if (operation.operation === 'project.dashboard') {
+        const response = dashboardResponse();
+        if (response.operation !== 'project.dashboard') throw new Error('unexpected dashboard response');
+        return Promise.resolve({
+          ...response,
+          data: {
+            ...response.data,
+            regionDistribution: [],
+            materialTop: [],
+          },
+        });
+      }
+      if (operation.operation === 'project.drill') return Promise.resolve({ operation: 'project.drill', data: [] });
+      if (operation.operation === 'project.list') return Promise.resolve(listResponse());
+      return Promise.reject(new Error('unexpected operation'));
+    });
+
+    renderProjects(createClient(request));
+    await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
+
+    expect(screen.queryByRole('img', { name: 'enterprise.projects.dashboard.regionTitle' })).toBeNull();
+    expect(screen.queryByRole('img', { name: 'enterprise.projects.dashboard.materialTitle' })).toBeNull();
+    expect(screen.queryByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeNull();
+    expect(screen.getAllByText('enterprise.projects.dashboard.distributionEmpty')).toHaveLength(2);
+    expect(screen.getByText('enterprise.projects.dashboard.categoryEmpty')).toBeVisible();
   });
 
   it('desensitizes list and quick-view names while preserving the numeric detail route', async () => {
