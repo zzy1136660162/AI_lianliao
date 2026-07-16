@@ -86,6 +86,11 @@
     "workspace": "Enterprise workspace content",
     "assistant": "Enterprise AI assistant"
   },
+  "navigationGroups": {
+    "overview": "總覽",
+    "resources": "資料資源",
+    "collaboration": "業務協作"
+  },
   "navigation": {
     "dashboard": "Workbench",
     "companies": "Companies",

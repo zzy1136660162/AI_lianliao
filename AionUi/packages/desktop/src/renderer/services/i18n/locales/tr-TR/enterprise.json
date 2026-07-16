@@ -86,6 +86,11 @@
     "workspace": "Enterprise workspace content",
     "assistant": "Enterprise AI assistant"
   },
+  "navigationGroups": {
+    "overview": "Genel bakış",
+    "resources": "Veri kaynakları",
+    "collaboration": "İş işbirliği"
+  },
   "navigation": {
     "dashboard": "Workbench",
     "companies": "Companies",

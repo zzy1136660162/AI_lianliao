@@ -16,13 +16,29 @@ import { NavLink, useNavigate } from 'react-router-dom';
 
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 
-const primaryItems = [
-  { path: '/enterprise/dashboard', labelKey: 'enterprise.navigation.dashboard', Icon: DashboardOne },
-  { path: '/enterprise/companies', labelKey: 'enterprise.navigation.companies', Icon: BuildingFour },
-  { path: '/enterprise/products', labelKey: 'enterprise.navigation.products', Icon: Box },
-  { path: '/enterprise/projects', labelKey: 'enterprise.navigation.projects', Icon: EngineeringBrand },
-  { path: '/enterprise/favorites', labelKey: 'enterprise.navigation.favorites', Icon: Star },
-  { path: '/enterprise/leads', labelKey: 'enterprise.navigation.leads', Icon: FollowUpDateSort },
+const navigationGroups = [
+  {
+    key: 'overview',
+    labelKey: 'enterprise.navigationGroups.overview',
+    items: [{ path: '/enterprise/dashboard', labelKey: 'enterprise.navigation.dashboard', Icon: DashboardOne }],
+  },
+  {
+    key: 'resources',
+    labelKey: 'enterprise.navigationGroups.resources',
+    items: [
+      { path: '/enterprise/companies', labelKey: 'enterprise.navigation.companies', Icon: BuildingFour },
+      { path: '/enterprise/products', labelKey: 'enterprise.navigation.products', Icon: Box },
+      { path: '/enterprise/projects', labelKey: 'enterprise.navigation.projects', Icon: EngineeringBrand },
+    ],
+  },
+  {
+    key: 'collaboration',
+    labelKey: 'enterprise.navigationGroups.collaboration',
+    items: [
+      { path: '/enterprise/favorites', labelKey: 'enterprise.navigation.favorites', Icon: Star },
+      { path: '/enterprise/leads', labelKey: 'enterprise.navigation.leads', Icon: FollowUpDateSort },
+    ],
+  },
 ] as const;
 
 /** Enterprise-only navigation, isolated from conversation history and chat state. */
@@ -64,17 +80,26 @@ const EnterpriseSider: React.FC = () => {
       </div>
 
       <nav className='enterprise-sider__navigation' aria-label={t('enterprise.accessibility.primaryNavigation')}>
-        {primaryItems.map(({ path, labelKey, Icon }) => (
-          <NavLink
-            key={path}
-            to={path}
-            className={({ isActive }) =>
-              `enterprise-sider__nav-item${isActive ? ' enterprise-sider__nav-item--active' : ''}`
-            }
-          >
-            <Icon size={18} />
-            <span>{t(labelKey)}</span>
-          </NavLink>
+        {navigationGroups.map(({ key, labelKey: groupLabelKey, items }) => (
+          <section key={key} className='enterprise-sider__nav-group' aria-labelledby={`enterprise-nav-${key}`}>
+            <p id={`enterprise-nav-${key}`} className='enterprise-sider__nav-group-label'>
+              {t(groupLabelKey)}
+            </p>
+            <div className='enterprise-sider__nav-group-items'>
+              {items.map(({ path, labelKey, Icon }) => (
+                <NavLink
+                  key={path}
+                  to={path}
+                  className={({ isActive }) =>
+                    `enterprise-sider__nav-item${isActive ? ' enterprise-sider__nav-item--active' : ''}`
+                  }
+                >
+                  <Icon size={18} />
+                  <span>{t(labelKey)}</span>
+                </NavLink>
+              ))}
+            </div>
+          </section>
         ))}
       </nav>
 

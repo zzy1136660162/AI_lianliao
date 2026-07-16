@@ -86,6 +86,11 @@
     "workspace": "Enterprise workspace content",
     "assistant": "Enterprise AI assistant"
   },
+  "navigationGroups": {
+    "overview": "Übersicht",
+    "resources": "Datenressourcen",
+    "collaboration": "Geschäftliche Zusammenarbeit"
+  },
   "navigation": {
     "dashboard": "Workbench",
     "companies": "Companies",

@@ -164,6 +164,20 @@ describe('enterprise desktop routing', () => {
     expect(container).not.toHaveTextContent('openid-must-not-be-rendered');
   });
 
+  it('groups primary navigation into three labelled card sections', async () => {
+    const { container } = renderAt('/enterprise/dashboard');
+
+    await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, ROUTE_WAIT_OPTIONS);
+    const navigation = screen.getByRole('navigation', {
+      name: 'enterprise.accessibility.primaryNavigation',
+    });
+
+    expect(container.querySelectorAll('.enterprise-sider__nav-group')).toHaveLength(3);
+    ['overview', 'resources', 'collaboration'].forEach((group) => {
+      expect(within(navigation).getByText(`enterprise.navigationGroups.${group}`)).toBeVisible();
+    });
+  });
+
   it('clears the enterprise session and returns to enterprise login', async () => {
     routerMocks.logout.mockImplementationOnce(async () => {
       routerMocks.enterpriseStatus = 'unauthenticated';

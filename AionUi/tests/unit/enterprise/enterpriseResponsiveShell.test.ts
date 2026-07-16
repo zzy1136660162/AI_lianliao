@@ -30,6 +30,14 @@ describe('enterprise desktop shell CSS contract', () => {
     expect(navigationRule).toMatch(/overflow-y:\s*auto/);
     expect(assistantRule).toMatch(/overflow-y:\s*auto/);
   });
+
+  it('presents navigation groups as separated card surfaces', () => {
+    const groupRule = css.match(/\.enterprise-sider__nav-group\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(groupRule).toMatch(/background:\s*var\(--enterprise-surface\)/);
+    expect(groupRule).toMatch(/border-radius:\s*var\(--enterprise-radius-card\)/);
+    expect(groupRule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-card\)/);
+  });
 });
 
 describe('enterprise compact shell CSS contract', () => {
