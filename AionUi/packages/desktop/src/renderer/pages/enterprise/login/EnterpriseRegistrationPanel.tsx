@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Button, Spin } from '@arco-design/web-react';
+import { Alert, Button, Spin } from 'antd';
 import { Iphone, Refresh, WeixinScan } from '@icon-park/react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
@@ -37,9 +37,9 @@ const EnterpriseRegistrationPanel: React.FC = () => {
       <Alert
         type='info'
         showIcon
-        content={
+        title={
           <span className='enterprise-login__auto-status' aria-live='polite'>
-            <Spin size={14} icon={<WeixinScan />} />
+            <Spin size='small' />
             {t('enterprise.registration.autoChecking')}
           </span>
         }

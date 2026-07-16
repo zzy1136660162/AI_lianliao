@@ -135,7 +135,7 @@
   animation: enterprise-stage-enter 560ms 90ms ease-out both;
 }
 
-.enterprise-login__stage-card .arco-card-body {
+.enterprise-login__stage-card .ll-ant-card-body {
   display: flex;
   min-height: 570px;
   padding: clamp(28px, 5vw, 54px);
@@ -258,7 +258,7 @@
   margin-top: 24px;
 }
 
-.enterprise-login__registration .arco-alert {
+.enterprise-login__registration .ll-ant-alert {
   width: 100%;
   border-radius: 4px;
 }

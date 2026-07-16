@@ -101,6 +101,9 @@ describe('EnterpriseLoginPage', () => {
     expect(screen.getByText('01:05')).toBeVisible();
     expect(screen.getByText('01:05').closest('[aria-live]')).toBeNull();
     expect(screen.getByText(translations['enterprise.login.autoChecking'])).toBeVisible();
+    expect(container.querySelector('.enterprise-login .ll-ant-card')).toBeInTheDocument();
+    expect(container.querySelector('.enterprise-login .ll-ant-spin')).toBeInTheDocument();
+    expect(container.querySelector('.enterprise-login [class*="arco-"]')).not.toBeInTheDocument();
     expect(container.querySelector('.enterprise-login__blueprint')).not.toBeInTheDocument();
   });
 

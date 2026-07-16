@@ -50,6 +50,8 @@ describe('enterprise login theme contract', () => {
     expect(stageRule).toMatch(/background:\s*var\(--enterprise-surface\)\s*!important/);
     expect(stageRule).toMatch(/border-radius:\s*var\(--enterprise-radius-card\)\s*!important/);
     expect(stageRule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-card\)/);
+    expect(loginCss).toContain('.ll-ant-card-body');
+    expect(loginCss).not.toMatch(/\.arco-/);
     expect(loginCss).not.toContain('.enterprise-login__blueprint');
   });
 });

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, Button, Card, Spin } from '@arco-design/web-react';
+import { Alert, Button, Card, Spin } from 'antd';
 import { BuildingFour, CheckOne, Refresh, Shield } from '@icon-park/react';
 import { useTranslation } from 'react-i18next';
 
@@ -65,7 +65,7 @@ const EnterpriseLoginPage: React.FC = () => {
     if (auth.status === 'checking' || (auth.status === 'unauthenticated' && !auth.isExpired)) {
       return (
         <div className='enterprise-login__center-state' role='status' aria-live='polite'>
-          <Spin size={34} />
+          <Spin size='large' />
           <h2>{t('enterprise.login.checkingTitle')}</h2>
           <p>{t('enterprise.login.checkingDescription')}</p>
         </div>
@@ -86,7 +86,7 @@ const EnterpriseLoginPage: React.FC = () => {
       const errorKey = auth.errorCode ? ENTERPRISE_ERROR_I18N_KEYS[auth.errorCode] : 'enterprise.errors.UNKNOWN';
       return (
         <div className='enterprise-login__error-state' role='alert'>
-          <Alert type='error' showIcon title={t('enterprise.login.errorTitle')} content={t(errorKey)} />
+          <Alert type='error' showIcon title={t('enterprise.login.errorTitle')} description={t(errorKey)} />
           <Button type='primary' icon={<Refresh />} onClick={() => void auth.retry()}>
             {t('enterprise.actions.retry')}
           </Button>
@@ -116,7 +116,7 @@ const EnterpriseLoginPage: React.FC = () => {
 
           {imageError ? (
             <div className='enterprise-login__image-error'>
-              <Alert type='error' showIcon content={t('enterprise.login.imageError')} />
+              <Alert type='error' showIcon title={t('enterprise.login.imageError')} />
               <Button icon={<Refresh />} onClick={() => void auth.startLogin()}>
                 {t('enterprise.actions.retry')}
               </Button>
@@ -137,7 +137,7 @@ const EnterpriseLoginPage: React.FC = () => {
             <span>{t('enterprise.login.remainingLabel')}</span>
           </div>
           <div className='enterprise-login__auto-status' role='status'>
-            <Spin size={14} />
+            <Spin size='small' />
             <span>{t('enterprise.login.autoChecking')}</span>
           </div>
         </section>
@@ -177,7 +177,7 @@ const EnterpriseLoginPage: React.FC = () => {
           </div>
         </section>
 
-        <Card className='enterprise-login__stage-card' bordered>
+        <Card className='enterprise-login__stage-card' variant='outlined'>
           {renderStage()}
         </Card>
       </main>
