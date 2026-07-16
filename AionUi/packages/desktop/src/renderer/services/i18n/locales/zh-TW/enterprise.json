@@ -250,7 +250,14 @@
     "memberLevel": {
       "vipAggregate": "全部 VIP 企業",
       "value": "Level {{level}}",
-      "unknown": "Not classified"
+      "unknown": "Not classified",
+      "verified": "實名認證",
+      "ordinary": "普通會員",
+      "vip": "VIP 會員",
+      "fourStar": "4 星會員",
+      "fiveStar": "5 星會員",
+      "flagship": "旗艦店",
+      "fallback": "會員等級 {{level}}"
     },
     "quickView": {
       "label": "Company quick view",

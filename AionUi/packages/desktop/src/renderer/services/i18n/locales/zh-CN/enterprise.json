@@ -250,7 +250,14 @@
     "memberLevel": {
       "vipAggregate": "全部 VIP 企业",
       "value": "{{level}} 级会员",
-      "unknown": "暂未分级"
+      "unknown": "暂未分级",
+      "verified": "实名认证",
+      "ordinary": "普通会员",
+      "vip": "VIP 会员",
+      "fourStar": "4 星会员",
+      "fiveStar": "5 星会员",
+      "flagship": "旗舰店",
+      "fallback": "会员等级 {{level}}"
     },
     "quickView": {
       "label": "企业快速预览",

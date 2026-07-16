@@ -1,0 +1,30 @@
+.badge {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.image {
+  display: block;
+  width: auto;
+  max-width: 112px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.compact .image {
+  max-width: 88px;
+  height: 19px;
+}
+
+.fallback {
+  padding: 2px 8px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-base);
+  border-radius: 999px;
+  background: var(--bg-2);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: nowrap;
+}
