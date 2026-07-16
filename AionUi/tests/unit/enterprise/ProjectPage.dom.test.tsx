@@ -222,7 +222,11 @@ describe('project dashboard and catalog', () => {
     const quickView = screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' });
     expect(quickView).not.toHaveTextContent('Factory expansion');
     expect(quickView).not.toHaveTextContent('Acme Manufacturing');
-    fireEvent.click(within(quickView).getByRole('button', { name: 'enterprise.projects.actions.viewDetails' }));
+    expect(quickView).not.toHaveTextContent(/enterprise\.projects\.quickView\.index|0901/);
+    expect(within(quickView).getByText('enterprise.projects.quickView.title')).toBeVisible();
+    expect(within(quickView).getByText('enterprise.projects.quickView.hint')).toBeVisible();
+    expect(within(quickView).getByRole('button', { name: 'enterprise.projects.quickView.action' })).toBeVisible();
+    fireEvent.click(within(quickView).getByRole('button', { name: 'enterprise.projects.quickView.action' }));
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/projects/901');
   });
 
@@ -347,7 +351,7 @@ describe('project dashboard and catalog', () => {
     const quickView = screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' });
     await waitFor(() => expect(quickView).toHaveFocus());
     expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' });
-    expect(within(quickView).getByRole('button', { name: 'enterprise.projects.actions.viewDetails' })).toBeVisible();
+    expect(within(quickView).getByRole('button', { name: 'enterprise.projects.quickView.action' })).toBeVisible();
   });
 
   it.each([

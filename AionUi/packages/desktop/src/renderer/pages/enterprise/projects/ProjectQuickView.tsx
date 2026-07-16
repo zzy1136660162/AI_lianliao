@@ -44,9 +44,6 @@ const ProjectQuickView: React.FC<ProjectQuickViewProps> = ({ project, onClose, o
         onClose();
       }}
     >
-      <div className={styles.quickViewIndex}>
-        {t('enterprise.projects.quickView.index', { index: project.hpInfoId.slice(-4).padStart(4, '0') })}
-      </div>
       <Button
         className={styles.quickViewClose}
         type='text'
@@ -86,7 +83,7 @@ const ProjectQuickView: React.FC<ProjectQuickViewProps> = ({ project, onClose, o
       </dl>
       <p className={styles.quickViewHint}>{t('enterprise.projects.quickView.hint')}</p>
       <Button type='primary' block icon={<ArrowRight />} onClick={() => onViewDetails(project)}>
-        {t('enterprise.projects.actions.viewDetails')}
+        {t('enterprise.projects.quickView.action')}
       </Button>
     </aside>
   );
