@@ -1,0 +1,27 @@
+/* Scoped visual tokens for 链上辽宁·产业云城. */
+.enterprise-shell,
+.enterprise-login {
+  --enterprise-font-ui: 'Microsoft YaHei', '微软雅黑', 'Segoe UI', Arial, sans-serif;
+  --enterprise-page-bg: #f4f8ff;
+  --enterprise-surface: #ffffff;
+  --enterprise-surface-soft: #f8fbff;
+  --enterprise-border: #d8e6f5;
+  --enterprise-primary: #2878ff;
+  --enterprise-primary-soft: #eaf3ff;
+  --enterprise-text-primary: #102a43;
+  --enterprise-text-secondary: #6b7f93;
+  --enterprise-radius-card: 15px;
+  --enterprise-radius-control: 10px;
+  --enterprise-shadow-card: 0 8px 24px rgba(36, 92, 145, 0.08);
+  --enterprise-shadow-hover: 0 12px 30px rgba(36, 92, 145, 0.13);
+  --enterprise-content-gap: 14px;
+
+  color: var(--enterprise-text-primary);
+  font-family: var(--enterprise-font-ui);
+  font-weight: 400;
+}
+
+.enterprise-shell :where(button, input, textarea, select),
+.enterprise-login :where(button, input, textarea, select) {
+  font-family: inherit;
+}
