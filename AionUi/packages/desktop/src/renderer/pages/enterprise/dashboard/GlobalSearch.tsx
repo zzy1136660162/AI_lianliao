@@ -1,5 +1,5 @@
-import { Alert, Button, Empty, Input, Spin } from '@arco-design/web-react';
 import { Box, BuildingFour, EngineeringBrand, Search } from '@icon-park/react';
+import { Alert, AutoComplete, Button, Empty, Input, Spin, type AutoCompleteProps } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,13 @@ type SearchOption = {
   label: string;
   secondary?: string;
   path: string;
+};
+
+type SearchSelectOption = {
+  value: string;
+  label: React.ReactNode;
+  disabled?: boolean;
+  option?: SearchOption;
 };
 
 export type GlobalSearchProps = {
@@ -52,16 +59,15 @@ const groupIcon = {
   projects: EngineeringBrand,
 } as const;
 
-const optionDomId = (option: SearchOption, index: number): string => `enterprise-search-${option.kind}-${index}`;
-
-/** Keyboard-accessible, grouped search over the three verified enterprise catalogs. */
+/** Ant Design autocomplete over the three verified enterprise catalogs. */
 const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const [activeOptionState, setActiveOptionState] = useState({ index: -1, optionsIdentity: '' });
-  const optionElementsRef = useRef(new Map<string, HTMLButtonElement>());
+  const activeOptionIndexRef = useRef(-1);
+  const dismissedQueryRef = useRef<string | null>(null);
+  const inputFocusedRef = useRef(false);
   const search = useDashboardSearch(client, query, debounceMs);
   const ready = isDashboardSearchQueryReady(query);
 
@@ -95,66 +101,165 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
     ];
   }, [search.result, t]);
 
-  const options = useMemo(() => groups.flatMap((group) => group.options), [groups]);
-  const resultsOpen = open && ready;
-  const optionIdentityKey = useMemo(() => options.map((option) => `${option.kind}:${option.id}`).join('|'), [options]);
-  const activeIndex = activeOptionState.optionsIdentity === optionIdentityKey ? activeOptionState.index : -1;
-  const activeOption = activeIndex >= 0 ? options[activeIndex] : undefined;
-  const activeOptionDomId = activeOption ? optionDomId(activeOption, activeIndex) : undefined;
-
-  useEffect(() => {
-    if (!resultsOpen || !activeOptionDomId) return;
-    optionElementsRef.current.get(activeOptionDomId)?.scrollIntoView({ block: 'nearest' });
-  }, [activeOptionDomId, resultsOpen]);
-
-  const choose = (option: SearchOption) => {
-    setOpen(false);
-    setActiveOptionState({ index: -1, optionsIdentity: optionIdentityKey });
-    navigate(option.path);
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Escape') {
-      setOpen(false);
-      setActiveOptionState({ index: -1, optionsIdentity: optionIdentityKey });
-      return;
-    }
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      const canNavigate =
-        search.result?.query === search.normalizedQuery &&
-        !search.isLoading &&
-        search.result.errorCode === null &&
-        options.length > 0;
-      if (!canNavigate) return;
-      event.preventDefault();
-      setOpen(true);
-      const direction = event.key === 'ArrowDown' ? 1 : -1;
-      setActiveOptionState((current) => {
-        const currentIndex = current.optionsIdentity === optionIdentityKey ? current.index : -1;
-        return {
-          index:
-            currentIndex < 0
-              ? direction > 0
-                ? 0
-                : options.length - 1
-              : (currentIndex + direction + options.length) % options.length,
-          optionsIdentity: optionIdentityKey,
-        };
-      });
-      return;
-    }
-    if (event.key === 'Enter' && resultsOpen && activeOption) {
-      event.preventDefault();
-      choose(activeOption);
-    }
-  };
-
   const showEmpty =
     search.result !== null &&
     search.result.errorCode === null &&
     groups.every((group) => group.errorCode === null && group.options.length === 0);
-  const showsListbox =
-    resultsOpen && search.result !== null && !search.isLoading && !search.result.errorCode && !showEmpty;
+  const businessOptions = useMemo(() => groups.flatMap((group) => group.options), [groups]);
+
+  const autocompleteOptions = useMemo<NonNullable<AutoCompleteProps['options']>>(() => {
+    const disabledOption = (value: string, label: React.ReactNode): SearchSelectOption => ({
+      value,
+      label,
+      disabled: true,
+    });
+
+    if (search.isLoading) {
+      return [
+        disabledOption(
+          '__loading',
+          <div className={styles.searchStatus} role='status'>
+            <Spin size='small' />
+            <span>{t('enterprise.dashboard.search.loading')}</span>
+          </div>
+        ),
+      ];
+    }
+
+    if (search.result?.errorCode) {
+      return [
+        disabledOption(
+          '__error',
+          <div className={styles.searchTotalError}>
+            <Alert type='error' showIcon title={t('enterprise.dashboard.search.totalError')} />
+            <Button
+              size='small'
+              type='primary'
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                search.retry();
+              }}
+            >
+              {t('enterprise.actions.retry')}
+            </Button>
+          </div>
+        ),
+      ];
+    }
+
+    if (showEmpty) {
+      return [
+        disabledOption(
+          '__empty',
+          <div className={styles.searchEmpty}>
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('enterprise.dashboard.search.empty')} />
+          </div>
+        ),
+      ];
+    }
+
+    return groups.map((group) => {
+      const Icon = groupIcon[group.kind];
+      const groupOptions: SearchSelectOption[] = group.errorCode
+        ? [
+            disabledOption(
+              `__group-error-${group.kind}`,
+              <Alert type='warning' showIcon title={t('enterprise.dashboard.search.groupError')} />
+            ),
+          ]
+        : group.options.length
+          ? group.options.map((option) => ({
+              value: option.path,
+              option,
+              label: (
+                <div className={styles.searchOption}>
+                  <span>{option.label}</span>
+                  {option.secondary ? <small>{option.secondary}</small> : null}
+                </div>
+              ),
+            }))
+          : [
+              disabledOption(
+                `__group-empty-${group.kind}`,
+                <p className={styles.groupEmpty}>{t('enterprise.dashboard.search.groupEmpty')}</p>
+              ),
+            ];
+
+      return {
+        label: (
+          <div className={styles.searchGroupTitle}>
+            <Icon aria-hidden='true' />
+            <span>{t(`enterprise.dashboard.search.groups.${group.kind}`)}</span>
+          </div>
+        ),
+        options: groupOptions,
+      };
+    });
+  }, [groups, search.isLoading, search.result?.errorCode, search.retry, showEmpty, t]);
+
+  const resultsOpen = open && ready;
+  useEffect(() => {
+    if (
+      inputFocusedRef.current &&
+      ready &&
+      autocompleteOptions.length > 0 &&
+      dismissedQueryRef.current !== search.normalizedQuery
+    ) {
+      setOpen(true);
+    }
+  }, [autocompleteOptions, ready, search.normalizedQuery]);
+  useEffect(() => {
+    activeOptionIndexRef.current = -1;
+  }, [businessOptions, search.normalizedQuery]);
+
+  const updateActiveOption = (nextIndex: number) => {
+    activeOptionIndexRef.current = nextIndex;
+  };
+
+  const choose = (option: SearchOption) => {
+    dismissedQueryRef.current = search.normalizedQuery;
+    setOpen(false);
+    updateActiveOption(-1);
+    navigate(option.path);
+  };
+  const handleSelect: AutoCompleteProps['onSelect'] = (_value, item) => {
+    const option = (item as SearchSelectOption).option;
+    if (option) choose(option);
+  };
+  const handleInputKeyDown: AutoCompleteProps['onInputKeyDown'] = (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      dismissedQueryRef.current = search.normalizedQuery;
+      setOpen(false);
+      updateActiveOption(-1);
+      return;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (!businessOptions.length || search.isLoading || search.result?.errorCode) return;
+      event.preventDefault();
+      dismissedQueryRef.current = null;
+      setOpen(true);
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const current = activeOptionIndexRef.current;
+      updateActiveOption(
+        current < 0
+          ? direction > 0
+            ? 0
+            : businessOptions.length - 1
+          : (current + direction + businessOptions.length) % businessOptions.length
+      );
+      return;
+    }
+    if (event.key === 'Enter' && activeOptionIndexRef.current >= 0) {
+      event.preventDefault();
+      const option = businessOptions[activeOptionIndexRef.current];
+      if (option) choose(option);
+    }
+  };
 
   return (
     <section className={styles.searchSection} aria-labelledby='enterprise-global-search-title'>
@@ -169,105 +274,52 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
         <p>{t('enterprise.dashboard.search.description')}</p>
       </div>
       <div className={styles.searchControl}>
-        <Input.Search
+        <AutoComplete
           value={query}
-          maxLength={100}
-          prefix={<Search aria-hidden='true' />}
-          placeholder={t('enterprise.dashboard.search.placeholder')}
-          aria-label={t('enterprise.dashboard.search.ariaLabel')}
-          role='combobox'
-          aria-autocomplete='list'
-          aria-expanded={showsListbox}
-          aria-controls={showsListbox ? 'enterprise-global-search-results' : undefined}
-          aria-activedescendant={showsListbox ? activeOptionDomId : undefined}
-          onFocus={() => {
-            if (ready) setOpen(true);
+          options={autocompleteOptions}
+          open={resultsOpen}
+          filterOption={false}
+          virtual={false}
+          defaultActiveFirstOption={false}
+          classNames={{ popup: { root: styles.searchResults } }}
+          onOpenChange={(nextOpen) => {
+            if (nextOpen) {
+              if (dismissedQueryRef.current === search.normalizedQuery) return;
+              setOpen(ready);
+              return;
+            }
+            // A ready query has one render before the search hook publishes its
+            // loading option. Ignore that transitional close so the popup can
+            // open as soon as the status row is available.
+            if (!ready || autocompleteOptions.length > 0) setOpen(false);
           }}
+          onSelect={handleSelect}
           onChange={(value) => {
+            dismissedQueryRef.current = null;
             setQuery(value);
             setOpen(isDashboardSearchQueryReady(value));
-            setActiveOptionState({ index: -1, optionsIdentity: optionIdentityKey });
+            updateActiveOption(-1);
           }}
-          onKeyDown={handleKeyDown}
-        />
+        >
+          <Input.Search
+            maxLength={100}
+            prefix={<Search aria-hidden='true' />}
+            allowClear
+            placeholder={t('enterprise.dashboard.search.placeholder')}
+            aria-label={t('enterprise.dashboard.search.ariaLabel')}
+            onKeyDown={handleInputKeyDown}
+            onFocus={() => {
+              inputFocusedRef.current = true;
+              dismissedQueryRef.current = null;
+              if (ready) setOpen(true);
+            }}
+            onBlur={() => {
+              inputFocusedRef.current = false;
+            }}
+          />
+        </AutoComplete>
         {!ready && query.length > 0 ? <p>{t('enterprise.dashboard.search.minimumHint')}</p> : null}
       </div>
-
-      {resultsOpen ? (
-        <div
-          id='enterprise-global-search-results'
-          className={styles.searchResults}
-          role={showsListbox ? 'listbox' : undefined}
-          aria-label={t('enterprise.dashboard.search.resultsLabel')}
-        >
-          {search.isLoading ? (
-            <div className={styles.searchStatus} role='status'>
-              <Spin dot />
-              <span>{t('enterprise.dashboard.search.loading')}</span>
-            </div>
-          ) : search.result?.errorCode ? (
-            <div className={styles.searchTotalError}>
-              <Alert type='error' showIcon content={t('enterprise.dashboard.search.totalError')} />
-              <Button size='small' type='primary' onClick={search.retry}>
-                {t('enterprise.actions.retry')}
-              </Button>
-            </div>
-          ) : showEmpty ? (
-            <Empty description={t('enterprise.dashboard.search.empty')} />
-          ) : (
-            groups.map((group) => {
-              const Icon = groupIcon[group.kind];
-              return (
-                <section
-                  key={group.kind}
-                  className={styles.searchGroup}
-                  role='group'
-                  aria-labelledby={`enterprise-search-${group.kind}-title`}
-                >
-                  <h3 id={`enterprise-search-${group.kind}-title`}>
-                    <Icon aria-hidden='true' />
-                    {t(`enterprise.dashboard.search.groups.${group.kind}`)}
-                  </h3>
-                  {group.errorCode ? (
-                    <Alert type='warning' showIcon content={t('enterprise.dashboard.search.groupError')} />
-                  ) : group.options.length ? (
-                    <div className={styles.searchOptions}>
-                      {group.options.map((option) => {
-                        const optionIndex = options.findIndex((candidate) => candidate.id === option.id);
-                        const domId = optionDomId(option, optionIndex);
-                        return (
-                          <Button
-                            key={`${option.kind}-${option.id}-${optionIndex}`}
-                            ref={(element: unknown) => {
-                              if (element instanceof HTMLButtonElement) optionElementsRef.current.set(domId, element);
-                              else optionElementsRef.current.delete(domId);
-                            }}
-                            id={domId}
-                            className={styles.searchOption}
-                            type='text'
-                            role='option'
-                            tabIndex={-1}
-                            aria-selected={optionIndex === activeIndex}
-                            onMouseEnter={() =>
-                              setActiveOptionState({ index: optionIndex, optionsIdentity: optionIdentityKey })
-                            }
-                            onClick={() => choose(option)}
-                          >
-                            <span>{option.label}</span>
-                            {option.secondary ? <small>{option.secondary}</small> : null}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className={styles.groupEmpty}>{t('enterprise.dashboard.search.groupEmpty')}</p>
-                  )}
-                </section>
-              );
-            })
-          )}
-        </div>
-      ) : null}
     </section>
   );
 };

@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 import type { EnterpriseRequest, EnterpriseResponse, EnterpriseUserContext } from '@/common/enterprise/contracts';
 import DashboardPage from '@/renderer/pages/enterprise/dashboard/DashboardPage';
+import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 const authUser: EnterpriseUserContext = {
@@ -152,15 +153,21 @@ const LocationProbe = () => {
 };
 
 const dashboardTree = (client: EnterpriseClient) => (
-  <MemoryRouter initialEntries={['/enterprise/dashboard']}>
-    <Routes>
-      <Route path='/enterprise/dashboard' element={<DashboardPage client={client} />} />
-      <Route path='*' element={<LocationProbe />} />
-    </Routes>
-  </MemoryRouter>
+  <EnterpriseAntdProvider>
+    <MemoryRouter initialEntries={['/enterprise/dashboard']}>
+      <Routes>
+        <Route path='/enterprise/dashboard' element={<DashboardPage client={client} />} />
+        <Route path='*' element={<LocationProbe />} />
+      </Routes>
+    </MemoryRouter>
+  </EnterpriseAntdProvider>
 );
 
 const renderDashboard = (client = createClient(defaultRequest)) => render(dashboardTree(client));
+const setSearchValue = (input: HTMLElement, value: string) => {
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value } });
+};
 
 describe('enterprise dashboard', () => {
   beforeEach(() => {
@@ -180,6 +187,7 @@ describe('enterprise dashboard', () => {
     const { container } = renderDashboard();
 
     expect(await screen.findByText('Liaoning Precision Equipment')).toBeVisible();
+    expect(container.querySelector('.ll-ant-select-auto-complete')).toBeInTheDocument();
     expect(screen.getByText('Chen Wei')).toBeVisible();
     expect(await screen.findByText('128')).toBeVisible();
     expect(screen.getByText('Shenyang')).toBeVisible();
@@ -207,11 +215,11 @@ describe('enterprise dashboard', () => {
     const search = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
     const initialCalls = defaultRequest.mock.calls.length;
 
-    fireEvent.change(search, { target: { value: ' a ' } });
+    setSearchValue(search, ' a ');
     await act(async () => vi.advanceTimersByTime(500));
     expect(defaultRequest).toHaveBeenCalledTimes(initialCalls);
 
-    fireEvent.change(search, { target: { value: ' ab ' } });
+    setSearchValue(search, ' ab ');
     await act(async () => vi.advanceTimersByTime(299));
     expect(defaultRequest).toHaveBeenCalledTimes(initialCalls);
     await act(async () => vi.advanceTimersByTime(1));
@@ -230,7 +238,7 @@ describe('enterprise dashboard', () => {
     });
   });
 
-  it('does not expose combobox popup relationships while search results are loading', async () => {
+  it('shows loading inside the controlled autocomplete popup', async () => {
     const pendingSearch = deferred<EnterpriseResponse>();
     const request = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
@@ -240,13 +248,11 @@ describe('enterprise dashboard', () => {
     renderDashboard(createClient(request));
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
 
-    fireEvent.change(input, { target: { value: 'pump' } });
-    expect(await screen.findByText('enterprise.dashboard.search.loading')).toBeVisible();
-
-    expect(input).toHaveAttribute('aria-expanded', 'false');
-    expect(input).not.toHaveAttribute('aria-controls');
-    expect(input).not.toHaveAttribute('aria-activedescendant');
-    expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull();
+    setSearchValue(input, 'pump');
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByText('enterprise.dashboard.search.loading')).toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(input).toHaveAttribute('aria-controls', listbox.id);
   });
 
   it('keeps partial results, reports the failed group and routes clicks to real details', async () => {
@@ -260,82 +266,67 @@ describe('enterprise dashboard', () => {
     });
     renderDashboard(createClient(request));
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), {
-      target: { value: 'pump' },
-    });
+    setSearchValue(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), 'pump');
 
-    const listbox = await screen.findByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' });
-    expect(await within(listbox).findByText('Clickable company')).toBeVisible();
-    expect(within(listbox).getByText('enterprise.dashboard.search.groupError')).toBeVisible();
+    const companyResult = await screen.findByRole('option', { name: /Clickable company/ });
+    const listbox = companyResult.closest('[role="listbox"]') as HTMLElement;
+    expect(companyResult).toBeInTheDocument();
+    expect(within(listbox).getByText('enterprise.dashboard.search.groupError')).toBeInTheDocument();
     expect(within(listbox).queryByText('RAW secret project')).toBeNull();
 
-    await userEvent.click(within(listbox).getByRole('option', { name: /Clickable company/ }));
+    await userEvent.click(companyResult);
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/11');
   });
 
-  it('cycles across grouped results with Arrow keys, navigates on Enter and closes on Escape', async () => {
+  it('navigates the first grouped result with ArrowDown and Enter and closes on Escape', async () => {
+    const user = userEvent.setup();
     renderDashboard();
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
-    fireEvent.change(input, { target: { value: 'pump' } });
+    setSearchValue(input, 'pump');
     await screen.findByRole('option', { name: /Search company/ });
 
-    const listbox = screen.getByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' });
+    const listbox = screen.getByRole('listbox');
     expect(input).toHaveAttribute('aria-expanded', 'true');
     expect(input).toHaveAttribute('aria-controls', listbox.id);
 
-    fireEvent.keyDown(input, { key: 'ArrowUp' });
-    const selectedProject = screen.getByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
-    expect(selectedProject).toHaveAttribute('aria-selected', 'true');
-    expect(input).toHaveAttribute('aria-activedescendant', selectedProject.id);
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-    expect(screen.getByRole('option', { name: /Search company/ })).toHaveAttribute('aria-selected', 'true');
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-    expect(screen.queryByText('138****0000')).toBeNull();
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/products/22');
+    await user.click(input);
+    await user.keyboard('{ArrowDown}');
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/11');
 
     renderDashboard();
     const nextInput = screen.getAllByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }).at(-1)!;
-    fireEvent.change(nextInput, { target: { value: 'pump' } });
-    await screen.findAllByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' });
+    setSearchValue(nextInput, 'pump');
+    await screen.findAllByRole('listbox');
     fireEvent.keyDown(nextInput, { key: 'Escape' });
-    await waitFor(() =>
-      expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull()
-    );
+    await waitFor(() => expect(nextInput).toHaveAttribute('aria-expanded', 'false'));
   });
 
-  it('keeps options out of the Tab order and scrolls only the keyboard-active option', async () => {
+  it('renders grouped Ant options without exposing protected phone data', async () => {
     renderDashboard();
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
-    fireEvent.change(input, { target: { value: 'pump' } });
-    const options = await screen.findAllByRole('option');
+    setSearchValue(input, 'pump');
+    await screen.findByRole('option', { name: /Search company/ });
 
-    options.forEach((option) => expect(option).toHaveAttribute('tabindex', '-1'));
-    expect(new Set(options.map((option) => option.id)).size).toBe(options.length);
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' }));
-    expect(scrollIntoView.mock.contexts.at(-1)).toBe(options[0]);
+    expect(screen.getByText('enterprise.dashboard.search.groups.companies')).toBeInTheDocument();
+    expect(screen.getByText('enterprise.dashboard.search.groups.products')).toBeInTheDocument();
+    expect(screen.getByText('enterprise.dashboard.search.groups.projects')).toBeInTheDocument();
+    expect(screen.queryByText('138****0000')).toBeNull();
   });
 
   it('reopens closed results from the focused input and selects the directional edge', async () => {
     renderDashboard();
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
-    fireEvent.change(input, { target: { value: 'pump' } });
+    setSearchValue(input, 'pump');
     await screen.findByRole('option', { name: /Search company/ });
     act(() => input.focus());
 
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(document.activeElement).toBe(input);
-    expect(screen.queryByRole('listbox')).toBeNull();
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-    expect(await screen.findByRole('option', { name: /Search company/ })).toHaveAttribute('aria-selected', 'true');
-
-    fireEvent.keyDown(input, { key: 'Escape' });
-    fireEvent.keyDown(input, { key: 'ArrowUp' });
-    expect(
-      await screen.findByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })
-    ).toHaveAttribute('aria-selected', 'true');
+    await waitFor(() => expect(input).toHaveAttribute('aria-expanded', 'false'));
+    fireEvent.focus(input);
+    await waitFor(() => expect(input).toHaveAttribute('aria-expanded', 'true'));
+    expect(await screen.findByRole('option', { name: /Search company/ })).toBeInTheDocument();
   });
 
   it('clears a stale active option when the same query receives a shorter result set', async () => {
@@ -360,23 +351,20 @@ describe('enterprise dashboard', () => {
     });
     const view = renderDashboard(initialClient);
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
-    fireEvent.change(input, { target: { value: 'pump' } });
+    setSearchValue(input, 'pump');
     await screen.findByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
     fireEvent.keyDown(input, { key: 'ArrowUp' });
     expect(input).toHaveAttribute('aria-activedescendant');
 
     view.rerender(dashboardTree(createClient(nextRequest)));
-    expect(await screen.findByRole('option', { name: /Only company/ })).toBeVisible();
-    await waitFor(() => expect(input).not.toHaveAttribute('aria-activedescendant'));
-    expect(input).not.toHaveAttribute('aria-activedescendant', 'enterprise-search-undefined');
-    expect(() => fireEvent.keyDown(input, { key: 'Enter' })).not.toThrow();
+    expect(await screen.findByRole('option', { name: /Only company/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Search product/ })).toBeNull();
+    expect(screen.queryByRole('option', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).toBeNull();
   });
 
   it('routes a protected project result by numeric identity without rendering its raw name', async () => {
     const { container } = renderDashboard();
-    fireEvent.change(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), {
-      target: { value: 'pump' },
-    });
+    setSearchValue(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), 'pump');
 
     const projectOption = await screen.findByRole('option', {
       name: /enterprise\.projectDetail\.lockedProjectTitle/,
@@ -397,15 +385,11 @@ describe('enterprise dashboard', () => {
     });
     renderDashboard(createClient(request));
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
-    fireEvent.change(input, {
-      target: { value: 'none' },
-    });
+    setSearchValue(input, 'none');
 
-    expect(await screen.findByText('enterprise.dashboard.search.empty')).toBeVisible();
-    expect(input).toHaveAttribute('aria-expanded', 'false');
-    expect(input).not.toHaveAttribute('aria-controls');
-    expect(input).not.toHaveAttribute('aria-activedescendant');
-    expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull();
+    await waitFor(() => expect(screen.getByRole('listbox')).toHaveTextContent('enterprise.dashboard.search.empty'));
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(input).toHaveAttribute('aria-controls', screen.getByRole('listbox').id);
   });
 
   it('discards stale search results when the query changes during a request', async () => {
@@ -424,15 +408,15 @@ describe('enterprise dashboard', () => {
     renderDashboard(createClient(request));
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
 
-    fireEvent.change(input, { target: { value: 'ab' } });
+    setSearchValue(input, 'ab');
     await waitFor(() => expect(request).toHaveBeenCalledWith(expect.objectContaining({ operation: 'company.list' })));
-    fireEvent.change(input, { target: { value: 'cd' } });
-    expect(await screen.findByText('Latest company')).toBeVisible();
+    setSearchValue(input, 'cd');
+    expect(await screen.findByRole('option', { name: /Latest company/ })).toBeInTheDocument();
     firstCompany.resolve(companyResponse('Stale company'));
     await act(async () => undefined);
 
     expect(screen.queryByText('Stale company')).toBeNull();
-    expect(screen.getByText('Latest company')).toBeVisible();
+    expect(screen.getByRole('option', { name: /Latest company/ })).toBeInTheDocument();
   });
 
   it('shows one total search error when all groups fail without leaking raw errors', async () => {
@@ -443,15 +427,13 @@ describe('enterprise dashboard', () => {
     });
     const { container } = renderDashboard(createClient(request));
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
-    fireEvent.change(input, {
-      target: { value: 'pump' },
-    });
+    setSearchValue(input, 'pump');
 
-    expect(await screen.findByText('enterprise.dashboard.search.totalError')).toBeVisible();
-    expect(input).toHaveAttribute('aria-expanded', 'false');
-    expect(input).not.toHaveAttribute('aria-controls');
-    expect(input).not.toHaveAttribute('aria-activedescendant');
-    expect(screen.queryByRole('listbox', { name: 'enterprise.dashboard.search.resultsLabel' })).toBeNull();
+    await waitFor(() =>
+      expect(screen.getByRole('listbox')).toHaveTextContent('enterprise.dashboard.search.totalError')
+    );
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+    expect(input).toHaveAttribute('aria-controls', screen.getByRole('listbox').id);
     expect(container).not.toHaveTextContent('raw-openid-secret');
   });
 

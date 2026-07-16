@@ -23,10 +23,17 @@ describe('enterprise dashboard search styles', () => {
   it('keeps total search errors usable in narrow layouts', () => {
     expect(dashboardStyles).toMatch(/\.searchTotalError\s*\{[^}]*flex-wrap:\s*wrap;/s);
     expect(dashboardStyles).toMatch(
-      /\.searchTotalError\s+:global\(\.arco-alert\)\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s
+      /\.searchTotalError\s+:global\(\.ll-ant-alert\)\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;/s
     );
     expect(dashboardStyles).toMatch(
       /@media\s*\(max-width:\s*700px\)[\s\S]*?\.searchTotalError\s*\{[^}]*flex-direction:\s*column;/
     );
+  });
+
+  it('keeps autocomplete results independently scrollable', () => {
+    const resultRule = dashboardStyles.match(/\.searchResults\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(resultRule).toMatch(/max-height:/);
+    expect(resultRule).toMatch(/overflow-y:\s*auto/);
   });
 });
