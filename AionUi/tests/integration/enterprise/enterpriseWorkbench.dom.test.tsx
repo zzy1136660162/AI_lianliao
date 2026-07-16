@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Link, MemoryRouter, Outlet, useLocation } from 'react-router-dom';
@@ -16,6 +16,16 @@ import type { ElectronBridgeAPI } from '@/common/types/platform/electron';
 import { loadProjectDetail } from '@/renderer/pages/enterprise/projects/projectData';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import type { EnterpriseRawBridge } from '@/renderer/services/enterprise/enterpriseClient';
+
+const chartMocks = vi.hoisted(() => ({
+  init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+  use: vi.fn(),
+}));
+
+vi.mock('echarts/core', () => ({ init: chartMocks.init, use: chartMocks.use }));
+vi.mock('echarts/charts', () => ({ BarChart: {} }));
+vi.mock('echarts/components', () => ({ GridComponent: {}, LegendComponent: {}, TooltipComponent: {} }));
+vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }));
 
 const AUTHENTICATED_USER: EnterpriseUserContext = {
   registered: true,
@@ -450,14 +460,9 @@ describe('enterprise desktop core workbench', () => {
     sensitiveAudit.assertNeverObserved(container);
 
     await user.type(screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' }), 'Integration');
-    const searchResults = await screen.findByRole('listbox', {
-      name: 'enterprise.dashboard.search.resultsLabel',
-    });
-    const companyGroup = within(searchResults).getByRole('group', {
-      name: 'enterprise.dashboard.search.groups.companies',
-    });
+    const companyOption = await screen.findByRole('option', { name: new RegExp(`^${COMPANY_NAME}`) });
     sensitiveAudit.assertNeverObserved(container);
-    await user.click(within(companyGroup).getByRole('option', { name: new RegExp(`^${COMPANY_NAME}`) }));
+    await user.click(companyOption);
 
     expect(await screen.findByRole('heading', { name: COMPANY_NAME }, { timeout: 5000 })).toBeVisible();
     sensitiveAudit.assertNeverObserved(container);

@@ -115,4 +115,28 @@ describe('EnterpriseChart', () => {
     expect(screen.getByRole('table', { name: 'regions data' })).toHaveTextContent('沈阳12');
     expect(chartMocks.dispose).not.toHaveBeenCalled();
   });
+
+  it('falls back without escaping errors when option rendering and partial disposal both fail', async () => {
+    chartMocks.setOption.mockImplementationOnce(() => {
+      throw new Error('canvas context unavailable');
+    });
+    chartMocks.dispose.mockImplementationOnce(() => {
+      throw new Error('partial canvas cannot be disposed');
+    });
+
+    render(
+      <EnterpriseChart
+        ariaLabel='regions'
+        option={{ series: [] }}
+        rows={[{ label: '沈阳', value: 12 }]}
+        fallback='chart unavailable'
+      />
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent('chart unavailable');
+    expect(screen.queryByRole('img', { name: 'regions' })).toBeNull();
+    expect(screen.getByRole('table', { name: 'regions data' })).toHaveTextContent('沈阳12');
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(chartMocks.dispose).toHaveBeenCalledTimes(1);
+  });
 });

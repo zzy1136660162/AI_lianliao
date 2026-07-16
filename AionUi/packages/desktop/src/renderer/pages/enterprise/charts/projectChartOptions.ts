@@ -50,7 +50,14 @@ const tooltip = {
   formatter: formatAxisTooltip,
 };
 
-const grid = { top: 18, right: 24, bottom: 28, left: 18, containLabel: true };
+const grid = {
+  top: 18,
+  right: 24,
+  bottom: 28,
+  left: 18,
+  outerBoundsMode: 'same' as const,
+  outerBoundsContain: 'axisLabel' as const,
+};
 
 export const buildDistributionBarOption = (
   items: EnterpriseDashboardDistributionItem[],

@@ -18,6 +18,15 @@ export type EnterpriseChartProps = {
   fallback: ReactNode;
 };
 
+const disposeSafely = (chart: EChartsType) => {
+  try {
+    chart.dispose();
+  } catch {
+    // A renderer can be only partially initialized when Canvas is unavailable.
+    // The chart has already failed locally, so disposal must not break the page.
+  }
+};
+
 /**
  * Owns one ECharts instance and keeps the source values available to screen readers.
  * A canvas failure is isolated to this chart so the surrounding enterprise page remains usable.
@@ -28,9 +37,11 @@ const EnterpriseChart: React.FC<EnterpriseChartProps> = ({ ariaLabel, option, ro
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (failed) return;
     const element = elementRef.current;
     if (!element) return;
 
+    let active = true;
     let chart: EChartsType;
     try {
       chart = init(element);
@@ -40,22 +51,43 @@ const EnterpriseChart: React.FC<EnterpriseChartProps> = ({ ariaLabel, option, ro
     }
 
     chartRef.current = chart;
-    const resize = () => chart.resize();
+    const resize = () => {
+      try {
+        chart.resize();
+      } catch {
+        if (!active) return;
+        if (chartRef.current === chart) chartRef.current = null;
+        disposeSafely(chart);
+        setFailed(true);
+      }
+    };
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(resize);
     if (observer) observer.observe(element);
     else window.addEventListener('resize', resize);
 
     return () => {
+      active = false;
       observer?.disconnect();
       if (!observer) window.removeEventListener('resize', resize);
-      chart.dispose();
-      chartRef.current = null;
+      if (chartRef.current === chart) {
+        chartRef.current = null;
+        disposeSafely(chart);
+      }
     };
-  }, []);
+  }, [failed]);
 
   useEffect(() => {
-    chartRef.current?.setOption(option, { notMerge: true });
-  }, [option]);
+    if (failed) return;
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      chart.setOption(option, { notMerge: true });
+    } catch {
+      chartRef.current = null;
+      disposeSafely(chart);
+      setFailed(true);
+    }
+  }, [failed, option]);
 
   const dataTable = (
     <table className='enterprise-chart__data' aria-label={`${ariaLabel} data`}>

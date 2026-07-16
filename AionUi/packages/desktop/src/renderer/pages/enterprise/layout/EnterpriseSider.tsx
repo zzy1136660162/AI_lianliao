@@ -53,17 +53,19 @@ const EnterpriseSider: React.FC = () => {
     if (logoutPending) return;
     setLogoutPending(true);
     setLogoutFailed(false);
+    let failed = false;
     try {
       const sessionCleared = await logout();
       if (!sessionCleared) {
-        setLogoutFailed(true);
+        failed = true;
         return;
       }
       navigate('/enterprise/login', { replace: true });
     } catch {
-      setLogoutFailed(true);
+      failed = true;
     } finally {
       setLogoutPending(false);
+      setLogoutFailed(failed);
     }
   };
 
@@ -126,6 +128,7 @@ const EnterpriseSider: React.FC = () => {
           className='enterprise-sider__utility enterprise-sider__utility--button'
           type='text'
           htmlType='button'
+          aria-label={t('enterprise.shell.actions.logout')}
           loading={logoutPending}
           icon={logoutPending ? undefined : <Logout size={17} />}
           onClick={() => void handleLogout()}
