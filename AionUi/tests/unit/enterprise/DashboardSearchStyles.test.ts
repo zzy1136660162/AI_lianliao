@@ -36,4 +36,23 @@ describe('enterprise dashboard search styles', () => {
     expect(resultRule).toMatch(/max-height:/);
     expect(resultRule).toMatch(/overflow-y:\s*auto/);
   });
+
+  it('aligns the actual Ant search container, input and button to one control height', () => {
+    const searchContainerRule =
+      dashboardStyles.match(/\.searchControl\s+:global\(\.ll-ant-input-search\)\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const alignedControlsRule =
+      dashboardStyles.match(
+        /\.searchControl\s+:global\(\.ll-ant-input-affix-wrapper\),\s*\.searchControl\s+:global\(\.ll-ant-input-search-button\)\s*\{([^}]*)\}/s
+      )?.[1] ?? '';
+    const searchButtonRule =
+      dashboardStyles.match(
+        /\.searchControl\s+:global\(\.ll-ant-input-search-button\)\s*\{(?=[^}]*min-width)([^}]*)\}/s
+      )?.[1] ?? '';
+
+    expect(searchContainerRule).toMatch(/height:\s*46px/);
+    expect(alignedControlsRule).toMatch(/height:\s*46px/);
+    expect(searchButtonRule).toMatch(/min-width:\s*46px/);
+    expect(searchButtonRule).toMatch(/border-start-end-radius:\s*10px/);
+    expect(searchButtonRule).toMatch(/border-end-end-radius:\s*10px/);
+  });
 });

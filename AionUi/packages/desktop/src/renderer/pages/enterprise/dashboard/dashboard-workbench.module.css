@@ -118,9 +118,18 @@
   margin-top: 16px;
 }
 
-.searchControl :global(.ll-ant-select-auto-complete),
+.searchControl :global(.ll-ant-select-auto-complete) {
+  width: 100%;
+}
+
 .searchControl :global(.ll-ant-input-search) {
   width: 100%;
+  height: 46px;
+}
+
+.searchControl :global(.ll-ant-input-affix-wrapper),
+.searchControl :global(.ll-ant-input-search-button) {
+  height: 46px;
 }
 
 .searchControl :global(.ll-ant-input-affix-wrapper) {
@@ -128,6 +137,12 @@
   border-color: var(--border-base);
   border-radius: 10px;
   background: var(--bg-2);
+}
+
+.searchControl :global(.ll-ant-input-search-button) {
+  min-width: 46px;
+  border-start-end-radius: 10px;
+  border-end-end-radius: 10px;
 }
 
 .searchControl :global(.ll-ant-input-affix-wrapper-focused) {
