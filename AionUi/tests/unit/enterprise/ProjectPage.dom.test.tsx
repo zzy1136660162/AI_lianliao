@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import type { EnterpriseRequest, EnterpriseResponse } from '@/common/enterprise/contracts';
+import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
 import ProjectDetailPage from '@/renderer/pages/enterprise/projects/ProjectDetailPage';
 import ProjectPage from '@/renderer/pages/enterprise/projects/ProjectPage';
 
@@ -135,12 +136,14 @@ const LocationProbe = () => {
 
 const renderProjects = (client: EnterpriseClient) =>
   render(
-    <MemoryRouter initialEntries={['/enterprise/projects']}>
-      <Routes>
-        <Route path='/enterprise/projects' element={<ProjectPage client={client} />} />
-        <Route path='/enterprise/projects/:hpInfoId' element={<LocationProbe />} />
-      </Routes>
-    </MemoryRouter>
+    <EnterpriseAntdProvider>
+      <MemoryRouter initialEntries={['/enterprise/projects']}>
+        <Routes>
+          <Route path='/enterprise/projects' element={<ProjectPage client={client} />} />
+          <Route path='/enterprise/projects/:hpInfoId' element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </EnterpriseAntdProvider>
   );
 
 describe('project dashboard and catalog', () => {
@@ -154,6 +157,8 @@ describe('project dashboard and catalog', () => {
     const { container } = renderProjects(createClient(createRequest()));
 
     expect(await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible();
+    expect(container.querySelector('.ll-ant-table')).toBeInTheDocument();
+    expect(container.querySelector('[class*="arco-"]')).not.toBeInTheDocument();
     expect(screen.getByText('128')).toBeVisible();
     expect(container).toHaveTextContent('36.5');
     expect(screen.getByText('Shenyang')).toBeVisible();
@@ -181,27 +186,37 @@ describe('project dashboard and catalog', () => {
 
   it('submits all desktop project filters at page one', async () => {
     const request = createRequest();
-    const user = userEvent.setup();
     renderProjects(createClient(request));
     await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
 
-    await user.type(screen.getByPlaceholderText('enterprise.projects.filters.keywordPlaceholder'), ' factory ');
-    await user.type(screen.getByPlaceholderText('enterprise.projects.filters.categoryL1Placeholder'), ' Building ');
-    await user.type(screen.getByPlaceholderText('enterprise.projects.filters.categoryL2Placeholder'), ' Materials ');
-    await user.type(
-      screen.getByPlaceholderText('enterprise.projects.filters.materialShortNamePlaceholder'),
-      ' Cement '
-    );
-    await user.type(screen.getByPlaceholderText('enterprise.projects.filters.materialNamePlaceholder'), ' P.O 42.5 ');
-    await user.type(screen.getByPlaceholderText('enterprise.projects.filters.provincePlaceholder'), ' Liaoning ');
-    await user.type(screen.getByPlaceholderText('enterprise.projects.filters.cityPlaceholder'), ' Shenyang ');
+    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.keywordPlaceholder'), {
+      target: { value: ' factory ' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.categoryL1Placeholder'), {
+      target: { value: ' Building ' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.categoryL2Placeholder'), {
+      target: { value: ' Materials ' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.materialShortNamePlaceholder'), {
+      target: { value: ' Cement ' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.materialNamePlaceholder'), {
+      target: { value: ' P.O 42.5 ' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.provincePlaceholder'), {
+      target: { value: ' Liaoning ' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.cityPlaceholder'), {
+      target: { value: ' Shenyang ' },
+    });
     fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.minInvestmentPlaceholder'), {
       target: { value: '1000' },
     });
     fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.maxInvestmentPlaceholder'), {
       target: { value: '8000' },
     });
-    await user.click(screen.getByRole('button', { name: 'enterprise.projects.actions.search' }));
+    fireEvent.click(screen.getByRole('button', { name: 'enterprise.projects.actions.search' }));
 
     await waitFor(() =>
       expect(request).toHaveBeenCalledWith({
@@ -257,16 +272,18 @@ describe('project dashboard and catalog', () => {
       if (listCalls === 2) return pageTwo.promise;
       return pageThree.promise;
     });
-    const { container } = renderProjects(createClient(request));
+    renderProjects(createClient(request));
 
     const row = (await screen.findByRole('heading', { name: /Region one/ })).closest('tr') as HTMLElement;
     fireEvent.click(row);
     expect(screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' })).toBeVisible();
-    const pageButtons = () => Array.from(container.querySelectorAll('.arco-pagination-item'));
-    fireEvent.click(pageButtons().find((item) => item.textContent === '2') as HTMLElement);
+    fireEvent.click(screen.getByTitle('2'));
+    await waitFor(() =>
+      expect(HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    );
     expect(screen.getByRole('heading', { name: /Region one/ })).toBeVisible();
     expect(screen.queryByRole('complementary', { name: 'enterprise.projects.quickView.label' })).toBeNull();
-    fireEvent.click(pageButtons().find((item) => item.textContent === '3') as HTMLElement);
+    fireEvent.click(screen.getByTitle('3'));
 
     pageThree.resolve(listResponse('Latest project', '903', 3, 45, 'Region three'));
     expect(await screen.findByRole('heading', { name: /Region three/ })).toBeVisible();
@@ -325,7 +342,7 @@ describe('project dashboard and catalog', () => {
         listResponse('Paged project', operation.payload.pageNum === 2 ? '902' : '901', operation.payload.pageNum, 21)
       );
     });
-    const { container } = renderProjects(createClient(request));
+    renderProjects(createClient(request));
 
     const row = (await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).closest(
       'tr'
@@ -335,9 +352,7 @@ describe('project dashboard and catalog', () => {
     await waitFor(() =>
       expect(screen.getByRole('complementary', { name: 'enterprise.projects.quickView.label' })).toHaveFocus()
     );
-    const pageTwo = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
-      (item) => item.textContent === '2'
-    ) as HTMLElement;
+    const pageTwo = screen.getByTitle('2');
     await user.click(pageTwo);
 
     const catalog = screen.getByRole('region', { name: 'enterprise.projects.catalog.title' });
@@ -363,11 +378,13 @@ describe('project detail permission display', () => {
 
   const renderDetail = (client: EnterpriseClient, hpInfoId = '901') =>
     render(
-      <MemoryRouter initialEntries={[`/enterprise/projects/${hpInfoId}`]}>
-        <Routes>
-          <Route path='/enterprise/projects/:hpInfoId' element={<ProjectDetailPage client={client} />} />
-        </Routes>
-      </MemoryRouter>
+      <EnterpriseAntdProvider>
+        <MemoryRouter initialEntries={[`/enterprise/projects/${hpInfoId}`]}>
+          <Routes>
+            <Route path='/enterprise/projects/:hpInfoId' element={<ProjectDetailPage client={client} />} />
+          </Routes>
+        </MemoryRouter>
+      </EnterpriseAntdProvider>
     );
 
   it('hides protected fields and offers no unlock action when the project is not purchased', async () => {
@@ -392,6 +409,8 @@ describe('project detail permission display', () => {
     const { container } = renderDetail(createClient(request));
 
     expect(await screen.findByText('enterprise.projectDetail.locked.title')).toBeVisible();
+    expect(container.querySelector('.ll-ant-card')).toBeInTheDocument();
+    expect(container.querySelector('[class*="arco-"]')).not.toBeInTheDocument();
     expect(screen.getByText(/enterprise\.projectDetail\.lockedProjectTitle/)).toBeVisible();
     expect(screen.getByText('Plant and warehouse')).toBeVisible();
     expect(container).not.toHaveTextContent('Secret owner');

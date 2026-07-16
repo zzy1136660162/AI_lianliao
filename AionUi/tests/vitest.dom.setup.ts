@@ -46,6 +46,12 @@ global.electronAPI = {
 
 if (typeof window !== 'undefined') {
   (window as unknown as { electronAPI: ElectronAPI }).electronAPI = global.electronAPI;
+
+  // jsdom logs a not-implemented error whenever Ant Design asks for a
+  // pseudo-element style. Tests only need the originating element's computed
+  // style, so keep the native jsdom calculation and ignore that second value.
+  const getComputedStyle = window.getComputedStyle.bind(window);
+  window.getComputedStyle = (element: Element) => getComputedStyle(element);
 }
 
 // Mock ResizeObserver for Virtuoso

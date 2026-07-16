@@ -1,4 +1,4 @@
-import { Button, Pagination, Table, Tag, type TableColumnProps } from '@arco-design/web-react';
+import { Button, Pagination, Table, Tag, type TableColumnsType } from 'antd';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -8,15 +8,17 @@ import { displayProjectName } from './projectData';
 import styles from './project-workspace.module.css';
 
 export type ProjectTableProps = {
+  listTopRef: React.Ref<HTMLDivElement>;
   page: EnterprisePage<EnterpriseProjectSummary>;
   loading: boolean;
   selected: EnterpriseProjectSummary | null;
   onSelect: (project: EnterpriseProjectSummary, trigger: HTMLTableRowElement) => void;
   onViewDetails: (project: EnterpriseProjectSummary) => void;
-  onPageChange: (pageNum: number, pageSize?: number) => void;
+  onPageChange: (pageNum: number, pageSize: number) => void;
 };
 
 const ProjectTable: React.FC<ProjectTableProps> = ({
+  listTopRef,
   page,
   loading,
   selected,
@@ -26,7 +28,7 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
 }) => {
   const { t } = useTranslation();
   const missing = t('enterprise.projects.missing');
-  const columns = useMemo<TableColumnProps<EnterpriseProjectSummary>[]>(
+  const columns = useMemo<TableColumnsType<EnterpriseProjectSummary>>(
     () => [
       {
         title: t('enterprise.projects.columns.name'),
@@ -98,11 +100,11 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
   );
 
   return (
-    <div className={styles.tablePanel}>
+    <div ref={listTopRef} className={styles.tablePanel}>
       <Table<EnterpriseProjectSummary>
         rowKey='hpInfoId'
         columns={columns}
-        data={page.list}
+        dataSource={page.list}
         pagination={false}
         loading={loading}
         scroll={{ x: 1160 }}
@@ -127,10 +129,9 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
           pageSize={page.pageSize}
           total={page.total}
           size='small'
-          showJumper
-          showTotal
-          sizeCanChange
-          sizeOptions={[10, 20, 50]}
+          showQuickJumper
+          showSizeChanger
+          pageSizeOptions={[10, 20, 50]}
           onChange={onPageChange}
         />
       </div>

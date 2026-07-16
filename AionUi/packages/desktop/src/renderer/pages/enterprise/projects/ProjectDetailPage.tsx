@@ -1,5 +1,5 @@
-import { Alert, Button, Card, Tag } from '@arco-design/web-react';
 import { Left, Lock } from '@icon-park/react';
+import { Alert, Button, Card, Tag } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -78,12 +78,12 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
             showIcon
             icon={<Lock />}
             title={t('enterprise.projectDetail.locked.title')}
-            content={t('enterprise.projectDetail.locked.description')}
+            description={t('enterprise.projectDetail.locked.description')}
           />
         ) : null}
 
         <div className={styles.detailColumns}>
-          <Card title={t('enterprise.projectDetail.sections.profile')} bordered>
+          <Card title={t('enterprise.projectDetail.sections.profile')} variant='outlined'>
             <dl className={styles.detailFacts}>
               {commonFacts.map(([key, value]) => (
                 <div key={key}>
@@ -94,7 +94,7 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
             </dl>
           </Card>
           {purchased ? (
-            <Card title={t('enterprise.projectDetail.sections.contact')} bordered>
+            <Card title={t('enterprise.projectDetail.sections.contact')} variant='outlined'>
               <dl className={styles.detailFacts}>
                 {[
                   ['constructionUnit', project.constructionUnit],
@@ -119,7 +119,7 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
             ['equipment', project.equipment],
             ['materials', project.materials],
           ].map(([key, value]) => (
-            <Card key={key} title={t(`enterprise.projectDetail.sections.${key}`)} bordered>
+            <Card key={key} title={t(`enterprise.projectDetail.sections.${key}`)} variant='outlined'>
               <p className={styles.plainText}>{value || missing}</p>
             </Card>
           ))}

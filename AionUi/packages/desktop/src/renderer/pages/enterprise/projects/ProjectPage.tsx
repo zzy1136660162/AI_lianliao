@@ -1,11 +1,12 @@
-import { Button, Form, Input, InputNumber } from '@arco-design/web-react';
 import { Refresh, Search } from '@icon-park/react';
+import { Button, Form, Input, InputNumber } from 'antd';
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 import type { EnterpriseProjectSummary } from '@/common/enterprise/contracts';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
+import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
@@ -27,6 +28,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
   const [selectedProject, setSelectedProject] = useState<EnterpriseProjectSummary | null>(null);
   const selectionTriggerRef = useRef<HTMLTableRowElement | null>(null);
   const catalogSectionRef = useRef<HTMLElement | null>(null);
+  const { targetRef: listTopRef, scrollToTarget } = useEnterprisePaginationScroll<HTMLDivElement>();
 
   const clearPreviewAndFocus = (preferredTarget?: HTMLElement | null) => {
     const hadSelection = selectedProject !== null;
@@ -50,9 +52,10 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
     clearPreviewAndFocus(catalogSectionRef.current);
     catalog.applyFilters({});
   };
-  const changePage = (pageNum: number, pageSize?: number) => {
+  const changePage = (pageNum: number, pageSize: number) => {
     clearPreviewAndFocus(catalogSectionRef.current);
     catalog.changePage(pageNum, pageSize);
+    scrollToTarget();
   };
   const retry = () => {
     overview.retry();
@@ -107,6 +110,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
           ) : (
             <div className={selectedProject ? styles.catalogWithPreview : styles.catalog}>
               <ProjectTable
+                listTopRef={listTopRef}
                 page={catalog.data}
                 loading={catalog.isLoading && catalog.isRetainingData}
                 selected={selectedProject}
@@ -161,7 +165,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
         <div className={styles.headerRule} aria-hidden='true' />
       </header>
 
-      <Form className={styles.filterForm} layout='vertical' onSubmit={applyFilters}>
+      <Form className={styles.filterForm} layout='vertical' onFinish={applyFilters}>
         {textFields.map((field) => (
           <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
             <Input
@@ -169,7 +173,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
               maxLength={textFieldLimits[field]}
               allowClear
               placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
-              onChange={(value) => setDraftFilters((current) => ({ ...current, [field]: value }))}
+              onChange={(event) => setDraftFilters((current) => ({ ...current, [field]: event.target.value }))}
             />
           </Form.Item>
         ))}

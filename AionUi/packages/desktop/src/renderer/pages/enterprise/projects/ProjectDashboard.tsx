@@ -1,4 +1,4 @@
-import { Card, Progress, Statistic } from '@arco-design/web-react';
+import { Card, Progress, Statistic } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,7 +23,7 @@ const DistributionList: React.FC<{
             <span>{item.label}</span>
             <strong>{item.value}</strong>
           </div>
-          <Progress percent={maximum === 0 ? 0 : (item.value / maximum) * 100} showText={false} size='small' />
+          <Progress percent={maximum === 0 ? 0 : (item.value / maximum) * 100} showInfo={false} size='small' />
         </li>
       ))}
     </ol>
@@ -56,7 +56,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
 
       <div className={styles.metricGrid}>
         {metrics.map(([key, value], index) => (
-          <Card key={key} className={index < 2 ? styles.metricPrimary : styles.metricCard} bordered>
+          <Card key={key} className={index < 2 ? styles.metricPrimary : styles.metricCard} variant='outlined'>
             <Statistic
               title={t(`enterprise.projects.dashboard.metrics.${key}`)}
               value={value}
@@ -67,13 +67,13 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
       </div>
 
       <div className={styles.insightGrid}>
-        <Card title={t('enterprise.projects.dashboard.regionTitle')} bordered>
+        <Card title={t('enterprise.projects.dashboard.regionTitle')} variant='outlined'>
           <DistributionList
             items={dashboard.regionDistribution}
             emptyText={t('enterprise.projects.dashboard.distributionEmpty')}
           />
         </Card>
-        <Card title={t('enterprise.projects.dashboard.materialTitle')} bordered>
+        <Card title={t('enterprise.projects.dashboard.materialTitle')} variant='outlined'>
           <DistributionList
             items={dashboard.materialTop}
             emptyText={t('enterprise.projects.dashboard.distributionEmpty')}
@@ -81,7 +81,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
         </Card>
       </div>
 
-      <Card className={styles.drillCard} title={t('enterprise.projects.dashboard.categoryTitle')} bordered>
+      <Card className={styles.drillCard} title={t('enterprise.projects.dashboard.categoryTitle')} variant='outlined'>
         {drillItems.length ? (
           <div className={styles.drillGrid}>
             {drillItems.slice(0, 8).map((item, index) => (

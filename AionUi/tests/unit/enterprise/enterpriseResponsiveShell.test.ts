@@ -3,11 +3,23 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(resolve('packages/desktop/src/renderer/pages/enterprise/layout/enterprise-shell.css'), 'utf8');
+const projectCss = readFileSync(
+  resolve('packages/desktop/src/renderer/pages/enterprise/projects/project-workspace.module.css'),
+  'utf8'
+);
 const compactStart = css.indexOf('@media (max-width: 780px)');
 const compactEnd = css.indexOf('@media (prefers-reduced-motion: reduce)');
 const compactCss = css.slice(compactStart, compactEnd);
 
 describe('enterprise desktop shell CSS contract', () => {
+  it('keeps project loading, empty, and error cards at the full workspace width', () => {
+    const stateRule =
+      projectCss.match(/\.workspace\s*>\s*:global\(\.enterprise-page-state\)[^{]*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(stateRule).toMatch(/width:\s*100%/);
+    expect(stateRule).toMatch(/box-sizing:\s*border-box/);
+  });
+
   it('constrains the shell to the viewport without allowing its grid to grow', () => {
     const shellRule = css.match(/\.enterprise-shell\s*\{([^}]*)\}/s)?.[1] ?? '';
 

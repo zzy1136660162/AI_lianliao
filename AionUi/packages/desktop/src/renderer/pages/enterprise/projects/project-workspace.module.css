@@ -74,16 +74,16 @@
   box-shadow: var(--enterprise-shadow-card);
 }
 
-.filterForm :global(.arco-form-item) {
+.filterForm :global(.ll-ant-form-item) {
   margin: 0;
 }
 
-.filterForm :global(.arco-form-label-item) {
+.filterForm :global(.ll-ant-form-item-label > label) {
   color: var(--text-secondary);
   font-size: 11px;
 }
 
-.filterForm :global(.arco-input-number) {
+.filterForm :global(.ll-ant-input-number) {
   width: 100%;
 }
 
@@ -101,6 +101,8 @@
 
 .workspace > :global(.enterprise-page-state),
 .detailContent > :global(.enterprise-page-state) {
+  box-sizing: border-box;
+  width: 100%;
   min-height: min(430px, calc(100vh - 320px));
   background: var(--enterprise-surface);
   border: 1px solid var(--enterprise-border);
@@ -164,13 +166,13 @@
   opacity: 0.55;
 }
 
-.metricGrid :global(.arco-statistic-title) {
+.metricGrid :global(.ll-ant-statistic-title) {
   min-height: 32px;
   color: var(--text-secondary);
   font-size: 11px;
 }
 
-.metricGrid :global(.arco-statistic-value) {
+.metricGrid :global(.ll-ant-statistic-content) {
   color: var(--text-primary);
   font-family: var(--enterprise-font-ui);
   font-size: 24px;
@@ -204,7 +206,7 @@
   font-family: var(--enterprise-font-ui);
 }
 
-.distributionList :global(.arco-progress-line-bar) {
+.distributionList :global(.ll-ant-progress-bg) {
   background: var(--primary);
 }
 
@@ -288,16 +290,16 @@
   padding: 16px 18px;
 }
 
-.tablePanel :global(.arco-table-tr[tabindex='0']) {
+.tablePanel :global(.ll-ant-table-row[tabindex='0']) {
   cursor: pointer;
 }
 
-.tablePanel :global(.arco-table-tr[tabindex='0']:focus-visible) {
+.tablePanel :global(.ll-ant-table-row[tabindex='0']:focus-visible) {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
 
-.selectedRow :global(.arco-table-td) {
+.selectedRow :global(.ll-ant-table-cell) {
   background: color-mix(in srgb, var(--primary) 8%, var(--bg-2));
 }
 
