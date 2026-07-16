@@ -1,5 +1,5 @@
-import { Button, Form, Input, Pagination, Select, Table, type TableColumnProps } from '@arco-design/web-react';
 import { Refresh, Search } from '@icon-park/react';
+import { Button, Form, Input, Pagination, Select, Table, type TableColumnsType } from 'antd';
 import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import type { EnterpriseCompanySummary } from '@/common/enterprise/contracts';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
+import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
 
 import CompanyQuickView from './CompanyQuickView';
 import { COMPANY_LEVEL_FILTERS, COMPANY_VIP_FILTER_VALUE, type CompanyFilters, useCompanyCatalog } from './companyData';
@@ -25,13 +26,14 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
   const catalog = useCompanyCatalog(client);
   const [draftFilters, setDraftFilters] = useState<CompanyFilters>({});
   const [selectedCompany, setSelectedCompany] = useState<EnterpriseCompanySummary | null>(null);
+  const { targetRef, scrollToTarget } = useEnterprisePaginationScroll<HTMLDivElement>();
   const missing = t('enterprise.companies.missing');
 
   const viewDetails = (company: EnterpriseCompanySummary) => {
     navigate(companyDetailPath(company.companyId));
   };
 
-  const columns = useMemo<TableColumnProps<EnterpriseCompanySummary>[]>(
+  const columns = useMemo<TableColumnsType<EnterpriseCompanySummary>>(
     () => [
       {
         title: t('enterprise.companies.columns.name'),
@@ -111,9 +113,10 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
     catalog.applyFilters(draftFilters);
   };
 
-  const changePage = (pageNum: number, pageSize?: number) => {
+  const changePage = (pageNum: number, pageSize: number) => {
     setSelectedCompany(null);
     catalog.changePage(pageNum, pageSize);
+    scrollToTarget();
   };
 
   const renderContent = () => {
@@ -144,11 +147,11 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
 
     return (
       <div className={selectedCompany ? styles.catalogGridWithPreview : styles.catalogGrid}>
-        <div className={styles.tablePanel}>
+        <div ref={targetRef} className={styles.tablePanel}>
           <Table<EnterpriseCompanySummary>
             rowKey='companyId'
             columns={columns}
-            data={catalog.data.list}
+            dataSource={catalog.data.list}
             pagination={false}
             loading={catalog.isLoading && catalog.isRetainingData}
             scroll={{ x: 1148 }}
@@ -171,10 +174,9 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
               pageSize={catalog.query.pageSize}
               total={catalog.data.total}
               size='small'
-              showJumper
-              showTotal
-              sizeCanChange
-              sizeOptions={[10, 20, 50]}
+              showQuickJumper
+              showSizeChanger
+              pageSizeOptions={[10, 20, 50]}
               onChange={changePage}
             />
           </div>
@@ -201,13 +203,13 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
         <div className={styles.headerRule} aria-hidden='true' />
       </header>
 
-      <Form className={styles.filterForm} layout='vertical' onSubmit={submitFilters}>
+      <Form className={styles.filterForm} layout='vertical' onFinish={submitFilters}>
         <Form.Item label={t('enterprise.companies.filters.keywordLabel')}>
           <Input
             value={draftFilters.keyword}
             allowClear
             placeholder={t('enterprise.companies.filters.keywordPlaceholder')}
-            onChange={(keyword) => setDraftFilters((current) => ({ ...current, keyword }))}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
           />
         </Form.Item>
         <Form.Item label={t('enterprise.companies.filters.industryLabel')}>
@@ -215,7 +217,7 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             value={draftFilters.industry}
             allowClear
             placeholder={t('enterprise.companies.filters.industryPlaceholder')}
-            onChange={(industry) => setDraftFilters((current) => ({ ...current, industry }))}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, industry: event.target.value }))}
           />
         </Form.Item>
         <Form.Item label={t('enterprise.companies.filters.provinceLabel')}>
@@ -223,7 +225,7 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             value={draftFilters.province}
             allowClear
             placeholder={t('enterprise.companies.filters.provincePlaceholder')}
-            onChange={(province) => setDraftFilters((current) => ({ ...current, province }))}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, province: event.target.value }))}
           />
         </Form.Item>
         <Form.Item label={t('enterprise.companies.filters.cityLabel')}>
@@ -231,7 +233,7 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             value={draftFilters.city}
             allowClear
             placeholder={t('enterprise.companies.filters.cityPlaceholder')}
-            onChange={(city) => setDraftFilters((current) => ({ ...current, city }))}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, city: event.target.value }))}
           />
         </Form.Item>
         <Form.Item label={t('enterprise.companies.filters.districtLabel')}>
@@ -239,13 +241,14 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             value={draftFilters.district}
             allowClear
             placeholder={t('enterprise.companies.filters.districtPlaceholder')}
-            onChange={(district) => setDraftFilters((current) => ({ ...current, district }))}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, district: event.target.value }))}
           />
         </Form.Item>
         <Form.Item label={t('enterprise.companies.filters.memberLevelLabel')}>
           <Select
             value={draftFilters.vip ? COMPANY_VIP_FILTER_VALUE : draftFilters.companyLevel}
             allowClear
+            virtual={false}
             placeholder={t('enterprise.companies.filters.memberLevelPlaceholder')}
             options={[
               {

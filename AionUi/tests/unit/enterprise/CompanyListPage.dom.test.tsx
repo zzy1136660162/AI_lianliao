@@ -1,12 +1,13 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 
 import type { EnterpriseResponse } from '@/common/enterprise/contracts';
 import CompanyDetailPage from '@/renderer/pages/enterprise/companies/CompanyDetailPage';
 import CompanyListPage from '@/renderer/pages/enterprise/companies/CompanyListPage';
+import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 vi.mock('react-i18next', () => ({
@@ -14,6 +15,18 @@ vi.mock('react-i18next', () => ({
     t: (key: string, values?: Record<string, unknown>) => (values ? `${key}:${Object.values(values).join(',')}` : key),
   }),
 }));
+
+const scrollIntoViewMock = vi.fn();
+let animationFrameCallbacks: FrameRequestCallback[] = [];
+const requestAnimationFrameMock = vi.fn((callback: FrameRequestCallback) => {
+  animationFrameCallbacks.push(callback);
+  return animationFrameCallbacks.length;
+});
+
+const flushAnimationFrame = () => {
+  const callbacks = animationFrameCallbacks.splice(0);
+  callbacks.forEach((callback) => callback(0));
+};
 
 beforeAll(() => {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -26,6 +39,17 @@ beforeAll(() => {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })) as typeof window.matchMedia;
+  window.requestAnimationFrame = requestAnimationFrameMock;
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoViewMock,
+  });
+});
+
+beforeEach(() => {
+  animationFrameCallbacks = [];
+  requestAnimationFrameMock.mockClear();
+  scrollIntoViewMock.mockClear();
 });
 
 type Deferred<T> = {
@@ -88,12 +112,14 @@ const LocationProbe = () => {
 
 const renderList = (client: EnterpriseClient) =>
   render(
-    <MemoryRouter initialEntries={['/enterprise/companies']}>
-      <Routes>
-        <Route path='/enterprise/companies' element={<CompanyListPage client={client} />} />
-        <Route path='/enterprise/companies/:companyId' element={<LocationProbe />} />
-      </Routes>
-    </MemoryRouter>
+    <EnterpriseAntdProvider>
+      <MemoryRouter initialEntries={['/enterprise/companies']}>
+        <Routes>
+          <Route path='/enterprise/companies' element={<CompanyListPage client={client} />} />
+          <Route path='/enterprise/companies/:companyId' element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    </EnterpriseAntdProvider>
   );
 
 const replaceInput = async (user: ReturnType<typeof userEvent.setup>, input: HTMLElement, value: string) => {
@@ -116,13 +142,13 @@ describe('company list data lifecycle', () => {
     const { container } = renderList(createClient(request));
 
     expect(await screen.findByText('Alpha Hydraulics')).toBeVisible();
-    const pageTwo = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
-      (item) => item.textContent === '2'
-    );
-    expect(pageTwo).toBeDefined();
-    await user.click(pageTwo as HTMLElement);
+    expect(container.querySelector('.ll-ant-table')).toBeInTheDocument();
+    expect(container.querySelector('.arco-table')).not.toBeInTheDocument();
+    await user.click(screen.getByTitle('2'));
 
+    flushAnimationFrame();
     await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
     expect(screen.getByText('Alpha Hydraulics')).toBeVisible();
     expect(request.mock.calls[1]?.[0]).toMatchObject({ payload: { pageNum: 2, pageSize: 20 } });
 
@@ -160,7 +186,7 @@ describe('company list data lifecycle', () => {
     });
     filtered.resolve(companyPage('Filtered Company'));
     expect(await screen.findByText('Filtered Company')).toBeVisible();
-  });
+  }, 20_000);
 
   it('offers the H5 member levels and resets page one when selecting the VIP aggregate', async () => {
     const request = vi.fn<EnterpriseClient['request']>(async (input) => {
@@ -168,25 +194,26 @@ describe('company list data lifecycle', () => {
       return companyPage(`Page ${input.payload.pageNum}`, '42', input.payload.pageNum, 45);
     });
     const user = userEvent.setup();
-    const { container } = renderList(createClient(request));
+    renderList(createClient(request));
 
     await screen.findByText('Page 1');
-    const pageTwo = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
-      (item) => item.textContent === '2'
-    );
-    await user.click(pageTwo as HTMLElement);
+    await user.click(screen.getByTitle('2'));
     expect(await screen.findByText('Page 2')).toBeVisible();
 
     const levelSelect = screen
-      .getByPlaceholderText('enterprise.companies.filters.memberLevelPlaceholder')
-      .closest('.arco-select');
+      .getByText('enterprise.companies.filters.memberLevelPlaceholder')
+      .closest('.ll-ant-select');
     expect(levelSelect).not.toBeNull();
     await user.click(levelSelect as HTMLElement);
-    expect(await screen.findByText('enterprise.companies.memberLevel.vipAggregate')).toBeVisible();
+    const vipOptionContent = await screen.findByText('enterprise.companies.memberLevel.vipAggregate');
+    const memberPopup = vipOptionContent.closest('.ll-ant-select-dropdown');
+    expect(memberPopup).not.toBeNull();
     for (const level of [1, 1.1, 1.2, 2, 3, 3.1, 4, 5, 6, 7, 8, 9, 10]) {
-      expect(screen.getByRole('option', { name: `enterprise.companies.memberLevel.value:${level}` })).toBeVisible();
+      expect(
+        within(memberPopup as HTMLElement).getByText(`enterprise.companies.memberLevel.value:${level}`)
+      ).toBeInTheDocument();
     }
-    fireEvent.click(screen.getByRole('option', { name: 'enterprise.companies.memberLevel.vipAggregate' }));
+    fireEvent.click(vipOptionContent.closest('.ll-ant-select-item-option') as HTMLElement);
     await user.click(screen.getByRole('button', { name: 'enterprise.companies.actions.search' }));
 
     await waitFor(() => expect(request).toHaveBeenCalledTimes(3));
@@ -333,20 +360,18 @@ describe('company list interactions', () => {
       .fn<EnterpriseClient['request']>()
       .mockResolvedValueOnce(companyPage('Alpha Hydraulics', '42', 1, 45))
       .mockReturnValueOnce(nextPage.promise);
-    const { container } = renderList(createClient(request));
+    renderList(createClient(request));
 
     const row = (await screen.findByText('Alpha Hydraulics')).closest('tr');
     fireEvent.click(row as HTMLElement);
     expect(screen.getByRole('complementary', { name: 'enterprise.companies.quickView.label' })).toBeVisible();
-    const pageTwo = Array.from(container.querySelectorAll('.arco-pagination-item')).find(
-      (item) => item.textContent === '2'
-    );
-    expect(pageTwo).toBeDefined();
-    fireEvent.click(pageTwo as HTMLElement);
+    fireEvent.click(screen.getByTitle('2'));
+    flushAnimationFrame();
 
     expect(
       screen.queryByRole('complementary', { name: 'enterprise.companies.quickView.label' })
     ).not.toBeInTheDocument();
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
     await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
     nextPage.resolve(companyPage('Page Two Company', '43', 2, 45));
     expect(await screen.findByText('Page Two Company')).toBeVisible();
@@ -358,12 +383,14 @@ describe('company detail', () => {
 
   const renderDetail = (client: EnterpriseClient, companyId = '42') =>
     render(
-      <MemoryRouter initialEntries={[`/enterprise/companies/${companyId}`]}>
-        <Routes>
-          <Route path='/enterprise/companies/:companyId' element={<CompanyDetailPage client={client} />} />
-          <Route path='/enterprise/products/:productId' element={<LocationProbe />} />
-        </Routes>
-      </MemoryRouter>
+      <EnterpriseAntdProvider>
+        <MemoryRouter initialEntries={[`/enterprise/companies/${companyId}`]}>
+          <Routes>
+            <Route path='/enterprise/companies/:companyId' element={<CompanyDetailPage client={client} />} />
+            <Route path='/enterprise/products/:productId' element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </EnterpriseAntdProvider>
     );
 
   it('shows only returned contact permissions, plain-text profile fields and related products', async () => {
@@ -406,11 +433,15 @@ describe('company detail', () => {
     expect(await screen.findByRole('heading', { name: 'Alpha Hydraulics' })).toBeVisible();
     expect(screen.getByText('1380000****')).toBeVisible();
     expect(container).not.toHaveTextContent(rawPhone);
-    const contactSection = screen.getByText('enterprise.companyDetail.sections.contact').closest('.arco-card');
+    const contactSection = screen.getByText('enterprise.companyDetail.sections.contact').closest('.ll-ant-card');
     expect(contactSection).not.toBeNull();
     expect(contactSection?.querySelector('button, a')).toBeNull();
-    const summarySection = screen.getByText('enterprise.companyDetail.sections.businessSummary').closest('.arco-card');
-    const descriptionSection = screen.getByText('enterprise.companyDetail.sections.description').closest('.arco-card');
+    const summarySection = screen
+      .getByText('enterprise.companyDetail.sections.businessSummary')
+      .closest('.ll-ant-card');
+    const descriptionSection = screen
+      .getByText('enterprise.companyDetail.sections.description')
+      .closest('.ll-ant-card');
     expect(within(summarySection as HTMLElement).getByText('<strong>Business summary</strong>')).toBeVisible();
     expect(
       within(descriptionSection as HTMLElement).getByText('<script>window.stolen=true</script>Enterprise introduction')

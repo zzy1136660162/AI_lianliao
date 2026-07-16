@@ -1,5 +1,5 @@
-import { Button, Card, Tag } from '@arco-design/web-react';
 import { BuildingFour, Left } from '@icon-park/react';
+import { Button, Card, Tag } from 'antd';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -127,7 +127,7 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
         </section>
 
         <div className={styles.detailColumns}>
-          <Card title={t('enterprise.companyDetail.sections.basic')} bordered>
+          <Card title={t('enterprise.companyDetail.sections.basic')} variant='outlined'>
             <DetailFacts
               missing={missing}
               facts={[
@@ -155,7 +155,7 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
               ]}
             />
           </Card>
-          <Card title={t('enterprise.companyDetail.sections.contact')} bordered>
+          <Card title={t('enterprise.companyDetail.sections.contact')} variant='outlined'>
             <DetailFacts
               missing={missing}
               facts={[
@@ -175,13 +175,13 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
           </Card>
         </div>
 
-        <Card title={t('enterprise.companyDetail.sections.businessSummary')} bordered>
+        <Card title={t('enterprise.companyDetail.sections.businessSummary')} variant='outlined'>
           <p className={styles.plainText}>{company.businessSummary || missing}</p>
         </Card>
-        <Card title={t('enterprise.companyDetail.sections.description')} bordered>
+        <Card title={t('enterprise.companyDetail.sections.description')} variant='outlined'>
           <p className={styles.plainText}>{company.description || missing}</p>
         </Card>
-        <Card title={t('enterprise.companyDetail.sections.products')} bordered>
+        <Card title={t('enterprise.companyDetail.sections.products')} variant='outlined'>
           {products.list.length ? (
             <div className={styles.productGrid}>
               {products.list.map((product) => (

@@ -44,4 +44,9 @@ describe('enterprise catalog visual contract', () => {
     expectCardTokens(productCardRule);
     expect(productCardHoverRule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-hover\)/);
   });
+
+  it('styles the company catalog only through the scoped Ant Design prefix', () => {
+    expect(companyCss).toContain('.ll-ant-table');
+    expect(companyCss).not.toMatch(/\.arco-/);
+  });
 });

@@ -65,11 +65,11 @@
   box-shadow: var(--enterprise-shadow-card);
 }
 
-.filterForm :global(.arco-form-item) {
+.filterForm :global(.ll-ant-form-item) {
   margin: 0;
 }
 
-.filterForm :global(.arco-form-label-item) {
+.filterForm :global(.ll-ant-form-item-label > label) {
   color: var(--text-secondary);
   font-size: 11px;
 }
@@ -115,26 +115,26 @@
   overflow: hidden;
 }
 
-.tablePanel :global(.arco-table-container) {
+.tablePanel :global(.ll-ant-table-container) {
   border: 0;
 }
 
-.tablePanel :global(.arco-table-th) {
+.tablePanel :global(.ll-ant-table-thead > tr > .ll-ant-table-cell) {
   color: var(--text-secondary);
   background: var(--bg-2);
   font-size: 11px;
   letter-spacing: 0.025em;
 }
 
-.tablePanel :global(.arco-table-tr) {
+.tablePanel :global(.ll-ant-table-row) {
   cursor: pointer;
 }
 
-.tablePanel :global(.arco-table-tr:hover .arco-table-td) {
+.tablePanel :global(.ll-ant-table-row:hover > .ll-ant-table-cell) {
   background: var(--bg-hover);
 }
 
-.tablePanel :global(.arco-table-tr:focus-visible) {
+.tablePanel :global(.ll-ant-table-row:focus-visible) {
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
@@ -315,17 +315,17 @@
   gap: 14px;
 }
 
-.detailBody :global(.arco-card) {
+.detailBody :global(.ll-ant-card) {
   border-color: var(--border-base);
   border-radius: 2px;
   background: color-mix(in srgb, var(--bg-2) 86%, transparent);
 }
 
-.detailBody :global(.arco-card-header) {
+.detailBody :global(.ll-ant-card-head) {
   border-bottom-color: var(--border-light);
 }
 
-.detailBody :global(.arco-card-header-title) {
+.detailBody :global(.ll-ant-card-head-title) {
   font-family: var(--enterprise-font-ui);
   font-size: 15px;
 }
@@ -485,7 +485,7 @@
     flex-direction: column;
   }
 
-  .filterActions > :global(.arco-btn) {
+  .filterActions > :global(.ll-ant-btn) {
     flex: 1;
   }
 

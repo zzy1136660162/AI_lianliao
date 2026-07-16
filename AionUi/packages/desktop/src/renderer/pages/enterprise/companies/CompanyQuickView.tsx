@@ -1,5 +1,5 @@
-import { Button, Tag } from '@arco-design/web-react';
 import { ArrowRight, CloseSmall } from '@icon-park/react';
+import { Button, Tag } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -64,7 +64,7 @@ const CompanyQuickView: React.FC<CompanyQuickViewProps> = ({ company, onClose, o
       </dl>
 
       <p className={styles.quickViewHint}>{t('enterprise.companies.quickView.hint')}</p>
-      <Button type='primary' long icon={<ArrowRight />} onClick={() => onViewDetails(company)}>
+      <Button type='primary' block icon={<ArrowRight />} onClick={() => onViewDetails(company)}>
         {t('enterprise.companies.actions.viewDetails')}
       </Button>
     </aside>
