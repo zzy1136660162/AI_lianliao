@@ -9,6 +9,7 @@ import type { EnterpriseClient } from '@/renderer/services/enterprise/enterprise
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
+import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 
 import CompanyQuickView from './CompanyQuickView';
 import { COMPANY_LEVEL_FILTERS, COMPANY_VIP_FILTER_VALUE, type CompanyFilters, useCompanyCatalog } from './companyData';
@@ -62,22 +63,13 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
         title: t('enterprise.companies.columns.memberLevel'),
         dataIndex: 'companyLevel',
         width: 120,
-        render: (value) =>
-          typeof value === 'number'
-            ? t('enterprise.companies.memberLevel.value', { level: value })
-            : t('enterprise.companies.memberLevel.unknown'),
+        render: (value) => <CompanyMembershipBadge level={typeof value === 'number' ? value : undefined} compact />,
       },
       {
         title: t('enterprise.companies.columns.businessSummary'),
         dataIndex: 'businessSummary',
         width: 240,
         ellipsis: true,
-        render: (value) => value || missing,
-      },
-      {
-        title: t('enterprise.companies.columns.updatedAt'),
-        dataIndex: 'updatedAt',
-        width: 132,
         render: (value) => value || missing,
       },
       {
@@ -154,7 +146,7 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             dataSource={catalog.data.list}
             pagination={false}
             loading={catalog.isLoading && catalog.isRetainingData}
-            scroll={{ x: 1148 }}
+            scroll={{ x: 1016 }}
             onRow={(company) => ({
               tabIndex: 0,
               onClick: () => setSelectedCompany(company),
@@ -253,11 +245,16 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             options={[
               {
                 value: COMPANY_VIP_FILTER_VALUE,
-                label: t('enterprise.companies.memberLevel.vipAggregate'),
+                label: (
+                  <span className={styles.memberFilterOption}>
+                    <CompanyMembershipBadge level={1.2} compact />
+                    <span>{t('enterprise.companies.memberLevel.vipAggregate')}</span>
+                  </span>
+                ),
               },
               ...COMPANY_LEVEL_FILTERS.map((level) => ({
                 value: level,
-                label: t('enterprise.companies.memberLevel.value', { level }),
+                label: <CompanyMembershipBadge level={level} compact />,
               })),
             ]}
             onChange={(membership) =>

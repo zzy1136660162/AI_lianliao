@@ -1,9 +1,10 @@
 import { ArrowRight, CloseSmall } from '@icon-park/react';
-import { Button, Tag } from 'antd';
+import { Button } from 'antd';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { EnterpriseCompanySummary } from '@/common/enterprise/contracts';
+import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 
 import styles from './company-catalog.module.css';
 
@@ -40,7 +41,7 @@ const CompanyQuickView: React.FC<CompanyQuickViewProps> = ({ company, onClose, o
         <span>{t('enterprise.companies.quickView.title')}</span>
         <h2>{company.name}</h2>
         {company.companyLevel !== undefined ? (
-          <Tag>{t('enterprise.companies.memberLevel.value', { level: company.companyLevel })}</Tag>
+          <CompanyMembershipBadge level={company.companyLevel} compact />
         ) : null}
       </div>
 
@@ -56,10 +57,6 @@ const CompanyQuickView: React.FC<CompanyQuickViewProps> = ({ company, onClose, o
         <div>
           <dt>{t('enterprise.companies.columns.businessSummary')}</dt>
           <dd>{company.businessSummary || missing}</dd>
-        </div>
-        <div>
-          <dt>{t('enterprise.companies.columns.updatedAt')}</dt>
-          <dd>{company.updatedAt || missing}</dd>
         </div>
       </dl>
 

@@ -11,6 +11,7 @@ import {
   buildDistributionBarOption,
 } from '@/renderer/pages/enterprise/charts/projectChartOptions';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
+import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 import { useProjectDashboard } from '@/renderer/pages/enterprise/projects/projectData';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
@@ -169,7 +170,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
             {user?.companyLevel !== undefined ? (
               <div>
                 <dt>{t('enterprise.dashboard.identity.levelLabel')}</dt>
-                <dd>{t('enterprise.companies.memberLevel.value', { level: user.companyLevel })}</dd>
+                <dd>
+                  <CompanyMembershipBadge level={user.companyLevel} />
+                </dd>
               </div>
             ) : null}
           </dl>

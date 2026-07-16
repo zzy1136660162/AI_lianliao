@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import type { EnterpriseCompanyDetail, EnterpriseProductSummary } from '@/common/enterprise/contracts';
+import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
@@ -18,15 +19,17 @@ export type CompanyDetailPageProps = {
 
 type DetailFact = {
   label: string;
-  value?: string | number;
+  value?: React.ReactNode;
 };
+
+const isMissingFact = (value: React.ReactNode): boolean => value === undefined || value === null || value === '';
 
 const DetailFacts: React.FC<{ facts: DetailFact[]; missing: string }> = ({ facts, missing }) => (
   <dl className={styles.detailFacts}>
     {facts.map((fact) => (
       <div key={fact.label}>
         <dt>{fact.label}</dt>
-        <dd>{fact.value === undefined || fact.value === '' ? missing : fact.value}</dd>
+        <dd>{isMissingFact(fact.value) ? missing : fact.value}</dd>
       </div>
     ))}
   </dl>
@@ -120,7 +123,11 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
               {company.industry ? <Tag>{company.industry}</Tag> : null}
               {region ? <Tag>{region}</Tag> : null}
               {company.companyLevel !== undefined ? (
-                <Tag>{t('enterprise.companies.memberLevel.value', { level: company.companyLevel })}</Tag>
+                <CompanyMembershipBadge
+                  className={styles.detailMembership}
+                  level={company.companyLevel}
+                  compact
+                />
               ) : null}
             </div>
           </div>
@@ -150,7 +157,10 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
                 { label: t('enterprise.companyDetail.fields.industry'), value: company.industry },
                 {
                   label: t('enterprise.companyDetail.fields.memberLevel'),
-                  value: company.companyLevel,
+                  value:
+                    company.companyLevel === undefined ? undefined : (
+                      <CompanyMembershipBadge level={company.companyLevel} compact />
+                    ),
                 },
               ]}
             />

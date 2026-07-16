@@ -199,6 +199,7 @@ describe('enterprise dashboard', () => {
     expect(await screen.findByText('Liaoning Precision Equipment')).toBeVisible();
     expect(container.querySelector('.ll-ant-select-auto-complete')).toBeInTheDocument();
     expect(screen.getByText('Chen Wei')).toBeVisible();
+    expect(screen.getByRole('img', { name: 'enterprise.companies.memberLevel.vip' })).toBeVisible();
     expect(await screen.findByText('128')).toBeVisible();
     expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.regionTitle' })).toBeVisible();
     expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.materialTitle' })).toBeVisible();

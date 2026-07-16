@@ -144,6 +144,9 @@ describe('company list data lifecycle', () => {
     expect(await screen.findByText('Alpha Hydraulics')).toBeVisible();
     expect(container.querySelector('.ll-ant-table')).toBeInTheDocument();
     expect(container.querySelector('.arco-table')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'enterprise.companies.memberLevel.vip' })).toBeVisible();
+    expect(screen.queryByText('enterprise.companies.columns.updatedAt')).toBeNull();
+    expect(container.querySelector('table')).toHaveStyle({ width: '1016px' });
     await user.click(screen.getByTitle('2'));
 
     flushAnimationFrame();
@@ -208,10 +211,19 @@ describe('company list data lifecycle', () => {
     const vipOptionContent = await screen.findByText('enterprise.companies.memberLevel.vipAggregate');
     const memberPopup = vipOptionContent.closest('.ll-ant-select-dropdown');
     expect(memberPopup).not.toBeNull();
-    for (const level of [1, 1.1, 1.2, 2, 3, 3.1, 4, 5, 6, 7, 8, 9, 10]) {
-      expect(
-        within(memberPopup as HTMLElement).getByText(`enterprise.companies.memberLevel.value:${level}`)
-      ).toBeInTheDocument();
+    const popup = within(memberPopup as HTMLElement);
+    for (const label of [
+      'enterprise.companies.memberLevel.verified',
+      'enterprise.companies.memberLevel.ordinary',
+      'enterprise.companies.memberLevel.fourStar',
+      'enterprise.companies.memberLevel.fiveStar',
+      'enterprise.companies.memberLevel.flagship',
+    ]) {
+      expect(popup.getByRole('img', { name: label })).toBeInTheDocument();
+    }
+    expect(popup.getAllByRole('img', { name: 'enterprise.companies.memberLevel.vip' })).toHaveLength(4);
+    for (const level of [3.1, 7, 8, 9, 10]) {
+      expect(popup.getByText(`enterprise.companies.memberLevel.fallback:${level}`)).toBeInTheDocument();
     }
     fireEvent.click(vipOptionContent.closest('.ll-ant-select-item-option') as HTMLElement);
     await user.click(screen.getByRole('button', { name: 'enterprise.companies.actions.search' }));
@@ -294,6 +306,10 @@ describe('company list interactions', () => {
       name: 'enterprise.companies.quickView.label',
     });
     expect(within(quickView).getByText('Hydraulic systems')).toBeVisible();
+    expect(within(quickView).queryByText('enterprise.companies.columns.updatedAt')).toBeNull();
+    expect(
+      within(quickView).getByRole('img', { name: 'enterprise.companies.memberLevel.vip' })
+    ).toBeVisible();
 
     fireEvent.keyDown(row as HTMLElement, { key: 'Enter' });
     await user.click(within(quickView).getByRole('button', { name: 'enterprise.companies.actions.viewDetails' }));
@@ -409,6 +425,7 @@ describe('company detail', () => {
             address: 'No. 8 Industry Road',
             legalRepresentative: 'Zhang',
             companyType: 'Limited company',
+            companyLevel: 3,
             unifiedSocialCreditCode: 'CODE-42',
             contactName: 'Permission protected',
             phone: '1380000****',
@@ -431,6 +448,7 @@ describe('company detail', () => {
     const { container } = renderDetail(createClient(request));
 
     expect(await screen.findByRole('heading', { name: 'Alpha Hydraulics' })).toBeVisible();
+    expect(screen.getAllByRole('img', { name: 'enterprise.companies.memberLevel.vip' })).toHaveLength(2);
     expect(screen.getByText('1380000****')).toBeVisible();
     expect(container).not.toHaveTextContent(rawPhone);
     const contactSection = screen.getByText('enterprise.companyDetail.sections.contact').closest('.ll-ant-card');
