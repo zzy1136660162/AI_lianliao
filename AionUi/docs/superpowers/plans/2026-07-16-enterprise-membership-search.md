@@ -31,6 +31,7 @@
 ### Task 1: Add the pure H5-compatible membership resolver
 
 **Files:**
+
 - Create: `packages/desktop/src/renderer/pages/enterprise/membership/companyMembership.ts`
 - Create: `packages/desktop/src/renderer/pages/enterprise/membership/assets/sm.png`
 - Create: `packages/desktop/src/renderer/pages/enterprise/membership/assets/ordinary-member.png`
@@ -162,6 +163,7 @@ git commit -m "功能(企业会员): 封装 H5 等级映射"
 ### Task 2: Build the reusable accessible badge component
 
 **Files:**
+
 - Create: `packages/desktop/src/renderer/pages/enterprise/membership/CompanyMembershipBadge.tsx`
 - Create: `packages/desktop/src/renderer/pages/enterprise/membership/company-membership.module.css`
 - Modify: `packages/desktop/src/renderer/services/i18n/locales/zh-CN/enterprise.json`
@@ -215,10 +217,10 @@ Extend each locale's existing `companies.memberLevel` object with these keys whi
 
 Use these exact values:
 
-| Locale | verified | ordinary | vip | fourStar | fiveStar | flagship | fallback |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `zh-CN` | 实名认证 | 普通会员 | VIP 会员 | 4 星会员 | 5 星会员 | 旗舰店 | 会员等级 `{{level}}` |
-| `zh-TW` | 實名認證 | 普通會員 | VIP 會員 | 4 星會員 | 5 星會員 | 旗艦店 | 會員等級 `{{level}}` |
+| Locale  | verified          | ordinary        | vip        | fourStar      | fiveStar      | flagship       | fallback                     |
+| ------- | ----------------- | --------------- | ---------- | ------------- | ------------- | -------------- | ---------------------------- |
+| `zh-CN` | 实名认证          | 普通会员        | VIP 会员   | 4 星会员      | 5 星会员      | 旗舰店         | 会员等级 `{{level}}`         |
+| `zh-TW` | 實名認證          | 普通會員        | VIP 會員   | 4 星會員      | 5 星會員      | 旗艦店         | 會員等級 `{{level}}`         |
 | `en-US` | Verified business | Standard member | VIP member | 4-star member | 5-star member | Flagship store | Membership level `{{level}}` |
 | `ru-RU` | Verified business | Standard member | VIP member | 4-star member | 5-star member | Flagship store | Membership level `{{level}}` |
 
@@ -246,10 +248,7 @@ const CompanyMembershipBadge: React.FC<CompanyMembershipBadgeProps> = ({ level, 
   const label = t(membership.labelKey, membership.labelValues);
   const badgeClassName = [styles.badge, compact ? styles.compact : '', className ?? ''].filter(Boolean).join(' ');
   return (
-    <span
-      className={badgeClassName}
-      data-membership-kind={membership.kind}
-    >
+    <span className={badgeClassName} data-membership-kind={membership.kind}>
       {membership.iconSrc ? (
         <img className={styles.image} src={membership.iconSrc} alt={label} title={label} />
       ) : (
@@ -309,6 +308,7 @@ git commit -m "功能(企业会员): 增加统一等级标识组件"
 ### Task 3: Integrate the badge everywhere and remove update time
 
 **Files:**
+
 - Modify: `packages/desktop/src/renderer/pages/enterprise/dashboard/DashboardPage.tsx`
 - Modify: `packages/desktop/src/renderer/pages/enterprise/companies/CompanyListPage.tsx`
 - Modify: `packages/desktop/src/renderer/pages/enterprise/companies/CompanyQuickView.tsx`
@@ -324,7 +324,10 @@ Add assertions that:
 ```tsx
 expect(screen.getByRole('img', { name: 'enterprise.companies.memberLevel.vip' })).toBeVisible();
 expect(screen.queryByText('enterprise.companies.columns.updatedAt')).toBeNull();
-expect(container.querySelector('.enterprise-company-list .ll-ant-table')).toHaveAttribute('style', expect.not.stringContaining('1148'));
+expect(container.querySelector('.enterprise-company-list .ll-ant-table')).toHaveAttribute(
+  'style',
+  expect.not.stringContaining('1148')
+);
 ```
 
 In the detail render test, assert two VIP images exist: one in the identity area and one in the membership fact. In the quick-view test, assert the selected company renders the same VIP image. Update existing select assertions so known levels use business-name images and `3.1`, `7` through `10` use `memberLevel.fallback` text.
@@ -409,6 +412,7 @@ git commit -m "重构(企业会员): 统一工作台等级展示"
 ### Task 4: Align the dashboard search input and button
 
 **Files:**
+
 - Modify: `packages/desktop/src/renderer/pages/enterprise/dashboard/dashboard-workbench.module.css`
 - Test: `tests/unit/enterprise/DashboardSearchStyles.test.ts`
 
@@ -467,6 +471,7 @@ git commit -m "修复(企业工作台): 对齐统一搜索栏按钮"
 ### Task 5: Clarify adjacent comments and verify the complete change
 
 **Files:**
+
 - Modify: `packages/desktop/src/process/services/enterprise/enterpriseApiClient.ts`
 - Modify only if inaccurate: files changed in Tasks 1 through 4
 

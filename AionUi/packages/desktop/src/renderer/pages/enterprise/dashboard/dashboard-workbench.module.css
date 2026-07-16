@@ -128,7 +128,7 @@
 }
 
 .searchControl :global(.ll-ant-input-affix-wrapper),
-.searchControl :global(.ll-ant-input-search-button) {
+.searchControl :global(.ll-ant-input-search-btn) {
   height: 46px;
 }
 
@@ -139,7 +139,7 @@
   background: var(--bg-2);
 }
 
-.searchControl :global(.ll-ant-input-search-button) {
+.searchControl :global(.ll-ant-input-search-btn) {
   min-width: 46px;
   border-start-end-radius: 10px;
   border-end-end-radius: 10px;

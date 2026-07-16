@@ -42,11 +42,11 @@ describe('enterprise dashboard search styles', () => {
       dashboardStyles.match(/\.searchControl\s+:global\(\.ll-ant-input-search\)\s*\{([^}]*)\}/s)?.[1] ?? '';
     const alignedControlsRule =
       dashboardStyles.match(
-        /\.searchControl\s+:global\(\.ll-ant-input-affix-wrapper\),\s*\.searchControl\s+:global\(\.ll-ant-input-search-button\)\s*\{([^}]*)\}/s
+        /\.searchControl\s+:global\(\.ll-ant-input-affix-wrapper\),\s*\.searchControl\s+:global\(\.ll-ant-input-search-btn\)\s*\{([^}]*)\}/s
       )?.[1] ?? '';
     const searchButtonRule =
       dashboardStyles.match(
-        /\.searchControl\s+:global\(\.ll-ant-input-search-button\)\s*\{(?=[^}]*min-width)([^}]*)\}/s
+        /\.searchControl\s+:global\(\.ll-ant-input-search-btn\)\s*\{(?=[^}]*min-width)([^}]*)\}/s
       )?.[1] ?? '';
 
     expect(searchContainerRule).toMatch(/height:\s*46px/);
