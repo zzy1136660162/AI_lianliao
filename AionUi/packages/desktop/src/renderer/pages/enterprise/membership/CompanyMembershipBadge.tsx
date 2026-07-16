@@ -15,11 +15,7 @@ export type CompanyMembershipBadgeProps = {
  * Unknown levels stay visible as text so backend additions cannot create a
  * missing-image indicator or hide the source value from operators.
  */
-const CompanyMembershipBadge: React.FC<CompanyMembershipBadgeProps> = ({
-  level,
-  compact = false,
-  className,
-}) => {
+const CompanyMembershipBadge: React.FC<CompanyMembershipBadgeProps> = ({ level, compact = false, className }) => {
   const { t } = useTranslation();
   const membership = resolveCompanyMembership(level);
   const label = t(membership.labelKey, membership.labelValues);

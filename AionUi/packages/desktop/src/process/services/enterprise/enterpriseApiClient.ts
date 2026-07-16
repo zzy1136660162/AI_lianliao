@@ -168,6 +168,11 @@ const requireProjectIdentity = (context: EnterpriseUserContext): void => {
   if (!hasText(context.companyId)) throw apiError('MISSING_CONTEXT');
 };
 
+/**
+ * Converts renderer-friendly filters to the H5 controller contract.
+ * Identity fields come only from the validated desktop session; `keyword` and
+ * `companyLevel` intentionally become the legacy controller keys `name` and `comLevel`.
+ */
 const serializeCompanyList = (
   request: Extract<EnterpriseRequest, { operation: 'company.list' }>,
   context: EnterpriseUserContext

@@ -17,7 +17,7 @@ export type CompanyQuickViewProps = {
 const displayRegion = (company: EnterpriseCompanySummary, fallback: string): string =>
   [company.province, company.city, company.district].filter(Boolean).join(' / ') || fallback;
 
-/** Compact read-only company preview. Mutating actions are deliberately excluded from this phase. */
+/** Compact read-only preview; data mutations remain in dedicated enterprise workflows. */
 const CompanyQuickView: React.FC<CompanyQuickViewProps> = ({ company, onClose, onViewDetails }) => {
   const { t } = useTranslation();
   const missing = t('enterprise.companies.missing');
@@ -40,9 +40,7 @@ const CompanyQuickView: React.FC<CompanyQuickViewProps> = ({ company, onClose, o
       <div className={styles.quickViewHeading}>
         <span>{t('enterprise.companies.quickView.title')}</span>
         <h2>{company.name}</h2>
-        {company.companyLevel !== undefined ? (
-          <CompanyMembershipBadge level={company.companyLevel} compact />
-        ) : null}
+        {company.companyLevel !== undefined ? <CompanyMembershipBadge level={company.companyLevel} compact /> : null}
       </div>
 
       <dl className={styles.quickViewFacts}>

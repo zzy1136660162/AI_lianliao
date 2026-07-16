@@ -123,11 +123,7 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
               {company.industry ? <Tag>{company.industry}</Tag> : null}
               {region ? <Tag>{region}</Tag> : null}
               {company.companyLevel !== undefined ? (
-                <CompanyMembershipBadge
-                  className={styles.detailMembership}
-                  level={company.companyLevel}
-                  compact
-                />
+                <CompanyMembershipBadge className={styles.detailMembership} level={company.companyLevel} compact />
               ) : null}
             </div>
           </div>

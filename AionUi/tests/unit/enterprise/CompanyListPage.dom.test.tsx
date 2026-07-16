@@ -307,9 +307,7 @@ describe('company list interactions', () => {
     });
     expect(within(quickView).getByText('Hydraulic systems')).toBeVisible();
     expect(within(quickView).queryByText('enterprise.companies.columns.updatedAt')).toBeNull();
-    expect(
-      within(quickView).getByRole('img', { name: 'enterprise.companies.memberLevel.vip' })
-    ).toBeVisible();
+    expect(within(quickView).getByRole('img', { name: 'enterprise.companies.memberLevel.vip' })).toBeVisible();
 
     fireEvent.keyDown(row as HTMLElement, { key: 'Enter' });
     await user.click(within(quickView).getByRole('button', { name: 'enterprise.companies.actions.viewDetails' }));
