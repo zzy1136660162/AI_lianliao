@@ -260,10 +260,11 @@
       "fallback": "Membership level {{level}}"
     },
     "quickView": {
-      "label": "Company quick view",
+      "label": "Company overview",
       "index": "Company / {{index}}",
-      "title": "Selected company",
-      "hint": "Open the complete profile for contact visibility and related products returned by the service."
+      "title": "Company overview",
+      "hint": "Open the full company profile to learn more about the business, related products, and available contact details.",
+      "action": "Open company profile"
     },
     "empty": {
       "title": "No companies match these filters",
@@ -353,10 +354,11 @@
       "phone": "Phone"
     },
     "quickView": {
-      "label": "Product quick view",
+      "label": "Product overview",
       "index": "Product / {{index}}",
-      "title": "Selected product",
-      "hint": "Open the complete record for verified product information and a masked contact number."
+      "title": "Product overview",
+      "hint": "Open the full product profile to review product information, its company, and available contact details.",
+      "action": "Open product profile"
     },
     "empty": {
       "title": "No products match these filters",
@@ -470,10 +472,11 @@
       "description": "Select a row for a focused preview or open the verified detail record."
     },
     "quickView": {
-      "label": "Project quick view",
+      "label": "Project overview",
       "index": "Project / {{index}}",
-      "title": "Selected project",
-      "hint": "The detail view applies the service purchase state before showing protected owner and contact fields."
+      "title": "Project overview",
+      "hint": "Open the full project profile to review the construction unit, procurement needs, and contact-access status.",
+      "action": "Open project profile"
     },
     "empty": {
       "title": "No projects match these filters",
