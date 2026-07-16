@@ -63,9 +63,9 @@
 .enterprise-login__story h1 {
   max-width: 520px;
   margin: 0;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
   font-size: clamp(38px, 5vw, 68px);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: -0.045em;
   line-height: 1.04;
 }
@@ -107,7 +107,7 @@
 
 .enterprise-login__steps li > span {
   color: var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 12px;
   letter-spacing: 0.08em;
 }
@@ -166,6 +166,7 @@
 .enterprise-login__center-state h2 {
   margin: 0;
   font-size: 24px;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
@@ -241,7 +242,7 @@
 
 .enterprise-login__countdown {
   color: var(--text-primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 25px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.06em;

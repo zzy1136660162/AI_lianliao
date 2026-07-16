@@ -24,7 +24,8 @@
 .detailHero h2,
 .projectNameCell h2 {
   margin: 4px 0 0;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 
@@ -46,7 +47,7 @@
 .sectionHeading span,
 .quickViewIndex {
   color: var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -164,7 +165,7 @@
 
 .metricGrid :global(.arco-statistic-value) {
   color: var(--text-primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 24px;
 }
 
@@ -193,7 +194,7 @@
 }
 
 .distributionList strong {
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
 }
 
 .distributionList :global(.arco-progress-line-bar) {
@@ -224,7 +225,7 @@
 
 .drillGrid article > span {
   color: var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
 }
 
@@ -247,7 +248,7 @@
 
 .drillGrid dd {
   margin: 2px 0 0;
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 13px;
 }
 

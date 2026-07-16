@@ -5,6 +5,14 @@ import { describe, expect, it } from 'vitest';
 const rendererMain = readFileSync(resolve('packages/desktop/src/renderer/main.tsx'), 'utf8');
 const themePath = resolve('packages/desktop/src/renderer/styles/enterprise-theme.css');
 const themeCss = existsSync(themePath) ? readFileSync(themePath, 'utf8') : '';
+const enterprisePageStyles = [
+  'packages/desktop/src/renderer/pages/enterprise/layout/enterprise-shell.css',
+  'packages/desktop/src/renderer/pages/enterprise/dashboard/dashboard-workbench.module.css',
+  'packages/desktop/src/renderer/pages/enterprise/companies/company-catalog.module.css',
+  'packages/desktop/src/renderer/pages/enterprise/products/product-catalog.module.css',
+  'packages/desktop/src/renderer/pages/enterprise/projects/project-workspace.module.css',
+  'packages/desktop/src/renderer/pages/enterprise/login/enterprise-login.css',
+] as const;
 
 describe('enterprise visual theme contract', () => {
   it('loads the scoped enterprise theme after the shared color scheme', () => {
@@ -27,5 +35,11 @@ describe('enterprise visual theme contract', () => {
 
   it('does not apply the enterprise font to the global document', () => {
     expect(themeCss).not.toMatch(/(?:^|\n)\s*(?:html|body|:root)\s*\{/);
+  });
+
+  it.each(enterprisePageStyles)('uses the shared enterprise typeface in %s', (stylePath) => {
+    const css = readFileSync(resolve(stylePath), 'utf8');
+
+    expect(css).not.toMatch(/Noto Serif SC|Source Han Serif SC|ui-monospace|SFMono-Regular|\bmonospace\b/);
   });
 });

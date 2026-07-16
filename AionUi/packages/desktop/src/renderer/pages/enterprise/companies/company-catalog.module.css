@@ -18,7 +18,8 @@
 .detailIdentity h2,
 .quickViewHeading h2 {
   margin: 4px 0 0;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 
@@ -38,7 +39,7 @@
 .eyebrow,
 .quickViewIndex {
   color: var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -153,7 +154,7 @@
 
 .companyNameCell span {
   color: var(--text-secondary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
 }
 
@@ -320,7 +321,7 @@
 }
 
 .detailBody :global(.arco-card-header-title) {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
   font-size: 15px;
 }
 

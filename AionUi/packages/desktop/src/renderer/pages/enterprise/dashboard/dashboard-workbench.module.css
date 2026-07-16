@@ -31,7 +31,7 @@
 .sectionIndex,
 .cardHeading > span {
   color: var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -44,7 +44,8 @@
 .identityCompany h2,
 .quickCard h2 {
   margin: 4px 0 0;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 
@@ -67,7 +68,7 @@
   padding: 7px 10px;
   border: 1px solid var(--border-base);
   color: var(--text-secondary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
   letter-spacing: 0.11em;
 }
@@ -399,7 +400,7 @@
 
 .radarMetrics :global(.arco-statistic-value) {
   color: var(--text-primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 24px;
 }
 
@@ -439,7 +440,7 @@
 }
 
 .radarDistributions strong {
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
 }
 
 .radarDistributions :global(.arco-progress-line-bar) {

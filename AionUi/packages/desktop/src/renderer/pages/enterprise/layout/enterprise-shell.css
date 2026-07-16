@@ -55,7 +55,7 @@
   place-items: center;
   color: var(--primary);
   border: 1px solid var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -69,8 +69,9 @@
 }
 
 .enterprise-sider__brand strong {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
   font-size: 15px;
+  font-weight: 600;
 }
 
 .enterprise-sider__brand small,
@@ -128,6 +129,7 @@
   color: var(--text-secondary);
   border: 1px solid transparent;
   border-radius: var(--enterprise-radius-control);
+  font-weight: 500;
   text-decoration: none;
   transition:
     color 140ms ease,
@@ -246,7 +248,7 @@
 
 .enterprise-header__eyebrow {
   color: var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -324,7 +326,7 @@
 .enterprise-assistant__index {
   margin-bottom: 30px;
   color: var(--primary);
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--enterprise-font-ui);
   font-size: 10px;
   letter-spacing: 0.12em;
 }
@@ -335,8 +337,9 @@
 
 .enterprise-assistant h2 {
   margin: 18px 0 8px;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
   font-size: 18px;
+  font-weight: 600;
 }
 
 .enterprise-assistant p {
@@ -387,8 +390,9 @@
 
 .enterprise-page-state__copy h1 {
   margin: 0;
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-family: var(--enterprise-font-ui);
   font-size: clamp(24px, 3vw, 34px);
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 
