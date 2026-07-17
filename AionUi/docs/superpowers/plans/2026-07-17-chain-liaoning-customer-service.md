@@ -250,7 +250,7 @@ void rejectsInvalidIds(String value) {
 Run from `E:/ZZY_PROJECT/lianshang_liaoning/cloud-service`:
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=SignedIdCodecTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=SignedIdCodecTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 ```
 
 Expected: FAIL because `SignedIdCodec` does not exist.
@@ -283,7 +283,7 @@ SEQ_J_CY_CS_PUSH_LOG
 - [ ] **Step 4: 运行测试并提交脚本，不执行脚本**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=SignedIdCodecTest,CustomerServiceSchemaContractTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=SignedIdCodecTest,CustomerServiceSchemaContractTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/src/main/resources/db/customer_service.sql cloud-api/src/main/java/com/zzy/cloud/api/customer/domain/CustomerServiceEnums.java cloud-api/src/main/java/com/zzy/cloud/api/customer/util/SignedIdCodec.java cloud-api/src/test/java/com/zzy/cloud/api/customer
 git commit -m "客服：新增数据模型脚本与ID规则"
 ```
@@ -322,7 +322,7 @@ void staffRequiresRoleNineteenAndCustomerServicePost() {
 Run:
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceAuthServiceImplTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceAuthServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 ```
 
 Expected: FAIL because auth services do not exist.
@@ -345,7 +345,7 @@ cs:ws:ticket:<sha256> TTL 60 秒
 - [ ] **Step 4: 运行测试并提交**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceAuthServiceImplTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceAuthServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/src/main/java/com/zzy/cloud/api/customer cloud-api/src/main/java/com/zzy/cloud/api/mapper/customer/CustomerServiceIdentityMapper.java cloud-api/src/main/resources/mapper/customer/CustomerServiceIdentityMapper.xml cloud-api/src/test/java/com/zzy/cloud/api/customer/service/CustomerServiceAuthServiceImplTest.java
 git commit -m "客服：实现身份校验与短期令牌"
 ```
@@ -378,7 +378,7 @@ verify(ylsbUserService, times(1)).getAllocationKeFuUserInfo(argThat(json ->
 Run:
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceConversationServiceImplTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceConversationServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 ```
 
 Expected: FAIL because conversation services and mappers do not exist.
@@ -398,7 +398,7 @@ Expected: FAIL because conversation services and mappers do not exist.
 - [ ] **Step 5: 运行测试并提交**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceConversationServiceImplTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceConversationServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/src/main/java/com/zzy/cloud/api/customer cloud-api/src/main/java/com/zzy/cloud/api/mapper/customer cloud-api/src/main/resources/mapper/customer cloud-api/src/test/java/com/zzy/cloud/api/customer/service/CustomerServiceConversationServiceImplTest.java
 git commit -m "客服：实现会话恢复与客服分配"
 ```
@@ -441,7 +441,7 @@ TransactionSynchronizationManager.registerSynchronization(new TransactionSynchro
 - [ ] **Step 4: 运行测试并提交**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceMessageServiceImplTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceMessageServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/src/main/java/com/zzy/cloud/api/customer cloud-api/src/main/java/com/zzy/cloud/api/mapper/customer cloud-api/src/main/resources/mapper/customer cloud-api/src/test/java/com/zzy/cloud/api/customer/service/CustomerServiceMessageServiceImplTest.java
 git commit -m "客服：实现可靠消息与已读进度"
 ```
@@ -469,7 +469,7 @@ git commit -m "客服：实现可靠消息与已读进度"
 - [ ] **Step 4: 运行测试并提交**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceLifecycleTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceLifecycleTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/src/main/java/com/zzy/cloud/api/customer cloud-api/src/main/java/com/zzy/cloud/api/mapper/customer cloud-api/src/main/resources/mapper/customer cloud-api/src/test/java/com/zzy/cloud/api/customer/service/CustomerServiceLifecycleTest.java
 git commit -m "客服：实现转接与会话生命周期"
 ```
@@ -500,7 +500,7 @@ git commit -m "客服：实现转接与会话生命周期"
 - [ ] **Step 3: 运行测试并提交**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceNotificationServiceImplTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceNotificationServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/src/main/java/com/zzy/cloud/api/customer cloud-api/src/main/java/com/zzy/cloud/api/mapper/customer/CustomerServicePushMapper.java cloud-api/src/main/resources/mapper/customer/CustomerServicePushMapper.xml cloud-api/src/test/java/com/zzy/cloud/api/customer/service/CustomerServiceNotificationServiceImplTest.java
 git commit -m "客服：实现微信工单提醒与重试"
 ```
@@ -526,7 +526,7 @@ git commit -m "客服：实现微信工单提醒与重试"
 - [ ] **Step 3: 运行测试并提交**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceUploadServiceImplTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceUploadServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/src/main/java/com/zzy/cloud/api/customer cloud-api/src/test/java/com/zzy/cloud/api/customer/service/CustomerServiceUploadServiceImplTest.java
 git commit -m "客服：新增安全图片上传接口"
 ```
@@ -564,7 +564,7 @@ git commit -m "客服：新增安全图片上传接口"
 - [ ] **Step 4: 运行测试并提交**
 
 ```powershell
-mvn -pl cloud-api -am "-Dtest=CustomerServiceWebSocketHandlerTest" -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dtest=CustomerServiceWebSocketHandlerTest" "-Dsurefire.failIfNoSpecifiedTests=false" test
 git add cloud-api/pom.xml cloud-api/src/main/java/com/zzy/cloud/api/customer cloud-api/src/test/java/com/zzy/cloud/api/customer/websocket/CustomerServiceWebSocketHandlerTest.java
 git commit -m "客服：实现WebSocket实时通信"
 ```
@@ -595,7 +595,7 @@ git commit -m "客服：实现WebSocket实时通信"
 - [ ] **Step 4: 运行后端模块回归**
 
 ```powershell
-mvn -pl cloud-api -am -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dsurefire.failIfNoSpecifiedTests=false" test
 mvn -pl cloud-api -am -DskipTests package
 ```
 
@@ -908,7 +908,7 @@ Backend:
 
 ```powershell
 cd E:/ZZY_PROJECT/lianshang_liaoning/cloud-service
-mvn -pl cloud-api -am -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -pl cloud-api -am "-Dsurefire.failIfNoSpecifiedTests=false" test
 mvn -pl cloud-api -am -DskipTests package
 ```
 
