@@ -15,6 +15,8 @@ const EnterpriseShell: React.FC = () => {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
   const [assistantOpen, setAssistantOpen] = useState(true);
+  const isCustomerServiceRoute = location.pathname.startsWith('/enterprise/customer-service');
+  const effectiveAssistantOpen = assistantOpen && !isCustomerServiceRoute;
 
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
@@ -22,23 +24,34 @@ const EnterpriseShell: React.FC = () => {
 
   return (
     <EnterpriseAntdProvider>
-      <div className={`enterprise-shell${assistantOpen ? '' : ' enterprise-shell--assistant-closed'}`}>
+      <div
+        className={`enterprise-shell${effectiveAssistantOpen ? '' : ' enterprise-shell--assistant-closed'}${
+          isCustomerServiceRoute ? ' enterprise-shell--customer-service' : ''
+        }`}
+      >
         <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
         <EnterpriseSider />
         <div className='enterprise-shell__workspace'>
           <EnterpriseHeader
-            assistantOpen={assistantOpen}
+            assistantOpen={effectiveAssistantOpen}
+            assistantAvailable={!isCustomerServiceRoute}
             onToggleAssistant={() => setAssistantOpen((current) => !current)}
           />
           <div className='enterprise-shell__work-area'>
-            <main ref={mainRef} className='enterprise-shell__main' aria-label={t('enterprise.accessibility.workspace')}>
+            <main
+              ref={mainRef}
+              className={`enterprise-shell__main${
+                isCustomerServiceRoute ? ' enterprise-shell__main--customer-service' : ''
+              }`}
+              aria-label={t('enterprise.accessibility.workspace')}
+            >
               <Outlet />
             </main>
             <aside
               id='enterprise-assistant-panel'
               className='enterprise-assistant'
               aria-label={t('enterprise.accessibility.assistant')}
-              aria-hidden={!assistantOpen}
+              aria-hidden={!effectiveAssistantOpen}
             >
               <div className='enterprise-assistant__index'>{t('enterprise.assistant.index')}</div>
               <Robot size={24} />

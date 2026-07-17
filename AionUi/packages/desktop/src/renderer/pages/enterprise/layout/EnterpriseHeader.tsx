@@ -6,10 +6,12 @@ import { useLocation } from 'react-router-dom';
 
 type EnterpriseHeaderProps = {
   assistantOpen: boolean;
+  assistantAvailable?: boolean;
   onToggleAssistant: () => void;
 };
 
 const routeTitleKey = (pathname: string): string => {
+  if (pathname.startsWith('/enterprise/customer-service')) return 'enterprise.routes.customerService.title';
   if (pathname.startsWith('/enterprise/companies/')) return 'enterprise.routes.companyDetail.title';
   if (pathname.startsWith('/enterprise/companies')) return 'enterprise.routes.companies.title';
   if (pathname.startsWith('/enterprise/products/')) return 'enterprise.routes.productDetail.title';
@@ -22,7 +24,11 @@ const routeTitleKey = (pathname: string): string => {
 };
 
 /** Desktop title bar for the enterprise route namespace. */
-const EnterpriseHeader: React.FC<EnterpriseHeaderProps> = ({ assistantOpen, onToggleAssistant }) => {
+const EnterpriseHeader: React.FC<EnterpriseHeaderProps> = ({
+  assistantOpen,
+  assistantAvailable = true,
+  onToggleAssistant,
+}) => {
   const { t } = useTranslation();
   const location = useLocation();
   const assistantAction = assistantOpen
@@ -35,18 +41,20 @@ const EnterpriseHeader: React.FC<EnterpriseHeaderProps> = ({ assistantOpen, onTo
         <span className='enterprise-header__eyebrow'>{t('enterprise.shell.eyebrow')}</span>
         <span className='enterprise-header__route'>{t(routeTitleKey(location.pathname))}</span>
       </div>
-      <Button
-        className='enterprise-header__assistant-toggle'
-        type='text'
-        htmlType='button'
-        aria-label={assistantAction}
-        aria-expanded={assistantOpen}
-        aria-controls='enterprise-assistant-panel'
-        onClick={onToggleAssistant}
-      >
-        {assistantOpen ? <Right size={16} /> : <Left size={16} />}
-        <span>{assistantAction}</span>
-      </Button>
+      {assistantAvailable ? (
+        <Button
+          className='enterprise-header__assistant-toggle'
+          type='text'
+          htmlType='button'
+          aria-label={assistantAction}
+          aria-expanded={assistantOpen}
+          aria-controls='enterprise-assistant-panel'
+          onClick={onToggleAssistant}
+        >
+          {assistantOpen ? <Right size={16} /> : <Left size={16} />}
+          <span>{assistantAction}</span>
+        </Button>
+      ) : null}
     </header>
   );
 };

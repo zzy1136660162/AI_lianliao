@@ -97,7 +97,8 @@
     "products": "产品库",
     "projects": "在建项目",
     "favorites": "我的收藏",
-    "leads": "商机跟进"
+    "leads": "商机跟进",
+    "customerService": "客服接待"
   },
   "shell": {
     "brand": "链上辽宁·产业云城",
@@ -159,6 +160,10 @@
     "leads": {
       "title": "商机跟进",
       "description": "商机跟进能力将在下一产品阶段启用。"
+    },
+    "customerService": {
+      "title": "客服接待",
+      "description": "接收链辽真人客服会话，处理客户咨询并查看企业信息。"
     }
   },
   "pageState": {
@@ -503,6 +508,121 @@
     "error": {
       "title": "暂时无法加载项目详情",
       "description": "企业服务未返回有效的项目档案，请重试。"
+    }
+  },
+  "customerService": {
+    "title": "客服接待",
+    "queue": {
+      "eyebrow": "链辽真人客服"
+    },
+    "accessibility": {
+      "workspace": "客服接待工作台",
+      "queue": "客服会话队列",
+      "queues": "客服会话分类",
+      "timeline": "客服消息记录",
+      "profile": "客户与企业资料",
+      "composer": "客服消息输入区"
+    },
+    "queues": {
+      "pending": "待首次回复",
+      "active": "接待中",
+      "closed": "已结束"
+    },
+    "search": {
+      "placeholder": "搜索客户、电话或企业",
+      "ariaLabel": "搜索客服会话"
+    },
+    "list": {
+      "loading": "正在加载会话",
+      "empty": "当前分类暂无会话",
+      "noPreview": "暂无消息内容"
+    },
+    "timeline": {
+      "loading": "正在加载消息记录",
+      "selectConversation": "请选择一个会话开始接待",
+      "noSelection": "尚未选择会话",
+      "empty": "暂无消息，等待客户发起咨询",
+      "loadOlder": "加载更早消息",
+      "newMessages": "查看新消息",
+      "imageAlt": "客服会话图片",
+      "staffFallback": "客服人员"
+    },
+    "delivery": {
+      "sending": "发送中",
+      "delivered": "已送达",
+      "failed": "发送失败"
+    },
+    "composer": {
+      "placeholder": "输入回复内容，Enter 发送，Shift + Enter 换行",
+      "hint": "Enter 发送 · Shift + Enter 换行",
+      "image": "发送图片",
+      "send": "发送",
+      "closed": "会话已结束，无法继续回复。",
+      "transferred": "会话已转接给其他客服，当前仅可查看。"
+    },
+    "profile": {
+      "currentCustomer": "当前咨询客户",
+      "customer": "客户信息",
+      "company": "关联企业",
+      "phone": "联系电话",
+      "source": "咨询来源",
+      "companyName": "企业名称",
+      "assignedStaff": "当前接待客服",
+      "closedReason": "结束说明",
+      "unknownCustomer": "未知客户",
+      "companyUnavailable": "暂未关联企业",
+      "staffFallback": "客服人员",
+      "unavailable": "暂未提供",
+      "empty": "选择会话后查看客户资料",
+      "online": "在线",
+      "offline": "离线"
+    },
+    "status": {
+      "waiting": "等待分配",
+      "active": "接待中",
+      "closed": "已结束"
+    },
+    "connection": {
+      "idle": "尚未连接",
+      "connecting": "正在连接",
+      "connected": "实时连接正常",
+      "reconnecting": "正在重连",
+      "disconnected": "连接已断开"
+    },
+    "actions": {
+      "refresh": "刷新会话",
+      "retry": "重试",
+      "reconnect": "重新连接",
+      "search": "查询",
+      "transfer": "转接会话",
+      "close": "结束会话",
+      "cancel": "取消"
+    },
+    "transfer": {
+      "title": "转接给其他客服",
+      "searchPlaceholder": "搜索客服姓名",
+      "empty": "暂无可转接的客服",
+      "activeCount": "接待中 {{count}} 个",
+      "reasonPlaceholder": "填写转接说明（选填）",
+      "confirm": "确认转接",
+      "success": "会话已转接"
+    },
+    "close": {
+      "title": "结束当前会话",
+      "description": "结束后客服与客户均不能继续发送消息，请确认咨询已经处理完成。",
+      "reasonPlaceholder": "填写结束说明（选填）",
+      "confirm": "确认结束",
+      "success": "会话已结束"
+    },
+    "errors": {
+      "load": "暂时无法加载客服会话，请检查连接后重试。",
+      "loadConversation": "暂时无法加载该会话。",
+      "loadHistory": "暂时无法加载更早消息。",
+      "send": "消息发送失败，请重试。",
+      "upload": "图片发送失败，请检查图片格式后重试。",
+      "candidates": "暂时无法加载可转接客服。",
+      "transfer": "会话转接失败，数据可能已更新，请重试。",
+      "close": "结束会话失败，数据可能已更新，请重试。"
     }
   },
   "productDetail": {

@@ -97,7 +97,8 @@
     "products": "Products",
     "projects": "Projects",
     "favorites": "Favorites",
-    "leads": "Follow-ups"
+    "leads": "Follow-ups",
+    "customerService": "Customer service"
   },
   "shell": {
     "brand": "链上辽宁·产业云城",
@@ -159,6 +160,10 @@
     "leads": {
       "title": "Opportunity follow-ups",
       "description": "Opportunity follow-ups will be enabled in the next product phase."
+    },
+    "customerService": {
+      "title": "Customer service",
+      "description": "Receive live customer conversations, answer enquiries, and review company context."
     }
   },
   "pageState": {
@@ -523,6 +528,107 @@
     "error": {
       "title": "The project profile could not be loaded",
       "description": "The enterprise service did not return a valid project record. Try again."
+    }
+  },
+  "customerService": {
+    "title": "Customer service",
+    "queue": { "eyebrow": "Lianliao live support" },
+    "accessibility": {
+      "workspace": "Customer service workspace",
+      "queue": "Conversation queue",
+      "queues": "Conversation categories",
+      "timeline": "Conversation messages",
+      "profile": "Customer and company profile",
+      "composer": "Reply composer"
+    },
+    "queues": { "pending": "Awaiting reply", "active": "In progress", "closed": "Closed" },
+    "search": {
+      "placeholder": "Search customer, phone, or company",
+      "ariaLabel": "Search customer service conversations"
+    },
+    "list": {
+      "loading": "Loading conversations",
+      "empty": "No conversations in this category",
+      "noPreview": "No message preview"
+    },
+    "timeline": {
+      "loading": "Loading message history",
+      "selectConversation": "Select a conversation to begin",
+      "noSelection": "No conversation selected",
+      "empty": "No messages yet",
+      "loadOlder": "Load earlier messages",
+      "newMessages": "View new messages",
+      "imageAlt": "Customer service image",
+      "staffFallback": "Support agent"
+    },
+    "delivery": { "sending": "Sending", "delivered": "Delivered", "failed": "Failed" },
+    "composer": {
+      "placeholder": "Type a reply. Enter to send; Shift + Enter for a new line",
+      "hint": "Enter to send · Shift + Enter for a new line",
+      "image": "Send image",
+      "send": "Send",
+      "closed": "This conversation is closed and cannot receive replies.",
+      "transferred": "This conversation was transferred and is now read-only."
+    },
+    "profile": {
+      "currentCustomer": "Current customer",
+      "customer": "Customer",
+      "company": "Company",
+      "phone": "Phone",
+      "source": "Source",
+      "companyName": "Company name",
+      "assignedStaff": "Assigned agent",
+      "closedReason": "Closure note",
+      "unknownCustomer": "Unknown customer",
+      "companyUnavailable": "No company linked",
+      "staffFallback": "Support agent",
+      "unavailable": "Not available",
+      "empty": "Select a conversation to view its profile",
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "status": { "waiting": "Waiting", "active": "In progress", "closed": "Closed" },
+    "connection": {
+      "idle": "Not connected",
+      "connecting": "Connecting",
+      "connected": "Live connection active",
+      "reconnecting": "Reconnecting",
+      "disconnected": "Disconnected"
+    },
+    "actions": {
+      "refresh": "Refresh conversations",
+      "retry": "Retry",
+      "reconnect": "Reconnect",
+      "search": "Search",
+      "transfer": "Transfer conversation",
+      "close": "Close conversation",
+      "cancel": "Cancel"
+    },
+    "transfer": {
+      "title": "Transfer to another agent",
+      "searchPlaceholder": "Search agents",
+      "empty": "No agents are available",
+      "activeCount": "{{count}} active",
+      "reasonPlaceholder": "Transfer note (optional)",
+      "confirm": "Transfer",
+      "success": "Conversation transferred"
+    },
+    "close": {
+      "title": "Close this conversation",
+      "description": "Neither party can send more messages after closure. Confirm that the enquiry is complete.",
+      "reasonPlaceholder": "Closure note (optional)",
+      "confirm": "Close conversation",
+      "success": "Conversation closed"
+    },
+    "errors": {
+      "load": "Customer service conversations could not be loaded. Check the connection and try again.",
+      "loadConversation": "This conversation could not be loaded.",
+      "loadHistory": "Earlier messages could not be loaded.",
+      "send": "The message could not be sent. Try again.",
+      "upload": "The image could not be sent. Check the file format and try again.",
+      "candidates": "Transfer candidates could not be loaded.",
+      "transfer": "The conversation could not be transferred. Its data may have changed; try again.",
+      "close": "The conversation could not be closed. Its data may have changed; try again."
     }
   }
 }

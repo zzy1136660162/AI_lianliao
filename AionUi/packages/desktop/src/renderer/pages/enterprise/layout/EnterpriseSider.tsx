@@ -4,6 +4,7 @@ import {
   DashboardOne,
   EngineeringBrand,
   FollowUpDateSort,
+  HeadsetOne,
   Logout,
   Robot,
   SettingTwo,
@@ -37,6 +38,12 @@ const navigationGroups = [
     items: [
       { path: '/enterprise/favorites', labelKey: 'enterprise.navigation.favorites', Icon: Star },
       { path: '/enterprise/leads', labelKey: 'enterprise.navigation.leads', Icon: FollowUpDateSort },
+      {
+        path: '/enterprise/customer-service',
+        labelKey: 'enterprise.navigation.customerService',
+        Icon: HeadsetOne,
+        requiredRoleId: '19',
+      },
     ],
   },
 ] as const;
@@ -88,18 +95,25 @@ const EnterpriseSider: React.FC = () => {
               {t(groupLabelKey)}
             </p>
             <div className='enterprise-sider__nav-group-items'>
-              {items.map(({ path, labelKey, Icon }) => (
-                <NavLink
-                  key={path}
-                  to={path}
-                  className={({ isActive }) =>
-                    `enterprise-sider__nav-item${isActive ? ' enterprise-sider__nav-item--active' : ''}`
-                  }
-                >
-                  <Icon size={18} />
-                  <span>{t(labelKey)}</span>
-                </NavLink>
-              ))}
+              {items
+                .filter(
+                  (item) =>
+                    !('requiredRoleId' in item) ||
+                    item.requiredRoleId === undefined ||
+                    user?.roleId === item.requiredRoleId
+                )
+                .map(({ path, labelKey, Icon }) => (
+                  <NavLink
+                    key={path}
+                    to={path}
+                    className={({ isActive }) =>
+                      `enterprise-sider__nav-item${isActive ? ' enterprise-sider__nav-item--active' : ''}`
+                    }
+                  >
+                    <Icon size={18} />
+                    <span>{t(labelKey)}</span>
+                  </NavLink>
+                ))}
             </div>
           </section>
         ))}

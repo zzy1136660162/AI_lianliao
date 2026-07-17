@@ -33,6 +33,7 @@ const ProductDetailPage = React.lazy(() => import('@renderer/pages/enterprise/pr
 const ProjectPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectPage'));
 const ProjectDetailPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectDetailPage'));
 const DashboardPage = React.lazy(() => import('@renderer/pages/enterprise/dashboard/DashboardPage'));
+const CustomerServiceWorkbench = React.lazy(() => import('@renderer/pages/enterprise/customerService'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -137,6 +138,7 @@ export const PanelRoutes: React.FC<{ layout: React.ReactElement }> = ({ layout }
         <Route path='products/:productId' element={withRouteFallback(ProductDetailPage)} />
         <Route path='projects' element={withRouteFallback(ProjectPage)} />
         <Route path='projects/:hpInfoId' element={withRouteFallback(ProjectDetailPage)} />
+        <Route path='customer-service' element={withRouteFallback(CustomerServiceWorkbench)} />
         {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
           <Route
             key={path}
