@@ -1,7 +1,7 @@
 # 链辽真人客服系统设计
 
 - 日期：2026-07-17
-- 状态：设计已确认，等待规格审阅
+- 状态：设计已确认，规格审阅通过
 - 涉及项目：`AionUi`、`vip_store`、`cloud-service/cloud-api`
 
 ## 1. 背景与目标
@@ -159,6 +159,7 @@ flowchart LR
 - `VERSION`：乐观锁版本。
 - `CLOSED_BY_TYPE`、`CLOSED_BY_ID`、`CLOSED_REASON`、`CLOSED_AT`。
 - `ASSIGNED_AT`、`CREATED_AT`、`UPDATED_AT`、`DEL_SIGN`。
+- `STAFF_FIRST_REPLY_AT`：当前分配版本下客服首次回复时间；初次分配或转接时为空，用于派生“待接待”队列。
 
 使用基于状态的函数索引保证同一 `CUSTOMER_OPEN_ID` 只能存在一个 `WAITING` 或 `ACTIVE` 会话。Redis 创建锁用于降低冲突，Oracle 唯一约束负责最终一致性。
 
