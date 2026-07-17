@@ -162,7 +162,7 @@ export default defineConfig(({ mode }) => {
       // the output, which Electron's sandbox-mode preload cannot resolve from
       // node_modules (→ "module not found"). Bundling inlines the few hundred
       // bytes of IPC wiring we actually need.
-      plugins: [externalizeDepsPlugin({ exclude: ['@sentry/electron'] })],
+      plugins: [externalizeDepsPlugin({ exclude: ['@sentry/electron', 'zod'] })],
       resolve: {
         alias: {
           '@': resolve('packages/desktop/src'),

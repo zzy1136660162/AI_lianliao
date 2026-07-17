@@ -6,6 +6,26 @@ import type {
   EnterpriseResponse,
   EnterpriseUserContext,
 } from '../../enterprise/contracts';
+import type {
+  CustomerServiceCloseRequest,
+  CustomerServiceConnectionSnapshot,
+  CustomerServiceConversation,
+  CustomerServiceConversationIdRequest,
+  CustomerServiceConversationListRequest,
+  CustomerServiceImage,
+  CustomerServiceIpcResult,
+  CustomerServiceMarkReadRequest,
+  CustomerServiceMessage,
+  CustomerServiceMessageHistoryRequest,
+  CustomerServicePage,
+  CustomerServiceReadResult,
+  CustomerServiceSendMessageRequest,
+  CustomerServiceServerEnvelope,
+  CustomerServiceStaffCandidate,
+  CustomerServiceStaffCandidatesRequest,
+  CustomerServiceTransferRequest,
+  CustomerServiceUploadImageRequest,
+} from '../../enterprise/customer-service/contracts';
 
 // WebUI 状态接口 / WebUI status interface
 export interface WebUIStatus {
@@ -37,6 +57,34 @@ export interface ElectronBridgeAPI {
     restoreSession: () => Promise<EnterpriseIpcResult<EnterpriseUserContext | null>>;
     clearSession: () => Promise<EnterpriseIpcResult<void>>;
     request: (request: EnterpriseRequest) => Promise<EnterpriseIpcResult<EnterpriseResponse>>;
+  };
+  customerService?: {
+    connect: () => Promise<CustomerServiceIpcResult<CustomerServiceConnectionSnapshot>>;
+    disconnect: () => Promise<CustomerServiceIpcResult<void>>;
+    listConversations: (
+      request: CustomerServiceConversationListRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServicePage<CustomerServiceConversation>>>;
+    getConversation: (
+      request: CustomerServiceConversationIdRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
+    getHistory: (
+      request: CustomerServiceMessageHistoryRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServicePage<CustomerServiceMessage>>>;
+    sendMessage: (request: CustomerServiceSendMessageRequest) => Promise<CustomerServiceIpcResult<string>>;
+    markRead: (request: CustomerServiceMarkReadRequest) => Promise<CustomerServiceIpcResult<CustomerServiceReadResult>>;
+    uploadImage: (
+      request: CustomerServiceUploadImageRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServiceImage>>;
+    listCandidates: (
+      request: CustomerServiceStaffCandidatesRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServicePage<CustomerServiceStaffCandidate>>>;
+    transferConversation: (
+      request: CustomerServiceTransferRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
+    closeConversation: (
+      request: CustomerServiceCloseRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
+    onEvent: (callback: (event: CustomerServiceServerEnvelope) => void) => () => void;
   };
 }
 

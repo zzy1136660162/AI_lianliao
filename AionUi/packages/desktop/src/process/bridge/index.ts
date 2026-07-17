@@ -12,9 +12,15 @@ import { initWindowControlsBridge } from './windowControlsBridge';
 import { initNotificationBridge } from './notificationBridge';
 import { initWebuiBridge } from './webuiBridge';
 import { initThemeBridge } from './themeBridge';
-import { initEnterpriseBridge, type EnterpriseBridgeDependencies } from './enterpriseBridge';
+import {
+  initCustomerServiceBridge,
+  initEnterpriseBridge,
+  type CustomerServiceBridgeDependencies,
+  type EnterpriseBridgeDependencies,
+} from './enterpriseBridge';
 
 export type BridgeDependencies = {
+  customerService?: CustomerServiceBridgeDependencies;
   enterprise?: EnterpriseBridgeDependencies;
 };
 
@@ -28,6 +34,7 @@ export function initAllBridges(deps: BridgeDependencies = {}): void {
   initWebuiBridge();
   initThemeBridge();
   initEnterpriseBridge(deps.enterprise);
+  initCustomerServiceBridge(deps.customerService);
 }
 
 export {
@@ -39,6 +46,7 @@ export {
   initUpdateBridge,
   initWindowControlsBridge,
   initWebuiBridge,
+  initCustomerServiceBridge,
   initEnterpriseBridge,
 };
 export { registerWindowMaximizeListeners } from './windowControlsBridge';

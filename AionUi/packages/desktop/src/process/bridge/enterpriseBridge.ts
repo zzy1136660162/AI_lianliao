@@ -7,6 +7,42 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
 
 import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '@/common/enterprise/constants';
+import {
+  CUSTOMER_SERVICE_IPC_CHANNELS,
+  CUSTOMER_SERVICE_IPC_ERROR_MESSAGES,
+} from '@/common/enterprise/customer-service/constants';
+import type {
+  CustomerServiceCloseRequest,
+  CustomerServiceConnectionSnapshot,
+  CustomerServiceConversation,
+  CustomerServiceConversationIdRequest,
+  CustomerServiceConversationListRequest,
+  CustomerServiceImage,
+  CustomerServiceIpcErrorCode,
+  CustomerServiceIpcResult,
+  CustomerServiceMarkReadRequest,
+  CustomerServiceMessage,
+  CustomerServiceMessageHistoryRequest,
+  CustomerServicePage,
+  CustomerServiceReadResult,
+  CustomerServiceSendMessageRequest,
+  CustomerServiceServerEnvelope,
+  CustomerServiceStaffCandidate,
+  CustomerServiceStaffCandidatesRequest,
+  CustomerServiceTransferRequest,
+  CustomerServiceUploadImageRequest,
+} from '@/common/enterprise/customer-service/contracts';
+import {
+  CUSTOMER_SERVICE_COMMAND_SCHEMAS,
+  customerServiceConnectionSnapshotSchema,
+  customerServiceConversationSchema,
+  customerServiceImageSchema,
+  customerServiceMessageSchema,
+  customerServicePageSchema,
+  customerServiceReadResultSchema,
+  customerServiceServerEnvelopeSchema,
+  customerServiceStaffCandidateSchema,
+} from '@/common/enterprise/customer-service/schemas';
 import type {
   EnterpriseIpcErrorCode,
   EnterpriseIpcResult,
@@ -21,7 +57,13 @@ import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
 import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
+import { enterpriseSessionEvents } from '@process/services/enterprise/enterpriseSessionEvents';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
+import {
+  CustomerServiceGateway,
+  type CustomerServiceGatewayEventListener,
+} from '@process/services/enterprise/customer-service/customerServiceGateway';
+import { CustomerServiceApiError } from '@process/services/enterprise/customer-service/customerServiceApiClient';
 
 type EnterpriseIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<EnterpriseIpcResult<unknown>>;
 
@@ -50,6 +92,39 @@ export type EnterpriseBridgeDependencies = {
   ipcMain?: EnterpriseIpcMain;
   senderGuard?: EnterpriseSenderGuard;
   sessionStore?: EnterpriseSessionStoreDependency;
+};
+
+type CustomerServiceIpcHandler = (event: unknown, ...args: unknown[]) => Promise<CustomerServiceIpcResult<unknown>>;
+
+export type CustomerServiceIpcMain = {
+  handle: (channel: string, handler: CustomerServiceIpcHandler) => void;
+  removeHandler: (channel: string) => void;
+};
+
+export type CustomerServiceBridgeGateway = {
+  connect: () => Promise<CustomerServiceConnectionSnapshot>;
+  disconnect: () => Promise<void>;
+  listConversations: (
+    request: CustomerServiceConversationListRequest
+  ) => Promise<CustomerServicePage<CustomerServiceConversation>>;
+  getConversation: (request: CustomerServiceConversationIdRequest) => Promise<CustomerServiceConversation>;
+  getHistory: (request: CustomerServiceMessageHistoryRequest) => Promise<CustomerServicePage<CustomerServiceMessage>>;
+  sendMessage: (request: CustomerServiceSendMessageRequest) => string;
+  markRead: (request: CustomerServiceMarkReadRequest) => Promise<CustomerServiceReadResult>;
+  uploadImage: (request: CustomerServiceUploadImageRequest) => Promise<CustomerServiceImage>;
+  listCandidates: (
+    request: CustomerServiceStaffCandidatesRequest
+  ) => Promise<CustomerServicePage<CustomerServiceStaffCandidate>>;
+  transferConversation: (request: CustomerServiceTransferRequest) => Promise<CustomerServiceConversation>;
+  closeConversation: (request: CustomerServiceCloseRequest) => Promise<CustomerServiceConversation>;
+  subscribe: (listener: CustomerServiceGatewayEventListener) => () => void;
+};
+
+export type CustomerServiceBridgeDependencies = {
+  gateway?: CustomerServiceBridgeGateway;
+  ipcMain?: CustomerServiceIpcMain;
+  senderGuard?: (event: unknown) => boolean;
+  eventSink?: (event: CustomerServiceServerEnvelope) => void;
 };
 
 type EnterpriseOperation = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>;
@@ -413,6 +488,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     assertCurrentLifecycle();
     if (sessionGeneration !== clearGeneration) throw bridgeError('MISSING_CONTEXT');
     automaticHydrationBlocked = false;
+    enterpriseSessionEvents.emitCleared();
   };
 
   const clearSessionState = (): Promise<void> => {
@@ -588,4 +664,165 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
 
   for (const [channel] of handlers) ipcMain.removeHandler(channel);
   for (const [channel, handler] of handlers) ipcMain.handle(channel, handler);
+}
+
+let defaultCustomerServiceGateway: CustomerServiceBridgeGateway | undefined;
+let unsubscribeCustomerServiceBridgeEvents: (() => void) | undefined;
+
+const customerServiceFailure = (code: CustomerServiceIpcErrorCode): CustomerServiceIpcResult<never> => ({
+  ok: false,
+  error: { code, message: CUSTOMER_SERVICE_IPC_ERROR_MESSAGES[code] },
+});
+
+const normalizeCustomerServiceBridgeError = (error: unknown): CustomerServiceIpcErrorCode => {
+  if (error instanceof z.ZodError) return 'INVALID_REQUEST';
+  if (error instanceof CustomerServiceApiError) {
+    if (error.status === 401 || error.code === 'UNAUTHORIZED') return 'UNAUTHORIZED';
+    if (error.code === 'MISSING_ENTERPRISE_SESSION') return 'MISSING_ENTERPRISE_SESSION';
+    if (error.code === 'FORBIDDEN_STAFF' || error.status === 403) return 'FORBIDDEN_STAFF';
+    if (Object.prototype.hasOwnProperty.call(CUSTOMER_SERVICE_IPC_ERROR_MESSAGES, error.code)) {
+      return error.code as CustomerServiceIpcErrorCode;
+    }
+    if (error.status >= 400) return error.status === 408 ? 'TIMEOUT' : 'API_FAILURE';
+  }
+  return 'REQUEST_FAILED';
+};
+
+const broadcastCustomerServiceEvent = (event: CustomerServiceServerEnvelope): void => {
+  const expectedUrl = getExpectedRendererUrl();
+  if (!expectedUrl) return;
+  for (const window of BrowserWindow.getAllWindows()) {
+    try {
+      if (
+        !window.isDestroyed() &&
+        !window.webContents.isDestroyed() &&
+        hasExactRendererLocation(window.webContents.getURL(), expectedUrl)
+      ) {
+        window.webContents.send(CUSTOMER_SERVICE_IPC_CHANNELS.EVENT, event);
+      }
+    } catch {
+      // A closing window is skipped without interrupting delivery to other windows.
+    }
+  }
+};
+
+const getDefaultCustomerServiceGateway = (): CustomerServiceBridgeGateway => {
+  defaultCustomerServiceGateway ??= new CustomerServiceGateway({
+    sessionStore: getDefaultSessionStore(),
+    isPackaged: app.isPackaged,
+  });
+  return defaultCustomerServiceGateway;
+};
+
+/** Registers the fixed customer-service IPC commands under the enterprise trust boundary. */
+export function initCustomerServiceBridge(dependencies: CustomerServiceBridgeDependencies = {}): void {
+  const gateway = dependencies.gateway ?? getDefaultCustomerServiceGateway();
+  const ipcMain = dependencies.ipcMain ?? (electronIpcMain as unknown as CustomerServiceIpcMain);
+  const senderGuard =
+    dependencies.senderGuard ?? ((event: unknown) => isTrustedEnterpriseSender(event as IpcMainInvokeEvent));
+  const eventSink = dependencies.eventSink ?? broadcastCustomerServiceEvent;
+
+  const createHandler =
+    (
+      inputSchema: z.ZodTypeAny | undefined,
+      outputSchema: z.ZodTypeAny,
+      operation: (input: unknown) => unknown | Promise<unknown>
+    ): CustomerServiceIpcHandler =>
+    async (event, ...args) => {
+      if (!senderGuard(event)) return customerServiceFailure('UNTRUSTED_SENDER');
+      try {
+        let input: unknown;
+        if (inputSchema) {
+          if (args.length !== 1) return customerServiceFailure('INVALID_REQUEST');
+          input = inputSchema.parse(args[0]);
+        } else if (args.length !== 0) {
+          return customerServiceFailure('INVALID_REQUEST');
+        }
+        const result = await operation(input);
+        const output = outputSchema.safeParse(result);
+        if (!output.success) return customerServiceFailure('INVALID_RESPONSE');
+        return { ok: true, data: output.data };
+      } catch (error) {
+        return customerServiceFailure(normalizeCustomerServiceBridgeError(error));
+      }
+    };
+
+  const handlers: Array<[string, CustomerServiceIpcHandler]> = [
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.CONNECT,
+      createHandler(undefined, customerServiceConnectionSnapshotSchema, () => gateway.connect()),
+    ],
+    [CUSTOMER_SERVICE_IPC_CHANNELS.DISCONNECT, createHandler(undefined, z.void(), () => gateway.disconnect())],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.LIST_CONVERSATIONS,
+      createHandler(
+        CUSTOMER_SERVICE_COMMAND_SCHEMAS.listConversations,
+        customerServicePageSchema(customerServiceConversationSchema),
+        (request) => gateway.listConversations(request as CustomerServiceConversationListRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.GET_CONVERSATION,
+      createHandler(CUSTOMER_SERVICE_COMMAND_SCHEMAS.getConversation, customerServiceConversationSchema, (request) =>
+        gateway.getConversation(request as CustomerServiceConversationIdRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.GET_HISTORY,
+      createHandler(
+        CUSTOMER_SERVICE_COMMAND_SCHEMAS.getHistory,
+        customerServicePageSchema(customerServiceMessageSchema),
+        (request) => gateway.getHistory(request as CustomerServiceMessageHistoryRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.SEND_MESSAGE,
+      createHandler(CUSTOMER_SERVICE_COMMAND_SCHEMAS.sendMessage, z.string().uuid(), (request) =>
+        gateway.sendMessage(request as CustomerServiceSendMessageRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.MARK_READ,
+      createHandler(CUSTOMER_SERVICE_COMMAND_SCHEMAS.markRead, customerServiceReadResultSchema, (request) =>
+        gateway.markRead(request as CustomerServiceMarkReadRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.UPLOAD_IMAGE,
+      createHandler(CUSTOMER_SERVICE_COMMAND_SCHEMAS.uploadImage, customerServiceImageSchema, (request) =>
+        gateway.uploadImage(request as CustomerServiceUploadImageRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.LIST_CANDIDATES,
+      createHandler(
+        CUSTOMER_SERVICE_COMMAND_SCHEMAS.listCandidates,
+        customerServicePageSchema(customerServiceStaffCandidateSchema),
+        (request) => gateway.listCandidates(request as CustomerServiceStaffCandidatesRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.TRANSFER_CONVERSATION,
+      createHandler(
+        CUSTOMER_SERVICE_COMMAND_SCHEMAS.transferConversation,
+        customerServiceConversationSchema,
+        (request) => gateway.transferConversation(request as CustomerServiceTransferRequest)
+      ),
+    ],
+    [
+      CUSTOMER_SERVICE_IPC_CHANNELS.CLOSE_CONVERSATION,
+      createHandler(CUSTOMER_SERVICE_COMMAND_SCHEMAS.closeConversation, customerServiceConversationSchema, (request) =>
+        gateway.closeConversation(request as CustomerServiceCloseRequest)
+      ),
+    ],
+  ];
+
+  for (const [channel] of handlers) ipcMain.removeHandler(channel);
+  for (const [channel, handler] of handlers) ipcMain.handle(channel, handler);
+
+  unsubscribeCustomerServiceBridgeEvents?.();
+  unsubscribeCustomerServiceBridgeEvents = gateway.subscribe((untrustedEvent) => {
+    const parsed = customerServiceServerEnvelopeSchema.safeParse(untrustedEvent);
+    if (parsed.success) eventSink(parsed.data as CustomerServiceServerEnvelope);
+  });
 }

@@ -10,7 +10,45 @@
 // Electron's sandbox-mode preload doesn't try to resolve it from node_modules.
 import '@sentry/electron/preload';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
+import { z } from 'zod';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
+import {
+  CUSTOMER_SERVICE_IPC_CHANNELS,
+  CUSTOMER_SERVICE_IPC_ERROR_MESSAGES,
+} from '../common/enterprise/customer-service/constants';
+import type {
+  CustomerServiceCloseRequest,
+  CustomerServiceConnectionSnapshot,
+  CustomerServiceConversation,
+  CustomerServiceConversationIdRequest,
+  CustomerServiceConversationListRequest,
+  CustomerServiceImage,
+  CustomerServiceIpcErrorCode,
+  CustomerServiceIpcResult,
+  CustomerServiceMarkReadRequest,
+  CustomerServiceMessage,
+  CustomerServiceMessageHistoryRequest,
+  CustomerServicePage,
+  CustomerServiceReadResult,
+  CustomerServiceSendMessageRequest,
+  CustomerServiceServerEnvelope,
+  CustomerServiceStaffCandidate,
+  CustomerServiceStaffCandidatesRequest,
+  CustomerServiceTransferRequest,
+  CustomerServiceUploadImageRequest,
+} from '../common/enterprise/customer-service/contracts';
+import {
+  CUSTOMER_SERVICE_COMMAND_SCHEMAS,
+  customerServiceConnectionSnapshotSchema,
+  customerServiceConversationSchema,
+  customerServiceImageSchema,
+  customerServiceIpcResultSchema,
+  customerServiceMessageSchema,
+  customerServicePageSchema,
+  customerServiceReadResultSchema,
+  customerServiceServerEnvelopeSchema,
+  customerServiceStaffCandidateSchema,
+} from '../common/enterprise/customer-service/schemas';
 import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '../common/enterprise/constants';
 import type {
   EnterpriseIpcErrorCode,
@@ -137,6 +175,54 @@ const invokeEnterprise = async <T>(channel: string, ...args: unknown[]): Promise
   return parseEnterpriseIpcResult<T>(untrustedResult) ?? enterpriseFailureResult('INVALID_IPC_RESPONSE');
 };
 
+const customerServiceFailureResult = (code: CustomerServiceIpcErrorCode): CustomerServiceIpcResult<never> => ({
+  ok: false,
+  error: { code, message: CUSTOMER_SERVICE_IPC_ERROR_MESSAGES[code] },
+});
+
+type CustomerServicePreloadRequest = {
+  schema: z.ZodTypeAny;
+  value: unknown;
+};
+
+const invokeCustomerService = async <T>(
+  channel: string,
+  responseSchema: z.ZodTypeAny,
+  request?: CustomerServicePreloadRequest
+): Promise<CustomerServiceIpcResult<T>> => {
+  const args: unknown[] = [];
+  if (request) {
+    const parsedRequest = request.schema.safeParse(request.value);
+    if (!parsedRequest.success) return customerServiceFailureResult('INVALID_REQUEST');
+    args.push(parsedRequest.data);
+  }
+
+  let untrustedResult: unknown;
+  try {
+    untrustedResult = await ipcRenderer.invoke(channel, ...args);
+  } catch {
+    return customerServiceFailureResult('IPC_UNAVAILABLE');
+  }
+
+  const parsedResult = customerServiceIpcResultSchema(responseSchema).safeParse(untrustedResult);
+  if (!parsedResult.success) return customerServiceFailureResult('INVALID_IPC_RESPONSE');
+  const result = parsedResult.data as CustomerServiceIpcResult<T>;
+  if (result.ok === false && result.error.message !== CUSTOMER_SERVICE_IPC_ERROR_MESSAGES[result.error.code]) {
+    return customerServiceFailureResult('INVALID_IPC_RESPONSE');
+  }
+  return result;
+};
+
+const subscribeCustomerServiceEvents = (callback: (event: CustomerServiceServerEnvelope) => void): (() => void) => {
+  if (typeof callback !== 'function') return () => undefined;
+  const handler = (_event: unknown, untrustedEvent: unknown): void => {
+    const parsed = customerServiceServerEnvelopeSchema.safeParse(untrustedEvent);
+    if (parsed.success) callback(parsed.data as CustomerServiceServerEnvelope);
+  };
+  ipcRenderer.on(CUSTOMER_SERVICE_IPC_CHANNELS.EVENT, handler);
+  return () => ipcRenderer.off(CUSTOMER_SERVICE_IPC_CHANNELS.EVENT, handler);
+};
+
 /**
  * @description 注入到renderer进程中, 用于与main进程通信
  * */
@@ -183,6 +269,68 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearSession: () => invokeEnterprise<void>(ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
     request: (request: EnterpriseRequest) =>
       invokeEnterprise<EnterpriseResponse>(ENTERPRISE_IPC_CHANNELS.REQUEST, request),
+  },
+  customerService: {
+    connect: () =>
+      invokeCustomerService<CustomerServiceConnectionSnapshot>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.CONNECT,
+        customerServiceConnectionSnapshotSchema
+      ),
+    disconnect: () => invokeCustomerService<void>(CUSTOMER_SERVICE_IPC_CHANNELS.DISCONNECT, z.void()),
+    listConversations: (request: CustomerServiceConversationListRequest) =>
+      invokeCustomerService<CustomerServicePage<CustomerServiceConversation>>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.LIST_CONVERSATIONS,
+        customerServicePageSchema(customerServiceConversationSchema),
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.listConversations, value: request }
+      ),
+    getConversation: (request: CustomerServiceConversationIdRequest) =>
+      invokeCustomerService<CustomerServiceConversation>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.GET_CONVERSATION,
+        customerServiceConversationSchema,
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.getConversation, value: request }
+      ),
+    getHistory: (request: CustomerServiceMessageHistoryRequest) =>
+      invokeCustomerService<CustomerServicePage<CustomerServiceMessage>>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.GET_HISTORY,
+        customerServicePageSchema(customerServiceMessageSchema),
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.getHistory, value: request }
+      ),
+    sendMessage: (request: CustomerServiceSendMessageRequest) =>
+      invokeCustomerService<string>(CUSTOMER_SERVICE_IPC_CHANNELS.SEND_MESSAGE, z.string().uuid(), {
+        schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.sendMessage,
+        value: request,
+      }),
+    markRead: (request: CustomerServiceMarkReadRequest) =>
+      invokeCustomerService<CustomerServiceReadResult>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.MARK_READ,
+        customerServiceReadResultSchema,
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.markRead, value: request }
+      ),
+    uploadImage: (request: CustomerServiceUploadImageRequest) =>
+      invokeCustomerService<CustomerServiceImage>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.UPLOAD_IMAGE,
+        customerServiceImageSchema,
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.uploadImage, value: request }
+      ),
+    listCandidates: (request: CustomerServiceStaffCandidatesRequest) =>
+      invokeCustomerService<CustomerServicePage<CustomerServiceStaffCandidate>>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.LIST_CANDIDATES,
+        customerServicePageSchema(customerServiceStaffCandidateSchema),
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.listCandidates, value: request }
+      ),
+    transferConversation: (request: CustomerServiceTransferRequest) =>
+      invokeCustomerService<CustomerServiceConversation>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.TRANSFER_CONVERSATION,
+        customerServiceConversationSchema,
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.transferConversation, value: request }
+      ),
+    closeConversation: (request: CustomerServiceCloseRequest) =>
+      invokeCustomerService<CustomerServiceConversation>(
+        CUSTOMER_SERVICE_IPC_CHANNELS.CLOSE_CONVERSATION,
+        customerServiceConversationSchema,
+        { schema: CUSTOMER_SERVICE_COMMAND_SCHEMAS.closeConversation, value: request }
+      ),
+    onEvent: subscribeCustomerServiceEvents,
   },
 });
 
