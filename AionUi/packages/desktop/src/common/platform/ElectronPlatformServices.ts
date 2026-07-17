@@ -1,12 +1,15 @@
 // This is the only file in src/common/platform/ permitted to import from 'electron'.
 import { app, net, Notification, powerSaveBlocker, utilityProcess, type UtilityProcess } from 'electron';
 import path from 'path';
-import type { IPlatformServices, IWorkerProcess } from './IPlatformServices';
+import type { IPlatformServices, IWorkerProcess, PlatformNotificationOptions } from './IPlatformServices';
+
+const activeNotifications = new Set<Notification>();
 
 class ElectronWorkerProcess implements IWorkerProcess {
   constructor(private readonly up: UtilityProcess) {}
 
   postMessage(message: unknown): void {
+    // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Electron UtilityProcess is not Window.
     this.up.postMessage(message);
   }
 
@@ -61,8 +64,28 @@ export class ElectronPlatformServices implements IPlatformServices {
   };
 
   notification = {
-    send: ({ title, body }: { title: string; body: string; icon?: string }): void => {
-      new Notification({ title, body }).show();
+    send: ({ title, body, icon, onClick }: PlatformNotificationOptions): void => {
+      const notification = new Notification({ title, body, icon });
+      activeNotifications.add(notification);
+      const release = (): void => {
+        activeNotifications.delete(notification);
+      };
+      notification.once('click', () => {
+        release();
+        try {
+          onClick?.();
+        } catch {
+          // A navigation callback cannot affect the native notification lifecycle.
+        }
+      });
+      notification.once('close', release);
+      notification.once('failed', release);
+      try {
+        notification.show();
+      } catch (error) {
+        release();
+        throw error;
+      }
     },
   };
 

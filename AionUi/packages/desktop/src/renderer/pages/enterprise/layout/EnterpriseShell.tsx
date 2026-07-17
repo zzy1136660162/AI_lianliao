@@ -1,7 +1,10 @@
 import { Robot } from '@icon-park/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+
+import { CUSTOMER_SERVICE_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-service/constants';
+import { customerServiceNavigationDetailSchema } from '@/common/enterprise/customer-service/schemas';
 
 import EnterpriseAntdProvider from './EnterpriseAntdProvider';
 import EnterpriseHeader from './EnterpriseHeader';
@@ -13,6 +16,7 @@ import './enterprise-shell.css';
 const EnterpriseShell: React.FC = () => {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const mainRef = useRef<HTMLElement>(null);
   const [assistantOpen, setAssistantOpen] = useState(true);
   const isCustomerServiceRoute = location.pathname.startsWith('/enterprise/customer-service');
@@ -21,6 +25,18 @@ const EnterpriseShell: React.FC = () => {
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [location.pathname]);
+
+  useEffect(() => {
+    const handleCustomerServiceNavigation = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) return;
+      const detail = customerServiceNavigationDetailSchema.safeParse(event.detail);
+      if (!detail.success) return;
+      const search = new URLSearchParams({ conversationId: detail.data.conversationId });
+      void navigate(`/enterprise/customer-service?${search.toString()}`);
+    };
+    window.addEventListener(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, handleCustomerServiceNavigation);
+    return () => window.removeEventListener(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, handleCustomerServiceNavigation);
+  }, [navigate]);
 
   return (
     <EnterpriseAntdProvider>

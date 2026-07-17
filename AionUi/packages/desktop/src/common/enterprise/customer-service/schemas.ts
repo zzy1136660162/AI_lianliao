@@ -7,6 +7,9 @@ const ALLOWED_IMAGE_HOSTS = new Set(['sjbang.lslnii.com', 'www.lslnii.com']);
 /** Matches the backend SignedIdCodec without converting through number or BigInt. */
 export const signedBusinessIdSchema = z.string().regex(/^-?[1-9][0-9]{0,18}$/);
 
+/** Exact payload accepted from the trusted notification navigation channel. */
+export const customerServiceNavigationDetailSchema = z.object({ conversationId: signedBusinessIdSchema }).strict();
+
 const nullableBusinessIdSchema = signedBusinessIdSchema.nullable();
 const nonNegativeIntegerSchema = z.number().int().nonnegative().safe();
 const nullableTimestampSchema = z.number().int().nonnegative().safe().nullable();

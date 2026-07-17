@@ -30,6 +30,8 @@ import {
 import { CustomerServiceSocketClient } from './customerServiceSocketClient';
 
 const CREDENTIAL_REFRESH_SKEW_MS = 30_000;
+const MAX_TRACKED_CUSTOMER_MESSAGE_IDS = 2_000;
+const MAX_UNREAD_SYNC_PAGES = 1_000;
 
 export type CustomerServiceGatewaySessionStore = {
   loadOpenId: () => Promise<string | null>;
@@ -79,7 +81,17 @@ export type CustomerServiceGatewayOptions = {
   apiClient?: CustomerServiceGatewayApiClient;
   socketClient?: CustomerServiceGatewaySocketClient;
   sessionEvents?: EnterpriseSessionEvents;
+  desktopIntegration?: CustomerServiceGatewayDesktopIntegration;
   isPackaged?: boolean;
+};
+
+export type CustomerServiceGatewayDesktopIntegration = {
+  /** Returns true only when a native notification should interrupt the staff member. */
+  shouldNotify: () => boolean;
+  /** Displays a native notification without exposing credentials to the renderer. */
+  showMessageNotification: (input: { conversationId: string; message: CustomerServiceMessage }) => void | Promise<void>;
+  /** Keeps the operating-system tray badge derived from the gateway unread source of truth. */
+  setUnreadCount: (count: number) => void;
 };
 
 export type CustomerServiceGatewayEventListener = (event: CustomerServiceServerEnvelope) => void;
@@ -92,8 +104,19 @@ export class CustomerServiceGateway {
   private readonly sessionStore: CustomerServiceGatewaySessionStore;
   private readonly apiClient: CustomerServiceGatewayApiClient;
   private readonly socketClient: CustomerServiceGatewaySocketClient;
+  private readonly desktopIntegration?: CustomerServiceGatewayDesktopIntegration;
   private readonly listeners = new Set<CustomerServiceGatewayEventListener>();
   private readonly unreadByConversation = new Map<string, number>();
+  private readonly unreadRevisionByConversation = new Map<string, number>();
+  private readonly unreadQueryScopeByConversation = new Map<
+    string,
+    CustomerServiceConversationListRequest['status'] | 'ALL'
+  >();
+  private readonly customerMessageSequenceByConversation = new Map<string, number>();
+  private readonly nextReadRequestSequenceByConversation = new Map<string, number>();
+  private readonly lastAppliedReadRequestSequenceByConversation = new Map<string, number>();
+  private readonly trackedCustomerMessageIds = new Set<string>();
+  private readonly trackedCustomerMessageIdOrder: string[] = [];
   private readonly unsubscribeSocket: () => void;
   private readonly unsubscribeSessionCleared: () => void;
 
@@ -104,6 +127,7 @@ export class CustomerServiceGateway {
 
   constructor(options: CustomerServiceGatewayOptions) {
     this.sessionStore = options.sessionStore;
+    this.desktopIntegration = options.desktopIntegration;
     const apiOptions = resolveCustomerServiceApiClientOptions(options.isPackaged ?? false);
     this.apiClient = options.apiClient ?? new CustomerServiceApiClient(apiOptions);
     this.socketClient =
@@ -115,6 +139,7 @@ export class CustomerServiceGateway {
     const events = options.sessionEvents ?? enterpriseSessionEvents;
     this.unsubscribeSocket = this.socketClient.subscribe((event) => this.handleServerEvent(event));
     this.unsubscribeSessionCleared = events.subscribeCleared(() => this.clearForEnterpriseLogout());
+    this.publishUnreadCount();
   }
 
   async connect(): Promise<CustomerServiceConnectionSnapshot> {
@@ -127,10 +152,23 @@ export class CustomerServiceGateway {
     this.socketClient.disconnect();
   }
 
-  listConversations(
+  async listConversations(
     request: CustomerServiceConversationListRequest
   ): Promise<CustomerServicePage<CustomerServiceConversation>> {
-    return this.withAuthorization((token) => this.apiClient.listConversations(token, request));
+    return this.withAuthorization(async (token) => {
+      const credentialRevisionAtStart = this.credentialRevision;
+      const unreadRevisionAtStart = new Map(this.unreadRevisionByConversation);
+      const page = await this.apiClient.listConversations(token, request);
+      await this.synchronizeConversationUnreadPages(
+        token,
+        request,
+        page,
+        unreadRevisionAtStart,
+        credentialRevisionAtStart
+      );
+      this.publishUnreadCount();
+      return page;
+    });
   }
 
   getConversation(request: CustomerServiceConversationIdRequest): Promise<CustomerServiceConversation> {
@@ -147,8 +185,19 @@ export class CustomerServiceGateway {
 
   markRead(request: CustomerServiceMarkReadRequest): Promise<CustomerServiceReadResult> {
     return this.withAuthorization(async (token) => {
+      const readRequestSequence = (this.nextReadRequestSequenceByConversation.get(request.conversationId) ?? 0) + 1;
+      this.nextReadRequestSequenceByConversation.set(request.conversationId, readRequestSequence);
+      const messageSequenceAtStart = this.customerMessageSequenceByConversation.get(request.conversationId) ?? 0;
       const result = await this.apiClient.markRead(token, request);
-      this.unreadByConversation.set(request.conversationId, 0);
+      const lastAppliedReadRequestSequence =
+        this.lastAppliedReadRequestSequenceByConversation.get(request.conversationId) ?? 0;
+      if (readRequestSequence < lastAppliedReadRequestSequence) return result;
+      this.lastAppliedReadRequestSequenceByConversation.set(request.conversationId, readRequestSequence);
+      const currentMessageSequence = this.customerMessageSequenceByConversation.get(request.conversationId) ?? 0;
+      const messagesReceivedDuringRead = Math.max(0, currentMessageSequence - messageSequenceAtStart);
+      this.unreadByConversation.set(request.conversationId, messagesReceivedDuringRead);
+      this.advanceUnreadRevision(request.conversationId);
+      this.publishUnreadCount();
       return result;
     });
   }
@@ -228,15 +277,36 @@ export class CustomerServiceGateway {
     if (event.event === 'conversation.snapshot') {
       const conversation = event.payload as CustomerServiceConversation;
       this.unreadByConversation.set(conversation.conversationId, conversation.staffUnreadCount);
+      this.unreadQueryScopeByConversation.set(conversation.conversationId, conversation.status);
+      this.advanceUnreadRevision(conversation.conversationId);
     } else if (event.event === 'message.created' && conversationId) {
       const message = event.payload as CustomerServiceMessage;
       if (message.senderType === 'CUSTOMER') {
+        if (!this.trackCustomerMessage(message.messageId)) return;
+        this.customerMessageSequenceByConversation.set(
+          conversationId,
+          (this.customerMessageSequenceByConversation.get(conversationId) ?? 0) + 1
+        );
+        if (!this.unreadQueryScopeByConversation.has(conversationId)) {
+          this.unreadQueryScopeByConversation.set(conversationId, 'ACTIVE');
+        }
         this.unreadByConversation.set(conversationId, (this.unreadByConversation.get(conversationId) ?? 0) + 1);
+        this.advanceUnreadRevision(conversationId);
+        this.showCustomerMessageNotification(conversationId, message);
       }
     } else if (event.event === 'read.updated' && conversationId) {
       const readerType = (event.payload as { readerType?: unknown }).readerType;
-      if (readerType === 'STAFF') this.unreadByConversation.set(conversationId, 0);
+      if (readerType === 'STAFF') {
+        this.unreadByConversation.set(conversationId, 0);
+        this.lastAppliedReadRequestSequenceByConversation.set(
+          conversationId,
+          this.nextReadRequestSequenceByConversation.get(conversationId) ?? 0
+        );
+        this.advanceUnreadRevision(conversationId);
+      }
     }
+
+    this.publishUnreadCount();
 
     for (const listener of this.listeners) {
       try {
@@ -263,7 +333,131 @@ export class CustomerServiceGateway {
   private clearForEnterpriseLogout(): void {
     this.invalidateCredentials();
     this.unreadByConversation.clear();
+    this.unreadRevisionByConversation.clear();
+    this.unreadQueryScopeByConversation.clear();
+    this.customerMessageSequenceByConversation.clear();
+    this.nextReadRequestSequenceByConversation.clear();
+    this.lastAppliedReadRequestSequenceByConversation.clear();
+    this.trackedCustomerMessageIds.clear();
+    this.trackedCustomerMessageIdOrder.length = 0;
+    this.publishUnreadCount();
     this.socketClient.disconnect();
+  }
+
+  /**
+   * Consumes every page for an unfiltered status refresh so the tray reflects
+   * all conversations, while the renderer still receives its requested page.
+   */
+  private async synchronizeConversationUnreadPages(
+    accessToken: string,
+    request: CustomerServiceConversationListRequest,
+    firstPage: CustomerServicePage<CustomerServiceConversation>,
+    unreadRevisionAtStart: ReadonlyMap<string, number>,
+    credentialRevisionAtStart: number
+  ): Promise<void> {
+    const scope = request.status ?? 'ALL';
+    const conversations = [...firstPage.items];
+    const visitedCursors = new Set<string>();
+    let page = firstPage;
+    let pageCount = 1;
+    let completeRefresh = request.beforeConversationId === undefined && request.keyword === undefined;
+
+    while (completeRefresh && page.hasMore) {
+      this.assertCredentialRevision(credentialRevisionAtStart);
+      const cursor = page.nextCursor;
+      if (!cursor || visitedCursors.has(cursor) || pageCount >= MAX_UNREAD_SYNC_PAGES) {
+        completeRefresh = false;
+        break;
+      }
+      visitedCursors.add(cursor);
+      // eslint-disable-next-line no-await-in-loop -- The next cursor is returned by the preceding page.
+      page = await this.apiClient.listConversations(accessToken, {
+        ...request,
+        beforeConversationId: cursor,
+      });
+      conversations.push(...page.items);
+      pageCount += 1;
+    }
+
+    this.assertCredentialRevision(credentialRevisionAtStart);
+
+    const refreshedConversationIds = new Set<string>();
+    for (const conversation of conversations) {
+      refreshedConversationIds.add(conversation.conversationId);
+      if (this.hasUnreadChangedSince(conversation.conversationId, unreadRevisionAtStart)) continue;
+      this.unreadByConversation.set(conversation.conversationId, conversation.staffUnreadCount);
+      this.unreadQueryScopeByConversation.set(conversation.conversationId, scope);
+      this.advanceUnreadRevision(conversation.conversationId);
+    }
+
+    if (!completeRefresh) return;
+    for (const [conversationId, knownScope] of this.unreadQueryScopeByConversation) {
+      const belongsToRefresh = scope === 'ALL' || knownScope === scope;
+      if (
+        belongsToRefresh &&
+        !refreshedConversationIds.has(conversationId) &&
+        !this.hasUnreadChangedSince(conversationId, unreadRevisionAtStart)
+      ) {
+        this.unreadByConversation.delete(conversationId);
+        this.unreadQueryScopeByConversation.delete(conversationId);
+        this.customerMessageSequenceByConversation.delete(conversationId);
+        this.nextReadRequestSequenceByConversation.delete(conversationId);
+        this.lastAppliedReadRequestSequenceByConversation.delete(conversationId);
+        this.advanceUnreadRevision(conversationId);
+      }
+    }
+  }
+
+  private hasUnreadChangedSince(conversationId: string, revisionAtStart: ReadonlyMap<string, number>): boolean {
+    return (this.unreadRevisionByConversation.get(conversationId) ?? 0) !== (revisionAtStart.get(conversationId) ?? 0);
+  }
+
+  private advanceUnreadRevision(conversationId: string): void {
+    this.unreadRevisionByConversation.set(
+      conversationId,
+      (this.unreadRevisionByConversation.get(conversationId) ?? 0) + 1
+    );
+  }
+
+  private assertCredentialRevision(expectedRevision: number): void {
+    if (expectedRevision !== this.credentialRevision) {
+      throw new CustomerServiceApiError('AUTHENTICATION_CANCELLED', 401);
+    }
+  }
+
+  /** Bounds duplicate tracking so a long-running desktop session cannot grow indefinitely. */
+  private trackCustomerMessage(messageId: string): boolean {
+    if (this.trackedCustomerMessageIds.has(messageId)) return false;
+    this.trackedCustomerMessageIds.add(messageId);
+    this.trackedCustomerMessageIdOrder.push(messageId);
+    if (this.trackedCustomerMessageIdOrder.length > MAX_TRACKED_CUSTOMER_MESSAGE_IDS) {
+      const oldestMessageId = this.trackedCustomerMessageIdOrder.shift();
+      if (oldestMessageId) this.trackedCustomerMessageIds.delete(oldestMessageId);
+    }
+    return true;
+  }
+
+  private showCustomerMessageNotification(conversationId: string, message: CustomerServiceMessage): void {
+    const integration = this.desktopIntegration;
+    if (!integration) return;
+    try {
+      if (!integration.shouldNotify()) return;
+      void Promise.resolve(integration.showMessageNotification({ conversationId, message })).catch(
+        (): undefined => undefined
+      );
+    } catch {
+      // Native notification failures must not interrupt WebSocket event delivery.
+    }
+  }
+
+  private publishUnreadCount(): void {
+    if (!this.desktopIntegration) return;
+    const unreadCount = [...this.unreadByConversation.values()].reduce((total, count) => total + count, 0);
+    try {
+      this.desktopIntegration.setUnreadCount(unreadCount);
+    } catch {
+      // Tray availability is optional and must not affect customer-service state.
+    }
   }
 
   private invalidateCredentials(): void {
@@ -274,6 +468,8 @@ export class CustomerServiceGateway {
   }
 
   private isUnauthorized(error: unknown): boolean {
-    return error instanceof CustomerServiceApiError && (error.status === 401 || error.code === 'UNAUTHORIZED');
+    if (!(error instanceof CustomerServiceApiError)) return false;
+    if (error.code === 'AUTHENTICATION_CANCELLED' || error.code === 'MISSING_ENTERPRISE_SESSION') return false;
+    return error.status === 401 || error.code === 'UNAUTHORIZED';
   }
 }

@@ -56,6 +56,7 @@ import { isEnterpriseEntityId } from '@/common/enterprise/entityId';
 import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
+import i18n from '@process/services/i18n';
 import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
 import { enterpriseSessionEvents } from '@process/services/enterprise/enterpriseSessionEvents';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
@@ -64,6 +65,8 @@ import {
   type CustomerServiceGatewayEventListener,
 } from '@process/services/enterprise/customer-service/customerServiceGateway';
 import { CustomerServiceApiError } from '@process/services/enterprise/customer-service/customerServiceApiClient';
+import { showNotification } from '@process/bridge/notificationBridge';
+import { setCustomerServiceUnreadCount, shouldNotifyCustomerServiceMessage } from '@process/utils/tray';
 
 type EnterpriseIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<EnterpriseIpcResult<unknown>>;
 
@@ -709,6 +712,26 @@ const broadcastCustomerServiceEvent = (event: CustomerServiceServerEnvelope): vo
 const getDefaultCustomerServiceGateway = (): CustomerServiceBridgeGateway => {
   defaultCustomerServiceGateway ??= new CustomerServiceGateway({
     sessionStore: getDefaultSessionStore(),
+    desktopIntegration: {
+      shouldNotify: shouldNotifyCustomerServiceMessage,
+      showMessageNotification: ({ conversationId, message }) => {
+        const fallbackTitle = i18n.t('enterprise.customerService.title');
+        const title = message.senderName?.trim() || fallbackTitle;
+        const rawBody =
+          message.messageType === 'TEXT' && message.textContent?.trim()
+            ? message.textContent.trim()
+            : message.messageType === 'IMAGE'
+              ? i18n.t('enterprise.customerService.timeline.imageAlt')
+              : i18n.t('enterprise.customerService.list.noPreview');
+        const body = rawBody.length > 120 ? `${rawBody.slice(0, 120)}…` : rawBody;
+        return showNotification({
+          title,
+          body,
+          customer_service_conversation_id: conversationId,
+        });
+      },
+      setUnreadCount: setCustomerServiceUnreadCount,
+    },
     isPackaged: app.isPackaged,
   });
   return defaultCustomerServiceGateway;

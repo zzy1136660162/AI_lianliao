@@ -2,8 +2,9 @@ import React from 'react';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
+import { CUSTOMER_SERVICE_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-service/constants';
 import type {
   CustomerServiceConversation,
   CustomerServiceMessage,
@@ -143,6 +144,11 @@ const createClient = (): CustomerServiceClient => ({
   onEvent: vi.fn((): (() => void) => (): void => undefined),
 });
 
+const LocationProbe: React.FC = () => {
+  const location = useLocation();
+  return <div data-testid='location-probe'>{`${location.pathname}${location.search}`}</div>;
+};
+
 describe('desktop customer-service workbench', () => {
   it('selects a signed deep-link conversation and keeps all three work areas independently scrollable', async () => {
     const client = createClient();
@@ -192,5 +198,35 @@ describe('desktop customer-service workbench', () => {
     expect(container.querySelector('.enterprise-shell__main')).toHaveClass('enterprise-shell__main--customer-service');
     expect(screen.getByRole('link', { name: 'enterprise.navigation.customerService' })).toBeVisible();
     expect(screen.getByLabelText('enterprise.accessibility.assistant')).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('navigates to a signed conversation when preload dispatches a native-notification click', async () => {
+    render(
+      <MemoryRouter initialEntries={['/enterprise/dashboard']}>
+        <Routes>
+          <Route path='/enterprise' element={<EnterpriseShell />}>
+            <Route path='dashboard' element={<LocationProbe />} />
+            <Route path='customer-service' element={<LocationProbe />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
+
+    window.dispatchEvent(
+      new CustomEvent(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, {
+        detail: { conversationId: '0', route: '/guid' },
+      })
+    );
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/enterprise/dashboard');
+
+    window.dispatchEvent(
+      new CustomEvent(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, {
+        detail: { conversationId: '-8' },
+      })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location-probe')).toHaveTextContent('/enterprise/customer-service?conversationId=-8')
+    );
   });
 });

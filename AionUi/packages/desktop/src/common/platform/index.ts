@@ -87,5 +87,6 @@ export type {
   IWorkerProcessFactory,
   IPowerManager,
   INotificationService,
+  PlatformNotificationOptions,
   INetworkService,
 } from './IPlatformServices';

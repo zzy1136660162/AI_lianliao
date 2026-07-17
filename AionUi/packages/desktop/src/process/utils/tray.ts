@@ -14,6 +14,7 @@ import {
 import * as path from 'path';
 import { ipcBridge } from '@/common';
 import { AI_PRODUCT_NAME } from '@/common/config/constants';
+import { CUSTOMER_SERVICE_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-service/constants';
 import i18n from '@process/services/i18n';
 
 let tray: TrayInstance | null = null;
@@ -21,6 +22,29 @@ let closeToTrayEnabled = false;
 let isQuitting = false;
 let mainWindowRef: BrowserWindow | null = null;
 let cachedActiveCount = 0;
+let customerServiceUnreadCount = 0;
+
+const showAndFocusMainWindow = (): BrowserWindow | null => {
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) return null;
+  if (process.platform === 'darwin' && app.dock) {
+    void app.dock.show();
+  }
+  if (mainWindowRef.isMinimized()) mainWindowRef.restore();
+  mainWindowRef.show();
+  mainWindowRef.focus();
+  return mainWindowRef;
+};
+
+/** Native notifications are reserved for messages received away from the active window. */
+export const shouldNotifyCustomerServiceMessage = (): boolean =>
+  !mainWindowRef || mainWindowRef.isDestroyed() || mainWindowRef.isMinimized() || !mainWindowRef.isFocused();
+
+/** Restores the desktop shell before handing a validated conversation ID to the renderer. */
+export const openCustomerServiceConversation = (conversationId: string): void => {
+  if (!/^-?[1-9][0-9]{0,18}$/.test(conversationId)) return;
+  const window = showAndFocusMainWindow();
+  window?.webContents.send(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, { conversationId });
+};
 
 export const setTrayMainWindow = (win: BrowserWindow): void => {
   mainWindowRef = win;
@@ -72,19 +96,6 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   const recentConversations = await getRecentConversations();
   const runningTasksCount = getRunningTasksCount();
 
-  const showAndFocus = () => {
-    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-      if (process.platform === 'darwin' && app.dock) {
-        void app.dock.show();
-      }
-      if (mainWindowRef.isMinimized()) {
-        mainWindowRef.restore();
-      }
-      mainWindowRef.show();
-      mainWindowRef.focus();
-    }
-  };
-
   const hideToTray = () => {
     if (mainWindowRef && !mainWindowRef.isDestroyed()) {
       mainWindowRef.hide();
@@ -97,7 +108,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   const template: Electron.MenuItemConstructorOptions[] = [
     {
       label: i18n.t('common.tray.showWindow'),
-      click: showAndFocus,
+      click: showAndFocusMainWindow,
     },
     {
       label: i18n.t('common.tray.closeToTray'),
@@ -107,7 +118,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
     {
       label: i18n.t('common.tray.newChat'),
       click: () => {
-        showAndFocus();
+        showAndFocusMainWindow();
         mainWindowRef?.webContents.send('tray:navigate-to-guid');
       },
     },
@@ -124,7 +135,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
       template.push({
         label: displayTitle,
         click: () => {
-          showAndFocus();
+          showAndFocusMainWindow();
           mainWindowRef?.webContents.send('tray:navigate-to-conversation', {
             conversation_id: conv.id,
           });
@@ -135,13 +146,17 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
 
   template.push({ type: 'separator' });
   template.push({
+    label: `${i18n.t('enterprise.customerService.title')}: ${customerServiceUnreadCount}`,
+    enabled: false,
+  });
+  template.push({
     label: `${i18n.t('common.tray.runningTasks')}: ${runningTasksCount}`,
     enabled: false,
   });
   template.push({
     label: i18n.t('common.tray.pauseAll'),
     click: () => {
-      showAndFocus();
+      showAndFocusMainWindow();
       mainWindowRef?.webContents.send('tray:pause-all-tasks');
     },
   });
@@ -202,7 +217,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   template.push({
     label: i18n.t('common.tray.checkUpdate'),
     click: () => {
-      showAndFocus();
+      showAndFocusMainWindow();
       mainWindowRef?.webContents.send('tray:check-update');
     },
   });
@@ -210,7 +225,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   template.push({
     label: i18n.t('common.tray.about'),
     click: () => {
-      showAndFocus();
+      showAndFocusMainWindow();
       mainWindowRef?.webContents.send('tray:open-about');
     },
   });
@@ -244,26 +259,15 @@ export const createOrUpdateTray = (): void => {
   try {
     const icon = getTrayIcon();
     tray = new Tray(icon);
-    tray.setToolTip(AI_PRODUCT_NAME);
+    updateTrayPresentation();
     void buildTrayContextMenu().then((menu) => tray?.setContextMenu(menu));
 
     tray.on('double-click', () => {
-      if (mainWindowRef && !mainWindowRef.isDestroyed()) {
-        if (process.platform === 'darwin' && app.dock) {
-          void app.dock.show();
-        }
-        if (mainWindowRef.isMinimized()) {
-          mainWindowRef.restore();
-        }
-        mainWindowRef.show();
-        mainWindowRef.focus();
-      }
+      showAndFocusMainWindow();
     });
 
-    tray.on('click', (event: any) => {
-      if (event.event?.button === 2) {
-        void buildTrayContextMenu().then((menu) => tray?.setContextMenu(menu));
-      }
+    tray.on('right-click', () => {
+      void buildTrayContextMenu().then((menu) => tray?.setContextMenu(menu));
     });
 
     void fetchActiveCountAndMaybeRebuild();
@@ -278,6 +282,23 @@ export const createOrUpdateTray = (): void => {
 const rebuildTrayMenu = (): void => {
   if (!tray) return;
   void buildTrayContextMenu().then((menu) => tray?.setContextMenu(menu));
+};
+
+const updateTrayPresentation = (): void => {
+  if (!tray) return;
+  const unreadLabel = `${i18n.t('enterprise.customerService.title')}: ${customerServiceUnreadCount}`;
+  tray.setToolTip(customerServiceUnreadCount > 0 ? `${AI_PRODUCT_NAME} · ${unreadLabel}` : AI_PRODUCT_NAME);
+  if (process.platform === 'darwin')
+    tray.setTitle(customerServiceUnreadCount > 0 ? String(customerServiceUnreadCount) : '');
+};
+
+/** Updates the existing tray in place; creating or recreating the Tray is deliberately avoided. */
+export const setCustomerServiceUnreadCount = (count: number): void => {
+  const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+  if (normalizedCount === customerServiceUnreadCount) return;
+  customerServiceUnreadCount = normalizedCount;
+  updateTrayPresentation();
+  rebuildTrayMenu();
 };
 
 /**

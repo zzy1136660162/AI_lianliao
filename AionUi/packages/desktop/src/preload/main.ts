@@ -15,6 +15,7 @@ import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
 import {
   CUSTOMER_SERVICE_IPC_CHANNELS,
   CUSTOMER_SERVICE_IPC_ERROR_MESSAGES,
+  CUSTOMER_SERVICE_NAVIGATE_CHANNEL,
 } from '../common/enterprise/customer-service/constants';
 import type {
   CustomerServiceCloseRequest,
@@ -44,6 +45,7 @@ import {
   customerServiceImageSchema,
   customerServiceIpcResultSchema,
   customerServiceMessageSchema,
+  customerServiceNavigationDetailSchema,
   customerServicePageSchema,
   customerServiceReadResultSchema,
   customerServiceServerEnvelopeSchema,
@@ -361,3 +363,12 @@ for (const channel of trayEvents) {
     window.dispatchEvent(new CustomEvent(channel, { detail: args[0] }));
   });
 }
+
+// Customer-service notification navigation has a stricter signed-ID boundary
+// than generic tray events, so validate it before exposing a DOM event.
+ipcRenderer.on(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, (_event, untrustedDetail) => {
+  const detail = customerServiceNavigationDetailSchema.safeParse(untrustedDetail);
+  if (detail.success) {
+    window.dispatchEvent(new CustomEvent(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, { detail: detail.data }));
+  }
+});

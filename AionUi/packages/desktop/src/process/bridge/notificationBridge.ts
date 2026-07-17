@@ -13,9 +13,18 @@
 
 import { getPlatformServices } from '@/common/platform';
 import { ipcBridge } from '@/common';
+import { signedBusinessIdSchema } from '@/common/enterprise/customer-service/schemas';
 import { ProcessConfig } from '@process/utils/initStorage';
+import { openCustomerServiceConversation } from '@process/utils/tray';
 import path from 'path';
 import fs from 'fs';
+
+export type MainProcessNotificationOptions = {
+  title: string;
+  body: string;
+  conversation_id?: string;
+  customer_service_conversation_id?: string;
+};
 
 /**
  * Get app icon path for notifications
@@ -43,11 +52,9 @@ const getNotificationIcon = (): string | undefined => {
 export async function showNotification({
   title,
   body,
-}: {
-  title: string;
-  body: string;
-  conversation_id?: string;
-}): Promise<void> {
+  conversation_id,
+  customer_service_conversation_id,
+}: MainProcessNotificationOptions): Promise<void> {
   // Check if notification is enabled
   const notificationEnabled = await ProcessConfig.get('system.notificationEnabled');
   if (notificationEnabled === false) {
@@ -55,9 +62,15 @@ export async function showNotification({
   }
 
   const iconPath = getNotificationIcon();
+  const customerServiceConversationId = signedBusinessIdSchema.safeParse(customer_service_conversation_id);
+  const onClick = customerServiceConversationId.success
+    ? (): void => openCustomerServiceConversation(customerServiceConversationId.data)
+    : conversation_id
+      ? (): void => ipcBridge.notification.clicked.emit({ conversation_id })
+      : undefined;
 
   try {
-    getPlatformServices().notification.send({ title, body, icon: iconPath });
+    getPlatformServices().notification.send({ title, body, icon: iconPath, onClick });
   } catch (error) {
     console.error('[Notification] Error creating notification:', error);
   }

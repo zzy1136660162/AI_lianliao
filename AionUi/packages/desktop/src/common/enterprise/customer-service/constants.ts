@@ -8,6 +8,9 @@ export const CUSTOMER_SERVICE_API_BASE_URLS = Object.freeze({
 export const CUSTOMER_SERVICE_CONTROLLER_PATH = 'cloud-api/CustomerServiceController/';
 export const CUSTOMER_SERVICE_WEBSOCKET_PATH = 'cloud-api/customer-service/ws';
 
+/** Fixed main-to-renderer event used only after a trusted native-notification click. */
+export const CUSTOMER_SERVICE_NAVIGATE_CHANNEL = 'enterprise:customer-service:navigate-to-conversation';
+
 export const CUSTOMER_SERVICE_ENDPOINTS = Object.freeze({
   staffAuth: 'staff/auth',
   conversationList: 'conversation/list',

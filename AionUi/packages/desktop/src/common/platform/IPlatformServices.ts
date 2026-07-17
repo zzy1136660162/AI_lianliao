@@ -88,11 +88,18 @@ export interface IPowerManager {
  * System notification. Replaces Electron Notification class.
  *
  * In non-Electron mode: silent no-op (intentional degradation).
- * Notification lifecycle events (click, failed, close) are Electron-only
- * and are NOT modelled here.
+ * Only the click callback is modelled because navigation is a shared product
+ * behavior; other Electron-specific lifecycle events remain implementation details.
  */
+export type PlatformNotificationOptions = {
+  title: string;
+  body: string;
+  icon?: string;
+  onClick?: () => void;
+};
+
 export interface INotificationService {
-  send(options: { title: string; body: string; icon?: string }): void;
+  send(options: PlatformNotificationOptions): void;
 }
 
 /**

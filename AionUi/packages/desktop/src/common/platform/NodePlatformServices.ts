@@ -2,7 +2,7 @@ import { fork as cpFork, type ChildProcess } from 'child_process';
 import { readFileSync } from 'fs';
 import os from 'os';
 import path from 'path';
-import type { IPlatformServices, IWorkerProcess } from './IPlatformServices';
+import type { IPlatformServices, IWorkerProcess, PlatformNotificationOptions } from './IPlatformServices';
 
 class NodeWorkerProcess implements IWorkerProcess {
   constructor(private readonly cp: ChildProcess) {}
@@ -68,7 +68,7 @@ export class NodePlatformServices implements IPlatformServices {
   };
 
   notification = {
-    send: (_opts: { title: string; body: string; icon?: string }): void => {},
+    send: (_opts: PlatformNotificationOptions): void => {},
   };
 
   network = {
