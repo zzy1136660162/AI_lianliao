@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "供需對接",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "供需對接",
+      "description": "依類型、地區與狀態查詢已審核的產業需求。"
+    },
+    "supplyDemandDetail": {
+      "title": "供需詳情",
+      "description": "查看已審核供需資訊的公開業務欄位。"
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "遼寧產業供需大廳",
+    "notProvided": "暫未提供",
+    "total": "共 {{total}} 筆供需資訊",
+    "filters": {
+      "keyword": "關鍵字",
+      "keywordPlaceholder": "需求名稱、企業或工藝",
+      "type": "供需類型",
+      "allTypes": "全部類型",
+      "city": "城市",
+      "district": "區縣",
+      "status": "狀態"
+    },
+    "status": { "open": "進行中", "closed": "已結束" },
+    "columns": {
+      "title": "需求名稱",
+      "type": "類型",
+      "company": "發布企業",
+      "region": "所在地區",
+      "address": "詳細地址",
+      "budget": "預算",
+      "publishedAt": "發布時間",
+      "endTime": "截止時間",
+      "status": "狀態",
+      "actions": "操作"
+    },
+    "actions": {
+      "search": "查詢供需",
+      "reset": "重設篩選",
+      "preview": "快速預覽",
+      "detail": "查看詳情",
+      "closePreview": "關閉預覽",
+      "back": "返回供需大廳"
+    },
+    "preview": { "title": "供需快速預覽" },
+    "detail": {
+      "summaryTitle": "需求概況",
+      "fieldsTitle": "業務欄位",
+      "noFields": "此類型暫無可顯示的擴充欄位。"
+    },
+    "states": {
+      "loading": "正在載入供需資訊",
+      "emptyTitle": "找不到符合條件的供需資訊",
+      "emptyDescription": "請減少篩選條件或重設後重新查詢。",
+      "errorTitle": "暫時無法載入供需大廳",
+      "errorDescription": "供需服務未傳回有效資料，請稍後再試。",
+      "detailLoading": "正在載入供需詳情",
+      "detailErrorTitle": "暫時無法載入供需詳情",
+      "detailErrorDescription": "請返回供需大廳並選擇有效記錄。"
+    },
+    "errors": {
+      "invalidRoute": "供需詳情地址無效",
+      "invalidRouteDescription": "請返回供需大廳並選擇有效記錄。"
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

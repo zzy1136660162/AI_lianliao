@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "Сопоставление спроса и предложения",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "Спрос и предложение",
+      "description": "Поиск проверенных промышленных потребностей по типу, региону и статусу."
+    },
+    "supplyDemandDetail": {
+      "title": "Сведения о потребности",
+      "description": "Просмотр открытых деловых полей проверенной потребности."
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "Центр промышленного спроса Ляонина",
+    "notProvided": "Не указано",
+    "total": "Записей о потребностях: {{total}}",
+    "filters": {
+      "keyword": "Ключевое слово",
+      "keywordPlaceholder": "Потребность, компания или процесс",
+      "type": "Тип потребности",
+      "allTypes": "Все типы",
+      "city": "Город",
+      "district": "Район",
+      "status": "Статус"
+    },
+    "status": { "open": "В процессе", "closed": "Завершено" },
+    "columns": {
+      "title": "Потребность",
+      "type": "Тип",
+      "company": "Компания",
+      "region": "Регион",
+      "address": "Адрес",
+      "budget": "Бюджет",
+      "publishedAt": "Опубликовано",
+      "endTime": "Срок",
+      "status": "Статус",
+      "actions": "Действия"
+    },
+    "actions": {
+      "search": "Найти потребности",
+      "reset": "Сбросить фильтры",
+      "preview": "Быстрый просмотр",
+      "detail": "Подробнее",
+      "closePreview": "Закрыть просмотр",
+      "back": "Вернуться к списку"
+    },
+    "preview": { "title": "Быстрый просмотр потребности" },
+    "detail": {
+      "summaryTitle": "Описание потребности",
+      "fieldsTitle": "Деловые поля",
+      "noFields": "Для этого типа нет дополнительных полей для отображения."
+    },
+    "states": {
+      "loading": "Загрузка потребностей",
+      "emptyTitle": "Подходящие потребности не найдены",
+      "emptyDescription": "Уменьшите число фильтров или сбросьте их и повторите поиск.",
+      "errorTitle": "Не удалось загрузить потребности",
+      "errorDescription": "Сервис не вернул корректные данные. Повторите попытку позже.",
+      "detailLoading": "Загрузка сведений о потребности",
+      "detailErrorTitle": "Не удалось загрузить сведения",
+      "detailErrorDescription": "Вернитесь к списку и выберите корректную запись."
+    },
+    "errors": {
+      "invalidRoute": "Некорректный адрес сведений о потребности",
+      "invalidRouteDescription": "Вернитесь к списку и выберите корректную запись."
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

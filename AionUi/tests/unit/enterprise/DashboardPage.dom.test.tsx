@@ -206,6 +206,10 @@ describe('enterprise dashboard', () => {
     expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeVisible();
     expect(screen.getByText('Shenyang')).toBeVisible();
     expect(screen.getByText('Industrial pumps')).toBeVisible();
+    expect(screen.getByRole('link', { name: /enterprise\.navigation\.supplyDemand/ })).toHaveAttribute(
+      'href',
+      '/enterprise/supply-demand'
+    );
     expect(container).not.toHaveTextContent('openid-must-never-appear');
     expect(container).not.toHaveTextContent('enterprise.dashboard.metrics.favorites');
     expect(container).not.toHaveTextContent('enterprise.dashboard.metrics.leads');

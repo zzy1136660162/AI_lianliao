@@ -96,6 +96,7 @@
     "companies": "企业库",
     "products": "产品库",
     "projects": "在建项目",
+    "supplyDemand": "供需对接",
     "favorites": "我的收藏",
     "leads": "商机跟进",
     "customerService": "客服接待"
@@ -153,6 +154,14 @@
       "title": "项目详情",
       "description": "查看经过校验的项目内容与当前联系方式权限状态。"
     },
+    "supplyDemand": {
+      "title": "供需对接",
+      "description": "聚合机加与产业服务需求，按类型、地区和状态快速找到合作机会。"
+    },
+    "supplyDemandDetail": {
+      "title": "供需详情",
+      "description": "查看已审核供需信息的公开业务字段。"
+    },
     "favorites": {
       "title": "我的收藏",
       "description": "企业收藏能力将在下一产品阶段启用。"
@@ -172,6 +181,66 @@
     "emptyDescription": "请调整当前筛选条件后重试。",
     "errorTitle": "暂时无法加载企业数据",
     "errorDescription": "企业服务暂时不可用，请重试。"
+  },
+  "supplyDemand": {
+    "eyebrow": "辽宁产业供需大厅",
+    "notProvided": "暂未提供",
+    "total": "共 {{total}} 条供需信息",
+    "filters": {
+      "keyword": "关键词",
+      "keywordPlaceholder": "需求名称、企业或工艺",
+      "type": "供需类型",
+      "allTypes": "全部类型",
+      "city": "城市",
+      "district": "区县",
+      "status": "状态"
+    },
+    "status": {
+      "open": "进行中",
+      "closed": "已结束"
+    },
+    "columns": {
+      "title": "需求名称",
+      "type": "类型",
+      "company": "发布企业",
+      "region": "所在地区",
+      "address": "详细地址",
+      "budget": "预算",
+      "publishedAt": "发布时间",
+      "endTime": "截止时间",
+      "status": "状态",
+      "actions": "操作"
+    },
+    "actions": {
+      "search": "查询供需",
+      "reset": "重置筛选",
+      "preview": "快速预览",
+      "detail": "查看详情",
+      "closePreview": "关闭预览",
+      "back": "返回供需大厅"
+    },
+    "preview": {
+      "title": "供需快速预览"
+    },
+    "detail": {
+      "summaryTitle": "需求概况",
+      "fieldsTitle": "业务字段",
+      "noFields": "该类型暂无可展示的扩展字段。"
+    },
+    "states": {
+      "loading": "正在加载供需信息",
+      "emptyTitle": "未找到符合条件的供需信息",
+      "emptyDescription": "请减少筛选条件或重置后重新查询。",
+      "errorTitle": "暂时无法加载供需大厅",
+      "errorDescription": "供需服务未返回有效数据，请稍后重试。",
+      "detailLoading": "正在加载供需详情",
+      "detailErrorTitle": "暂时无法加载供需详情",
+      "detailErrorDescription": "请返回供需大厅并选择有效记录。"
+    },
+    "errors": {
+      "invalidRoute": "供需详情地址无效",
+      "invalidRouteDescription": "请返回供需大厅并选择有效记录。"
+    }
   },
   "dashboard": {
     "eyebrow": "辽宁产业身份工作台",

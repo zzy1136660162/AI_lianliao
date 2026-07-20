@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "需給マッチング",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "需給マッチング",
+      "description": "種類、地域、状態から審査済みの産業ニーズを検索します。"
+    },
+    "supplyDemandDetail": {
+      "title": "需給詳細",
+      "description": "審査済みニーズの公開業務項目を確認します。"
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "遼寧産業需給ホール",
+    "notProvided": "未提供",
+    "total": "需給情報 {{total}} 件",
+    "filters": {
+      "keyword": "キーワード",
+      "keywordPlaceholder": "需要名、企業、加工工程",
+      "type": "需給タイプ",
+      "allTypes": "すべてのタイプ",
+      "city": "都市",
+      "district": "区・県",
+      "status": "状態"
+    },
+    "status": { "open": "進行中", "closed": "終了" },
+    "columns": {
+      "title": "需要名",
+      "type": "タイプ",
+      "company": "公開企業",
+      "region": "地域",
+      "address": "住所",
+      "budget": "予算",
+      "publishedAt": "公開日",
+      "endTime": "期限",
+      "status": "状態",
+      "actions": "操作"
+    },
+    "actions": {
+      "search": "需給を検索",
+      "reset": "条件をリセット",
+      "preview": "クイック表示",
+      "detail": "詳細を見る",
+      "closePreview": "プレビューを閉じる",
+      "back": "需給一覧へ戻る"
+    },
+    "preview": { "title": "需給クイック表示" },
+    "detail": {
+      "summaryTitle": "需要概要",
+      "fieldsTitle": "業務項目",
+      "noFields": "このタイプには表示可能な拡張項目がありません。"
+    },
+    "states": {
+      "loading": "需給情報を読み込んでいます",
+      "emptyTitle": "該当する需給情報がありません",
+      "emptyDescription": "条件を減らすか、リセットして再検索してください。",
+      "errorTitle": "需給一覧を読み込めません",
+      "errorDescription": "需給サービスが有効なデータを返しませんでした。後でもう一度お試しください。",
+      "detailLoading": "需給詳細を読み込んでいます",
+      "detailErrorTitle": "需給詳細を読み込めません",
+      "detailErrorDescription": "需給一覧に戻り、有効な情報を選択してください。"
+    },
+    "errors": {
+      "invalidRoute": "需給詳細のアドレスが無効です",
+      "invalidRouteDescription": "需給一覧に戻り、有効な情報を選択してください。"
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

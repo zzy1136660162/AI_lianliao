@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "Arz ve talep eşleştirme",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "Arz ve talep eşleştirme",
+      "description": "Onaylanmış sanayi taleplerini tür, bölge ve duruma göre arayın."
+    },
+    "supplyDemandDetail": {
+      "title": "Talep ayrıntıları",
+      "description": "Onaylanmış bir talebin herkese açık iş alanlarını inceleyin."
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "Liaoning sanayi talep merkezi",
+    "notProvided": "Belirtilmedi",
+    "total": "Toplam {{total}} talep kaydı",
+    "filters": {
+      "keyword": "Anahtar kelime",
+      "keywordPlaceholder": "Talep, şirket veya süreç",
+      "type": "Talep türü",
+      "allTypes": "Tüm türler",
+      "city": "Şehir",
+      "district": "İlçe",
+      "status": "Durum"
+    },
+    "status": { "open": "Devam ediyor", "closed": "Sona erdi" },
+    "columns": {
+      "title": "Talep",
+      "type": "Tür",
+      "company": "Yayınlayan şirket",
+      "region": "Bölge",
+      "address": "Adres",
+      "budget": "Bütçe",
+      "publishedAt": "Yayın tarihi",
+      "endTime": "Son tarih",
+      "status": "Durum",
+      "actions": "İşlemler"
+    },
+    "actions": {
+      "search": "Talepleri ara",
+      "reset": "Filtreleri sıfırla",
+      "preview": "Hızlı önizleme",
+      "detail": "Ayrıntıları görüntüle",
+      "closePreview": "Önizlemeyi kapat",
+      "back": "Talep listesine dön"
+    },
+    "preview": { "title": "Talep hızlı önizlemesi" },
+    "detail": {
+      "summaryTitle": "Talep özeti",
+      "fieldsTitle": "İş alanları",
+      "noFields": "Bu tür için görüntülenebilir ek alan yok."
+    },
+    "states": {
+      "loading": "Talep kayıtları yükleniyor",
+      "emptyTitle": "Eşleşen talep bulunamadı",
+      "emptyDescription": "Filtreleri azaltın veya sıfırlayıp yeniden deneyin.",
+      "errorTitle": "Talep listesi yüklenemedi",
+      "errorDescription": "Talep hizmeti geçerli veri döndürmedi. Daha sonra tekrar deneyin.",
+      "detailLoading": "Talep ayrıntıları yükleniyor",
+      "detailErrorTitle": "Talep ayrıntıları yüklenemedi",
+      "detailErrorDescription": "Talep listesine dönün ve geçerli bir kayıt seçin."
+    },
+    "errors": {
+      "invalidRoute": "Talep ayrıntı adresi geçersiz",
+      "invalidRouteDescription": "Talep listesine dönün ve geçerli bir kayıt seçin."
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

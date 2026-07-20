@@ -42,9 +42,27 @@ const makeClient = (clearSession: EnterpriseClient['clearSession']): EnterpriseC
   }),
 });
 
-describe('enterprise logout integration', () => {
+describe('enterprise sider integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('renders the graphical product mark instead of the translated placeholder', async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/enterprise/dashboard']}>
+        <EnterpriseAuthProvider client={makeClient(vi.fn(async () => undefined))}>
+          <EnterpriseSider />
+        </EnterpriseAuthProvider>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText(USER.companyName!)).toBeVisible();
+    expect(container.querySelector('.enterprise-sider__brand-mark img')).toBeInTheDocument();
+    expect(screen.queryByText('enterprise.shell.brandMark')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'enterprise.navigation.supplyDemand' })).toHaveAttribute(
+      'href',
+      '/enterprise/supply-demand'
+    );
   });
 
   it('keeps the real authenticated provider and sider in the workbench after clear failure', async () => {

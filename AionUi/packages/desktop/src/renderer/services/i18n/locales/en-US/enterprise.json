@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "Supply and demand",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "Supply and demand",
+      "description": "Explore machining and industrial-service demand by type, region and status."
+    },
+    "supplyDemandDetail": {
+      "title": "Demand details",
+      "description": "Review the public business fields of an approved demand record."
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,66 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "Liaoning industrial demand exchange",
+    "notProvided": "Not provided",
+    "total": "{{total}} demand records",
+    "filters": {
+      "keyword": "Keyword",
+      "keywordPlaceholder": "Demand, company or process",
+      "type": "Demand type",
+      "allTypes": "All types",
+      "city": "City",
+      "district": "District",
+      "status": "Status"
+    },
+    "status": {
+      "open": "Open",
+      "closed": "Closed"
+    },
+    "columns": {
+      "title": "Demand",
+      "type": "Type",
+      "company": "Publisher",
+      "region": "Region",
+      "address": "Address",
+      "budget": "Budget",
+      "publishedAt": "Published",
+      "endTime": "Deadline",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "actions": {
+      "search": "Search demand",
+      "reset": "Reset filters",
+      "preview": "Quick preview",
+      "detail": "View details",
+      "closePreview": "Close preview",
+      "back": "Back to demand exchange"
+    },
+    "preview": {
+      "title": "Demand quick preview"
+    },
+    "detail": {
+      "summaryTitle": "Demand summary",
+      "fieldsTitle": "Business fields",
+      "noFields": "No mapped fields are available for this type."
+    },
+    "states": {
+      "loading": "Loading demand records",
+      "emptyTitle": "No matching demand records",
+      "emptyDescription": "Reduce or reset the filters and try again.",
+      "errorTitle": "Demand records could not be loaded",
+      "errorDescription": "The demand service returned invalid data. Try again later.",
+      "detailLoading": "Loading demand details",
+      "detailErrorTitle": "Demand details could not be loaded",
+      "detailErrorDescription": "Return to the demand exchange and select a valid record."
+    },
+    "errors": {
+      "invalidRoute": "The demand detail address is invalid",
+      "invalidRouteDescription": "Return to the demand exchange and select a valid record."
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

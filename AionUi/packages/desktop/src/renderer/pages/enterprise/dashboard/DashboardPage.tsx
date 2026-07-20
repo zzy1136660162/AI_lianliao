@@ -1,4 +1,13 @@
-import { ArrowRight, Box, BuildingFour, ChartHistogram, EngineeringBrand, RadarChart, User } from '@icon-park/react';
+import {
+  ArrowRight,
+  Box,
+  BuildingFour,
+  ChartHistogram,
+  EngineeringBrand,
+  ExchangeFour,
+  RadarChart,
+  User,
+} from '@icon-park/react';
 import { Card, Empty, Statistic } from 'antd';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +34,7 @@ const quickLinks = [
   { path: '/enterprise/companies', labelKey: 'enterprise.navigation.companies', Icon: BuildingFour },
   { path: '/enterprise/products', labelKey: 'enterprise.navigation.products', Icon: Box },
   { path: '/enterprise/projects', labelKey: 'enterprise.navigation.projects', Icon: EngineeringBrand },
+  { path: '/enterprise/supply-demand', labelKey: 'enterprise.navigation.supplyDemand', Icon: ExchangeFour },
 ] as const;
 
 /** Authenticated enterprise landing page backed only by live identity and project data. */

@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "Conexão entre oferta e demanda",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "Oferta e demanda",
+      "description": "Pesquise demandas industriais aprovadas por tipo, região e status."
+    },
+    "supplyDemandDetail": {
+      "title": "Detalhes da demanda",
+      "description": "Consulte os campos comerciais públicos de uma demanda aprovada."
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "Central de demanda industrial de Liaoning",
+    "notProvided": "Não informado",
+    "total": "{{total}} registros de demanda",
+    "filters": {
+      "keyword": "Palavra-chave",
+      "keywordPlaceholder": "Demanda, empresa ou processo",
+      "type": "Tipo de demanda",
+      "allTypes": "Todos os tipos",
+      "city": "Cidade",
+      "district": "Distrito",
+      "status": "Status"
+    },
+    "status": { "open": "Em andamento", "closed": "Encerrada" },
+    "columns": {
+      "title": "Demanda",
+      "type": "Tipo",
+      "company": "Empresa publicadora",
+      "region": "Região",
+      "address": "Endereço",
+      "budget": "Orçamento",
+      "publishedAt": "Publicação",
+      "endTime": "Prazo",
+      "status": "Status",
+      "actions": "Ações"
+    },
+    "actions": {
+      "search": "Pesquisar demandas",
+      "reset": "Limpar filtros",
+      "preview": "Visualização rápida",
+      "detail": "Ver detalhes",
+      "closePreview": "Fechar visualização",
+      "back": "Voltar à lista"
+    },
+    "preview": { "title": "Visualização rápida da demanda" },
+    "detail": {
+      "summaryTitle": "Resumo da demanda",
+      "fieldsTitle": "Campos comerciais",
+      "noFields": "Não há campos adicionais disponíveis para este tipo."
+    },
+    "states": {
+      "loading": "Carregando demandas",
+      "emptyTitle": "Nenhuma demanda correspondente",
+      "emptyDescription": "Reduza ou limpe os filtros e tente novamente.",
+      "errorTitle": "Não foi possível carregar as demandas",
+      "errorDescription": "O serviço não retornou dados válidos. Tente novamente mais tarde.",
+      "detailLoading": "Carregando detalhes da demanda",
+      "detailErrorTitle": "Não foi possível carregar os detalhes",
+      "detailErrorDescription": "Volte à lista e selecione um registro válido."
+    },
+    "errors": {
+      "invalidRoute": "O endereço dos detalhes da demanda é inválido",
+      "invalidRouteDescription": "Volte à lista e selecione um registro válido."
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

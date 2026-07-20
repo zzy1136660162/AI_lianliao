@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "Узгодження попиту й пропозиції",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "Попит і пропозиція",
+      "description": "Пошук перевірених промислових потреб за типом, регіоном і статусом."
+    },
+    "supplyDemandDetail": {
+      "title": "Деталі потреби",
+      "description": "Перегляд відкритих ділових полів перевіреної потреби."
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "Центр промислового попиту Ляоніну",
+    "notProvided": "Не вказано",
+    "total": "Записів про потреби: {{total}}",
+    "filters": {
+      "keyword": "Ключове слово",
+      "keywordPlaceholder": "Потреба, компанія або процес",
+      "type": "Тип потреби",
+      "allTypes": "Усі типи",
+      "city": "Місто",
+      "district": "Район",
+      "status": "Статус"
+    },
+    "status": { "open": "Триває", "closed": "Завершено" },
+    "columns": {
+      "title": "Потреба",
+      "type": "Тип",
+      "company": "Компанія",
+      "region": "Регіон",
+      "address": "Адреса",
+      "budget": "Бюджет",
+      "publishedAt": "Опубліковано",
+      "endTime": "Кінцевий термін",
+      "status": "Статус",
+      "actions": "Дії"
+    },
+    "actions": {
+      "search": "Знайти потреби",
+      "reset": "Скинути фільтри",
+      "preview": "Швидкий перегляд",
+      "detail": "Докладніше",
+      "closePreview": "Закрити перегляд",
+      "back": "Повернутися до списку"
+    },
+    "preview": { "title": "Швидкий перегляд потреби" },
+    "detail": {
+      "summaryTitle": "Опис потреби",
+      "fieldsTitle": "Ділові поля",
+      "noFields": "Для цього типу немає додаткових полів для показу."
+    },
+    "states": {
+      "loading": "Завантаження потреб",
+      "emptyTitle": "Відповідних потреб не знайдено",
+      "emptyDescription": "Зменште кількість фільтрів або скиньте їх і повторіть пошук.",
+      "errorTitle": "Не вдалося завантажити потреби",
+      "errorDescription": "Сервіс не повернув коректні дані. Спробуйте пізніше.",
+      "detailLoading": "Завантаження деталей потреби",
+      "detailErrorTitle": "Не вдалося завантажити деталі",
+      "detailErrorDescription": "Поверніться до списку й виберіть коректний запис."
+    },
+    "errors": {
+      "invalidRoute": "Некоректна адреса деталей потреби",
+      "invalidRouteDescription": "Поверніться до списку й виберіть коректний запис."
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

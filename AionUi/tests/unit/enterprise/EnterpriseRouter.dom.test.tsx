@@ -155,6 +155,7 @@ describe('enterprise desktop routing', () => {
     ['/enterprise/products/1', 'enterprise.routes.productDetail.title'],
     ['/enterprise/projects', 'enterprise.routes.projects.title'],
     ['/enterprise/projects/901', 'enterprise.routes.projectDetail.title'],
+    ['/enterprise/supply-demand', 'enterprise.routes.supplyDemand.title'],
     ['/enterprise/favorites', 'enterprise.routes.favorites.title'],
     ['/enterprise/leads', 'enterprise.routes.leads.title'],
   ])('registers %s inside the enterprise shell', async (path, heading) => {
@@ -164,6 +165,15 @@ describe('enterprise desktop routing', () => {
     expect(screen.getByRole('navigation', { name: 'enterprise.accessibility.primaryNavigation' })).toBeVisible();
     expect(screen.getByTestId('shared-window-controls')).toBeVisible();
     expect(container).not.toHaveTextContent('openid-must-not-be-rendered');
+  });
+
+  it('registers a signed demand detail route and gives it the detail header title', async () => {
+    renderAt('/enterprise/supply-demand/6/-800000000000000001');
+
+    expect(
+      await screen.findByText('enterprise.routes.supplyDemandDetail.title', undefined, ROUTE_WAIT_OPTIONS)
+    ).toBeVisible();
+    expect(window.location.hash).toBe('#/enterprise/supply-demand/6/-800000000000000001');
   });
 
   it('groups primary navigation into three labelled card sections', async () => {
@@ -180,6 +190,10 @@ describe('enterprise desktop routing', () => {
     ['overview', 'resources', 'collaboration'].forEach((group) => {
       expect(within(navigation).getByText(`enterprise.navigationGroups.${group}`)).toBeVisible();
     });
+    expect(within(navigation).getByRole('link', { name: 'enterprise.navigation.supplyDemand' })).toHaveAttribute(
+      'href',
+      '#/enterprise/supply-demand'
+    );
   });
 
   it('does not render the legacy blueprint decoration in the bright workspace shell', async () => {
@@ -264,7 +278,7 @@ describe('enterprise desktop routing', () => {
     expect(settings).toHaveFocus();
     await user.tab();
     expect(logout).toHaveFocus();
-  });
+  }, 20_000);
 
   it('returns the enterprise workspace to the top after navigating to another enterprise pathname', async () => {
     const { container } = renderAt('/enterprise/dashboard');

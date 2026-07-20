@@ -3,6 +3,7 @@ import {
   BuildingFour,
   DashboardOne,
   EngineeringBrand,
+  ExchangeFour,
   FollowUpDateSort,
   HeadsetOne,
   Logout,
@@ -15,6 +16,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate } from 'react-router-dom';
 
+import enterpriseBrandMark from '@renderer/assets/logos/brand/app-mark.png';
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 
 const navigationGroups = [
@@ -30,6 +32,7 @@ const navigationGroups = [
       { path: '/enterprise/companies', labelKey: 'enterprise.navigation.companies', Icon: BuildingFour },
       { path: '/enterprise/products', labelKey: 'enterprise.navigation.products', Icon: Box },
       { path: '/enterprise/projects', labelKey: 'enterprise.navigation.projects', Icon: EngineeringBrand },
+      { path: '/enterprise/supply-demand', labelKey: 'enterprise.navigation.supplyDemand', Icon: ExchangeFour },
     ],
   },
   {
@@ -80,7 +83,7 @@ const EnterpriseSider: React.FC = () => {
     <aside className='enterprise-sider'>
       <div className='enterprise-sider__brand' aria-label={t('enterprise.shell.brand')}>
         <span className='enterprise-sider__brand-mark' aria-hidden='true'>
-          {t('enterprise.shell.brandMark')}
+          <img src={enterpriseBrandMark} alt='' />
         </span>
         <span>
           <strong>{t('enterprise.shell.brand')}</strong>

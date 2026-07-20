@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "수요·공급 연계",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "수요·공급 연계",
+      "description": "유형, 지역, 상태별로 검토 완료된 산업 수요를 조회합니다."
+    },
+    "supplyDemandDetail": {
+      "title": "수요 상세",
+      "description": "검토 완료된 수요의 공개 업무 항목을 확인합니다."
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "랴오닝 산업 수요·공급 센터",
+    "notProvided": "제공되지 않음",
+    "total": "총 {{total}}건의 수요 정보",
+    "filters": {
+      "keyword": "키워드",
+      "keywordPlaceholder": "수요명, 기업 또는 공정",
+      "type": "수요 유형",
+      "allTypes": "모든 유형",
+      "city": "도시",
+      "district": "구·현",
+      "status": "상태"
+    },
+    "status": { "open": "진행 중", "closed": "종료" },
+    "columns": {
+      "title": "수요명",
+      "type": "유형",
+      "company": "게시 기업",
+      "region": "지역",
+      "address": "상세 주소",
+      "budget": "예산",
+      "publishedAt": "게시일",
+      "endTime": "마감일",
+      "status": "상태",
+      "actions": "작업"
+    },
+    "actions": {
+      "search": "수요 조회",
+      "reset": "필터 초기화",
+      "preview": "빠른 미리보기",
+      "detail": "상세 보기",
+      "closePreview": "미리보기 닫기",
+      "back": "수요 목록으로 돌아가기"
+    },
+    "preview": { "title": "수요 빠른 미리보기" },
+    "detail": {
+      "summaryTitle": "수요 개요",
+      "fieldsTitle": "업무 항목",
+      "noFields": "이 유형에는 표시 가능한 확장 항목이 없습니다."
+    },
+    "states": {
+      "loading": "수요 정보를 불러오는 중",
+      "emptyTitle": "조건에 맞는 수요 정보가 없습니다",
+      "emptyDescription": "필터를 줄이거나 초기화한 후 다시 조회하세요.",
+      "errorTitle": "수요 목록을 불러올 수 없습니다",
+      "errorDescription": "수요 서비스가 유효한 데이터를 반환하지 않았습니다. 잠시 후 다시 시도하세요.",
+      "detailLoading": "수요 상세 정보를 불러오는 중",
+      "detailErrorTitle": "수요 상세 정보를 불러올 수 없습니다",
+      "detailErrorDescription": "수요 목록으로 돌아가 유효한 항목을 선택하세요."
+    },
+    "errors": {
+      "invalidRoute": "수요 상세 주소가 올바르지 않습니다",
+      "invalidRouteDescription": "수요 목록으로 돌아가 유효한 항목을 선택하세요."
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",

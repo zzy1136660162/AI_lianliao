@@ -96,6 +96,7 @@
     "companies": "Companies",
     "products": "Products",
     "projects": "Projects",
+    "supplyDemand": "Angebot und Nachfrage",
     "favorites": "Favorites",
     "leads": "Follow-ups",
     "customerService": "Customer service"
@@ -153,6 +154,14 @@
       "title": "Project profile",
       "description": "Review verified project content and its current contact-access state."
     },
+    "supplyDemand": {
+      "title": "Angebot und Nachfrage",
+      "description": "Geprüfte industrielle Bedarfe nach Typ, Region und Status durchsuchen."
+    },
+    "supplyDemandDetail": {
+      "title": "Bedarfsdetails",
+      "description": "Öffentliche Geschäftsfelder eines geprüften Bedarfs anzeigen."
+    },
     "favorites": {
       "title": "My favorites",
       "description": "Enterprise favorites will be enabled in the next product phase."
@@ -172,6 +181,61 @@
     "emptyDescription": "Adjust the current filters and try again.",
     "errorTitle": "Enterprise data could not be loaded",
     "errorDescription": "The enterprise service is temporarily unavailable. Try again."
+  },
+  "supplyDemand": {
+    "eyebrow": "Industriebedarfszentrum Liaoning",
+    "notProvided": "Nicht angegeben",
+    "total": "{{total}} Bedarfseinträge",
+    "filters": {
+      "keyword": "Suchbegriff",
+      "keywordPlaceholder": "Bedarf, Unternehmen oder Prozess",
+      "type": "Bedarfstyp",
+      "allTypes": "Alle Typen",
+      "city": "Stadt",
+      "district": "Bezirk",
+      "status": "Status"
+    },
+    "status": { "open": "Laufend", "closed": "Beendet" },
+    "columns": {
+      "title": "Bedarf",
+      "type": "Typ",
+      "company": "Veröffentlichendes Unternehmen",
+      "region": "Region",
+      "address": "Adresse",
+      "budget": "Budget",
+      "publishedAt": "Veröffentlicht",
+      "endTime": "Frist",
+      "status": "Status",
+      "actions": "Aktionen"
+    },
+    "actions": {
+      "search": "Bedarfe suchen",
+      "reset": "Filter zurücksetzen",
+      "preview": "Schnellansicht",
+      "detail": "Details anzeigen",
+      "closePreview": "Vorschau schließen",
+      "back": "Zur Bedarfsliste"
+    },
+    "preview": { "title": "Bedarfsschnellansicht" },
+    "detail": {
+      "summaryTitle": "Bedarfsübersicht",
+      "fieldsTitle": "Geschäftsfelder",
+      "noFields": "Für diesen Typ sind keine zusätzlichen Felder verfügbar."
+    },
+    "states": {
+      "loading": "Bedarfe werden geladen",
+      "emptyTitle": "Keine passenden Bedarfe gefunden",
+      "emptyDescription": "Weniger Filter verwenden oder zurücksetzen und erneut suchen.",
+      "errorTitle": "Bedarfe konnten nicht geladen werden",
+      "errorDescription": "Der Dienst hat keine gültigen Daten geliefert. Später erneut versuchen.",
+      "detailLoading": "Bedarfsdetails werden geladen",
+      "detailErrorTitle": "Bedarfsdetails konnten nicht geladen werden",
+      "detailErrorDescription": "Zur Bedarfsliste zurückkehren und einen gültigen Eintrag wählen."
+    },
+    "errors": {
+      "invalidRoute": "Die Adresse der Bedarfsdetails ist ungültig",
+      "invalidRouteDescription": "Zur Bedarfsliste zurückkehren und einen gültigen Eintrag wählen."
+    }
   },
   "dashboard": {
     "eyebrow": "Authenticated industrial desk / Liaoning",
