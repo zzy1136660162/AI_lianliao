@@ -119,6 +119,23 @@ const projectSummary = {
   procurementSummary: 'Industrial pumps and control valves',
 } as const;
 
+const demandSummary = {
+  demandId: '-88001',
+  typeId: 6,
+  typeName: 'Packaging service',
+  title: 'Integration packaging requirement',
+  companyName: COMPANY_NAME,
+  city: 'Shenyang',
+  district: 'Hunnan',
+  budget: 'Negotiable',
+  summary: 'Public packaging cooperation requirement',
+  publishedAt: '2026-07-20',
+  status: 0,
+  grabCount: 0,
+  remainingGrabCount: 10,
+  primaryTags: ['Carton', 'Printing'],
+};
+
 const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
   switch (request.operation) {
     case 'company.list': {
@@ -209,6 +226,25 @@ const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
           collected: false,
           followStatus: 'NONE',
           purchased: false,
+        },
+      };
+    case 'demand.types':
+      return {
+        operation: request.operation,
+        data: [{ typeId: demandSummary.typeId, typeName: demandSummary.typeName }],
+      };
+    case 'demand.list':
+      return {
+        operation: request.operation,
+        data: page([demandSummary], request.payload.pageNum, request.payload.pageSize),
+      };
+    case 'demand.detail':
+      return {
+        operation: request.operation,
+        data: {
+          ...demandSummary,
+          address: 'Public industrial park address',
+          fields: [{ key: 'packingType', label: 'Packaging type', value: 'Carton', valueType: 'TEXT' }],
         },
       };
   }

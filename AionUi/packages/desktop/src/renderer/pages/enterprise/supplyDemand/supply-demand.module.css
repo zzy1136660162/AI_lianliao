@@ -1,0 +1,280 @@
+.page {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  color: var(--text-primary);
+}
+
+.pageHeader,
+.detailHeader {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 22px;
+}
+
+.pageHeader h1,
+.detailHeader h1,
+.quickView h2 {
+  margin: 4px 0 0;
+  font-family: var(--enterprise-font-ui);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.pageHeader h1,
+.detailHeader h1 {
+  font-size: clamp(25px, 3vw, 36px);
+}
+
+.pageHeader p {
+  max-width: 700px;
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.eyebrow {
+  color: var(--primary);
+  font-family: var(--enterprise-font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.headerRule {
+  width: min(26%, 220px);
+  height: 1px;
+  margin-bottom: 9px;
+  background: var(--primary);
+  opacity: 0.62;
+}
+
+.filterForm {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.5fr) repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  background: var(--enterprise-surface);
+  border: 1px solid var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
+}
+
+.filterForm :global(.ll-ant-form-item) {
+  margin: 0;
+}
+
+.filterActions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.content {
+  min-width: 0;
+  margin-top: 14px;
+  overflow: hidden;
+  background: var(--enterprise-surface);
+  border: 1px solid var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
+}
+
+.content :global(.enterprise-page-state) {
+  min-height: min(430px, calc(100vh - 320px));
+}
+
+.catalog,
+.catalogWithPreview {
+  display: grid;
+  min-width: 0;
+}
+
+.catalog {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.catalogWithPreview {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 30%);
+}
+
+.tablePanel {
+  min-width: 0;
+  padding: 16px;
+}
+
+.titleCell {
+  display: grid;
+  gap: 4px;
+}
+
+.titleCell strong {
+  font-size: 14px;
+}
+
+.titleCell span {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rowActions a {
+  color: var(--primary);
+  font-size: 12px;
+}
+
+.paginationBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-light);
+}
+
+.paginationBar > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.quickView {
+  position: relative;
+  min-width: 0;
+  padding: 24px 20px;
+  border-left: 1px solid var(--border-base);
+  background: color-mix(in srgb, var(--bg-2) 94%, transparent);
+}
+
+.quickViewClose {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+}
+
+.quickView h2 {
+  padding-right: 54px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.factList {
+  display: grid;
+  margin: 0;
+}
+
+.factList > div {
+  padding: 12px 0;
+  border-top: 1px solid var(--border-light);
+}
+
+.factList dt {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.factList dd {
+  margin: 5px 0 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.primaryLink {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 18px;
+  padding: 8px 12px;
+  color: var(--enterprise-surface);
+  background: var(--primary);
+  border-radius: var(--enterprise-radius-control);
+}
+
+.detailHeader {
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.detailHeader > div {
+  padding-left: 18px;
+  border-left: 1px solid var(--border-base);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 14px;
+}
+
+.detailSummary,
+.detailFields {
+  border-color: var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
+}
+
+.detailSummary > p,
+.detailFields > p {
+  color: var(--text-secondary);
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.fieldGrid {
+  margin-top: 4px;
+}
+
+@media (max-width: 1120px) {
+  .filterForm {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+  }
+
+  .catalogWithPreview,
+  .detailGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quickView {
+    order: -1;
+    border-bottom: 1px solid var(--border-base);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .filterForm {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .paginationBar,
+  .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primaryLink {
+    scroll-behavior: auto;
+  }
+}
