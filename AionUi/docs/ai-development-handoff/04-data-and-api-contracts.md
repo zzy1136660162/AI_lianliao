@@ -22,16 +22,19 @@ AionUi/packages/desktop/src/process/services/enterprise/enterpriseApiClient.ts
 
 当前允许列表：
 
-| Operation           | cloud-api 路径                                               | 用途                           |
-| ------------------- | ------------------------------------------------------------ | ------------------------------ |
-| `company.list`      | `cloud-api/CompanyController/getQiYeMaCompanyList`           | 企业分页、行业、地区、会员筛选 |
-| `company.detail`    | `cloud-api/CompanyController/getDetailcompany`               | 企业详情和联系方式             |
-| `product.list`      | `cloud-api/CompanyController/getFindProducts`                | 产品分页、企业、园区和地区筛选 |
-| `product.detail`    | `cloud-api/CompanyController/FindProduct`                    | 产品详情                       |
-| `project.dashboard` | `cloud-api/OpportunityController/getAiMaterialDashboard`     | 在建项目聚合指标和图表         |
-| `project.drill`     | `cloud-api/OpportunityController/getAiMaterialDrillList`     | 分类、材料、地区和预算钻取     |
-| `project.list`      | `cloud-api/OpportunityController/getAiMaterialProjectList`   | 在建项目分页筛选               |
-| `project.detail`    | `cloud-api/OpportunityController/getAiMaterialProjectDetail` | 项目详情和隐私边界             |
+| Operation           | cloud-api 路径                                               | 用途                                 |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------ |
+| `company.list`      | `cloud-api/CompanyController/getQiYeMaCompanyList`           | 企业分页、行业、地区、会员筛选       |
+| `company.detail`    | `cloud-api/CompanyController/getDetailcompany`               | 企业详情和联系方式                   |
+| `product.list`      | `cloud-api/CompanyController/getFindProducts`                | 产品分页、企业、园区和地区筛选       |
+| `product.detail`    | `cloud-api/CompanyController/FindProduct`                    | 产品详情                             |
+| `project.dashboard` | `cloud-api/OpportunityController/getAiMaterialDashboard`     | 在建项目聚合指标和图表               |
+| `project.drill`     | `cloud-api/OpportunityController/getAiMaterialDrillList`     | 分类、材料、地区和预算钻取           |
+| `project.list`      | `cloud-api/OpportunityController/getAiMaterialProjectList`   | 在建项目分页筛选                     |
+| `project.detail`    | `cloud-api/OpportunityController/getAiMaterialProjectDetail` | 项目详情和隐私边界                   |
+| `demand.types`      | `cloud-api/DemandQueryController/types`                      | 仅返回存在审核通过公开数据的供需类型 |
+| `demand.list`       | `cloud-api/DemandQueryController/list`                       | 公开供需筛选与分页                   |
+| `demand.detail`     | `cloud-api/DemandQueryController/detail`                     | 按类型与业务 ID 查询公开详情         |
 
 Renderer 只传业务筛选字段；主进程从当前企业会话注入身份。新增操作必须同时扩展：
 
@@ -42,6 +45,40 @@ Renderer 只传业务筛选字段；主进程从当前企业会话注入身份�
 5. 主进程序列化和响应校验；
 6. Preload/Renderer Client；
 7. 后端 Controller/Service/Mapper 和契约测试。
+
+### 2.1 供需只读边界
+
+本期供需操作只有查询，没有发布、修改、删除、抢单、支付、收藏、询价或联系方式解锁：
+
+- `demand.types` 的 payload 必须是空对象；
+- `demand.list` 支持 `keyword/typeId/city/district/status/pageNum/pageSize`；
+- `demand.detail` 使用 `{ demandId, typeId }`，两个字段共同定位记录；
+- `typeId = 0` 固定读取 `J_DEMAND`，其他类型读取 `J_COMMON_DEMAND`；
+- 类型名称来自 `DEMAND_TYPE`，详情扩展字段来自服务端字段映射，不允许客户端传列名；
+- 列表与详情不返回 `OPEN_ID/USER_ID/UNION_ID/CONTACT_TEL/CONTACT_PERSON/SERVICE_FEE`；
+- Renderer 不直接访问网络，仍经 Preload/IPC/主进程固定路径白名单；
+- 供需业务 ID 使用非零有符号整数字符串，最长 31 位，不转换为 JavaScript `number`。
+
+后端 DDL 文件：
+
+```text
+E:/ZZY_PROJECT/lianshang_liaoning/cloud-service/cloud-api/src/main/resources/db/demand_field_mapping.sql
+```
+
+截至 2026-07-20，该脚本只进入源码，**尚未执行到 Oracle**。执行 `CREATE TABLE`、约束和 `MERGE` 种子数据前，仍需用户明确确认目标环境和回滚方案。
+
+### 2.2 2026-07-20 自动化验证记录
+
+- Electron 供需聚焦测试：6 个文件、72 个用例通过；
+- 企业测试 TypeScript 检查、i18n 类型生成和 i18n 结构检查通过；
+- `oxlint` 以 0 error 退出（仓库仍有历史 warning）；
+- Electron production package 通过；
+- 本次相关的 21 个前端文件格式检查通过；仓库级格式检查仍被 6 个无关既有文档/随包资源阻断；
+- cloud-api Controller、DDL contract、Mapper、Service 共 17 个测试通过；
+- cloud-service reactor `-DskipTests` package 通过；
+- 敏感字段、Renderer 直连网络和 MyBatis `${}` 动态插值扫描均为 0 命中。
+
+剩余验收不是自动化代码门禁：需经用户批准执行映射 DDL 后，使用 Oracle 真实数据验证 `typeId=0` 及至少两个公共供需类型，并通过本地 `127.0.0.1:12580` 网关联调类型、列表和详情。
 
 ## 3. 扫码登录接口
 
