@@ -297,6 +297,28 @@ const serializeProjectRequest = (
   }
 };
 
+const serializeDemandRequest = (
+  request: Extract<EnterpriseRequest, { operation: `demand.${string}` }>,
+  context: EnterpriseUserContext
+): EnterpriseRequestBody => {
+  requireRegisteredIdentity(context);
+  const body: EnterpriseRequestBody = {};
+  if (request.operation === 'demand.types') return body;
+  if (request.operation === 'demand.detail') {
+    setDefined(body, 'demandId', request.payload.demandId);
+    setDefined(body, 'typeId', request.payload.typeId);
+    return body;
+  }
+  setDefined(body, 'keyword', request.payload.keyword);
+  setDefined(body, 'typeId', request.payload.typeId);
+  setDefined(body, 'city', request.payload.city);
+  setDefined(body, 'district', request.payload.district);
+  setDefined(body, 'status', request.payload.status);
+  setDefined(body, 'pageNum', request.payload.pageNum);
+  setDefined(body, 'pageSize', request.payload.pageSize);
+  return body;
+};
+
 const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserContext): EnterpriseRequestBody => {
   switch (request.operation) {
     case 'company.list':
@@ -312,6 +334,10 @@ const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserCon
     case 'project.list':
     case 'project.detail':
       return serializeProjectRequest(request, context);
+    case 'demand.types':
+    case 'demand.list':
+    case 'demand.detail':
+      return serializeDemandRequest(request, context);
   }
 };
 

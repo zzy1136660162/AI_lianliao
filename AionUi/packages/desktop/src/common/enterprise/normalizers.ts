@@ -5,6 +5,10 @@ import { isEnterpriseEntityId } from './entityId';
 import type {
   EnterpriseCompanyDetail,
   EnterpriseDashboardDistributionItem,
+  EnterpriseDemandDetail,
+  EnterpriseDemandDetailField,
+  EnterpriseDemandSummary,
+  EnterpriseDemandTypeOption,
   EnterpriseOperation,
   EnterprisePage,
   EnterpriseProductDetail,
@@ -18,6 +22,8 @@ import type {
 import {
   enterpriseCompanyRawSchema,
   enterpriseDashboardRawSchema,
+  enterpriseDemandRawSchema,
+  enterpriseDemandTypeOptionRawSchema,
   enterpriseDrillRawSchema,
   enterprisePageRawSchema,
   enterpriseProductRawSchema,
@@ -450,6 +456,77 @@ const normalizeProjectDetail = (input: unknown): EnterpriseProjectDetail => {
   return result;
 };
 
+const normalizeDemandSummary = (
+  input: unknown,
+  operation: 'demand.list' | 'demand.detail'
+): EnterpriseDemandSummary => {
+  const raw = enterpriseDemandRawSchema.parse(input);
+  const demandId = requiredProjectIdentifier(operation, 'demandId', raw.demandId, raw.DEMAND_ID);
+  const typeId = requiredNonNegativeInteger(operation, 'typeId', raw.typeId, raw.TYPE_ID);
+  const rawTags = raw.primaryTags ?? raw.PRIMARY_TAGS ?? [];
+  const primaryTags = Array.from(new Set(rawTags.map((tag) => tag.trim()).filter(Boolean))).slice(0, 12);
+  const result: EnterpriseDemandSummary = {
+    demandId,
+    typeId,
+    typeName: requiredText(operation, 'typeName', raw.typeName, raw.TYPE_NAME),
+    title: requiredText(operation, 'title', raw.title, raw.TITLE),
+    primaryTags,
+  };
+  setText(result, 'companyName', raw.companyName, raw.COMPANY_NAME);
+  setText(result, 'city', raw.city, raw.CITY);
+  setText(result, 'district', raw.district, raw.DISTRICT);
+  setText(result, 'budget', raw.budget, raw.BUDGET);
+  setText(result, 'summary', raw.summary, raw.SUMMARY);
+  setText(result, 'publishedAt', raw.publishedAt, raw.PUBLISHED_AT);
+  setText(result, 'endTime', raw.endTime, raw.END_TIME);
+  const status = optionalNonNegativeInteger(operation, 'status', raw.status, raw.STATUS);
+  if (status !== undefined) result.status = status;
+  const grabCount = optionalNonNegativeInteger(operation, 'grabCount', raw.grabCount, raw.GRAB_COUNT);
+  if (grabCount !== undefined) result.grabCount = grabCount;
+  const remainingGrabCount = optionalNonNegativeInteger(
+    operation,
+    'remainingGrabCount',
+    raw.remainingGrabCount,
+    raw.REMAINING_GRAB_COUNT
+  );
+  if (remainingGrabCount !== undefined) result.remainingGrabCount = remainingGrabCount;
+  return result;
+};
+
+/** Converts a guarded backend type row into the stable renderer model. */
+const normalizeDemandTypeOption = (input: unknown): EnterpriseDemandTypeOption => {
+  const operation = 'demand.types';
+  const raw = enterpriseDemandTypeOptionRawSchema.parse(input);
+  return {
+    typeId: requiredNonNegativeInteger(operation, 'typeId', raw.typeId),
+    typeName: requiredText(operation, 'typeName', raw.typeName),
+  };
+};
+
+const normalizeDemandDetail = (input: unknown): EnterpriseDemandDetail => {
+  const operation = 'demand.detail';
+  const raw = enterpriseDemandRawSchema.parse(input);
+  const rawFields = raw.fields ?? raw.FIELDS;
+  if (!rawFields) throw operationError(operation, 'missing required fields');
+  const result: EnterpriseDemandDetail = {
+    ...normalizeDemandSummary(raw, operation),
+    fields: rawFields.map((field): EnterpriseDemandDetailField => {
+      const value = hasScalarValue(field.value) ? String(field.value).trim() : '';
+      if (!value) throw operationError(operation, 'invalid field value');
+      const normalized: EnterpriseDemandDetailField = {
+        key: requiredText(operation, 'field key', field.key),
+        label: requiredText(operation, 'field label', field.label),
+        value,
+        valueType: requiredText(operation, 'field valueType', field.valueType),
+      };
+      setText(normalized, 'unit', field.unit);
+      return normalized;
+    }),
+  };
+  setText(result, 'address', raw.address, raw.ADDRESS);
+  return result;
+};
+
 const normalizePage = <T>(
   input: unknown,
   operation: EnterpriseOperation,
@@ -653,6 +730,9 @@ export const enterpriseNormalizers = {
   describeParseError,
   normalizeCompany,
   normalizeDashboard,
+  normalizeDemandDetail,
+  normalizeDemandSummary,
+  normalizeDemandTypeOption,
   normalizeDrillItem,
   normalizePage,
   normalizeProduct,

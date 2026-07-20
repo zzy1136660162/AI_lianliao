@@ -180,6 +180,43 @@ export type EnterpriseProjectDetail = EnterpriseProjectSummary & {
   purchased?: boolean;
 };
 
+export type EnterpriseDemandSummary = {
+  demandId: string;
+  typeId: number;
+  typeName: string;
+  title: string;
+  companyName?: string;
+  city?: string;
+  district?: string;
+  budget?: string;
+  summary?: string;
+  publishedAt?: string;
+  endTime?: string;
+  status?: number;
+  grabCount?: number;
+  remainingGrabCount?: number;
+  primaryTags: string[];
+};
+
+export type EnterpriseDemandDetailField = {
+  key: string;
+  label: string;
+  value: string;
+  valueType: string;
+  unit?: string;
+};
+
+export type EnterpriseDemandDetail = EnterpriseDemandSummary & {
+  address?: string;
+  fields: EnterpriseDemandDetailField[];
+};
+
+/** Database-backed public option used by the supply-demand type filter. */
+export type EnterpriseDemandTypeOption = {
+  typeId: number;
+  typeName: string;
+};
+
 export type CompanyListQuery = {
   keyword?: string;
   industry?: string;
@@ -238,6 +275,16 @@ export type ProjectListQuery = {
   pageSize: number;
 };
 
+export type DemandListQuery = {
+  keyword?: string;
+  typeId?: number;
+  city?: string;
+  district?: string;
+  status?: number;
+  pageNum: number;
+  pageSize: number;
+};
+
 export type EnterpriseRequest =
   | { operation: 'company.list'; payload: CompanyListQuery }
   | { operation: 'company.detail'; payload: { companyId: string } }
@@ -246,7 +293,10 @@ export type EnterpriseRequest =
   | { operation: 'project.dashboard'; payload: { runId?: string } }
   | { operation: 'project.drill'; payload: ProjectDrillQuery }
   | { operation: 'project.list'; payload: ProjectListQuery }
-  | { operation: 'project.detail'; payload: { hpInfoId: string } };
+  | { operation: 'project.detail'; payload: { hpInfoId: string } }
+  | { operation: 'demand.types'; payload: Record<string, never> }
+  | { operation: 'demand.list'; payload: DemandListQuery }
+  | { operation: 'demand.detail'; payload: { demandId: string; typeId: number } };
 
 export type EnterpriseResponse =
   | { operation: 'company.list'; data: EnterprisePage<EnterpriseCompanySummary> }
@@ -256,6 +306,9 @@ export type EnterpriseResponse =
   | { operation: 'project.dashboard'; data: EnterpriseProjectDashboard }
   | { operation: 'project.drill'; data: EnterpriseProjectDrillItem[] }
   | { operation: 'project.list'; data: EnterprisePage<EnterpriseProjectSummary> }
-  | { operation: 'project.detail'; data: EnterpriseProjectDetail };
+  | { operation: 'project.detail'; data: EnterpriseProjectDetail }
+  | { operation: 'demand.types'; data: EnterpriseDemandTypeOption[] }
+  | { operation: 'demand.list'; data: EnterprisePage<EnterpriseDemandSummary> }
+  | { operation: 'demand.detail'; data: EnterpriseDemandDetail };
 
 export type EnterpriseOperation = EnterpriseRequest['operation'];

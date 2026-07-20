@@ -377,6 +377,71 @@ export const enterpriseProjectRawSchema = passthroughRawSchema({
   ] as const,
 });
 
+const enterpriseDemandDetailFieldRawSchema = guardedObject(
+  z
+    .object({
+      key: z.string(),
+      label: z.string(),
+      value: z.union([z.string(), z.number(), z.boolean()]),
+      valueType: z.string(),
+      unit: z.string().nullish(),
+    })
+    .passthrough(),
+  ['key', 'label', 'value', 'valueType']
+);
+
+/** Fail-closed schema for the two public fields returned by the type endpoint. */
+export const enterpriseDemandTypeOptionRawSchema = guardedObject(
+  z
+    .object({
+      typeId: rawNumberSchema,
+      typeName: rawTextSchema,
+    })
+    .passthrough(),
+  ['typeId', 'typeName']
+);
+
+export const enterpriseDemandRawSchema = guardedObject(
+  z
+    .object({
+      demandId: rawIdentifierSchema,
+      DEMAND_ID: rawIdentifierSchema,
+      typeId: rawNumberSchema,
+      TYPE_ID: rawNumberSchema,
+      typeName: rawTextSchema,
+      TYPE_NAME: rawTextSchema,
+      title: rawTextSchema,
+      TITLE: rawTextSchema,
+      companyName: rawTextSchema,
+      COMPANY_NAME: rawTextSchema,
+      city: rawTextSchema,
+      CITY: rawTextSchema,
+      district: rawTextSchema,
+      DISTRICT: rawTextSchema,
+      address: rawTextSchema,
+      ADDRESS: rawTextSchema,
+      budget: rawTextSchema,
+      BUDGET: rawTextSchema,
+      summary: rawTextSchema,
+      SUMMARY: rawTextSchema,
+      publishedAt: rawTextSchema,
+      PUBLISHED_AT: rawTextSchema,
+      endTime: rawTextSchema,
+      END_TIME: rawTextSchema,
+      status: rawNumberSchema,
+      STATUS: rawNumberSchema,
+      grabCount: rawNumberSchema,
+      GRAB_COUNT: rawNumberSchema,
+      remainingGrabCount: rawNumberSchema,
+      REMAINING_GRAB_COUNT: rawNumberSchema,
+      primaryTags: z.array(z.string()).optional(),
+      PRIMARY_TAGS: z.array(z.string()).optional(),
+      fields: z.array(enterpriseDemandDetailFieldRawSchema).optional(),
+      FIELDS: z.array(enterpriseDemandDetailFieldRawSchema).optional(),
+    })
+    .passthrough()
+);
+
 export const enterprisePageRawSchema = guardedObject(
   z
     .object({
@@ -595,6 +660,30 @@ const projectDashboardPayloadSchema = guardedObject(z.object({ runId: projectSho
 const projectDetailPayloadSchema = guardedObject(z.object({ hpInfoId: projectRequestIdentifierSchema }).strict(), [
   'hpInfoId',
 ]);
+const demandListQuerySchema = guardedObject(
+  z
+    .object({
+      keyword: z.string().max(100).optional(),
+      typeId: nonNegativeIntegerSchema.optional(),
+      city: z.string().max(100).optional(),
+      district: z.string().max(100).optional(),
+      status: nonNegativeIntegerSchema.optional(),
+      pageNum: projectPageNumSchema,
+      pageSize: projectPageSizeSchema,
+    })
+    .strict(),
+  ['pageNum', 'pageSize']
+);
+const demandDetailPayloadSchema = guardedObject(
+  z
+    .object({
+      demandId: projectRequestIdentifierSchema,
+      typeId: nonNegativeIntegerSchema,
+    })
+    .strict(),
+  ['demandId', 'typeId']
+);
+const demandTypesPayloadSchema = guardedObject(z.object({}).strict());
 
 const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('company.list'), payload: companyListQuerySchema }).strict(),
@@ -625,6 +714,9 @@ const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
       payload: projectDetailPayloadSchema,
     })
     .strict(),
+  z.object({ operation: z.literal('demand.types'), payload: demandTypesPayloadSchema }).strict(),
+  z.object({ operation: z.literal('demand.list'), payload: demandListQuerySchema }).strict(),
+  z.object({ operation: z.literal('demand.detail'), payload: demandDetailPayloadSchema }).strict(),
 ]);
 
 export const enterpriseRequestSchema = guardedObject(enterpriseRequestUnionSchema, ['operation', 'payload']);

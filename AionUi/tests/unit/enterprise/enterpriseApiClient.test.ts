@@ -79,6 +79,21 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
     total: 1,
   },
   'project.detail': { hpInfoId: '901', projectName: 'Factory' },
+  'demand.list': {
+    list: [{ demandId: '101', typeId: 0, typeName: 'Machining', title: 'Precision parts', primaryTags: [] }],
+    pageNum: 1,
+    pageSize: 20,
+    pages: 1,
+    total: 1,
+  },
+  'demand.detail': {
+    demandId: '101',
+    typeId: 0,
+    typeName: 'Machining',
+    title: 'Precision parts',
+    primaryTags: [],
+    fields: [],
+  },
 };
 
 const successResponse = (operation: EnterpriseOperation): Response =>
@@ -115,6 +130,9 @@ describe('enterprise API routes', () => {
       'project.drill': 'cloud-api/OpportunityController/getAiMaterialDrillList',
       'project.list': 'cloud-api/OpportunityController/getAiMaterialProjectList',
       'project.detail': 'cloud-api/OpportunityController/getAiMaterialProjectDetail',
+      'demand.types': 'cloud-api/DemandQueryController/types',
+      'demand.list': 'cloud-api/DemandQueryController/list',
+      'demand.detail': 'cloud-api/DemandQueryController/detail',
       'auth.create': 'cloud-api/CommonWxGZHQrCodeLogIn/desktop/create',
       'auth.poll': 'cloud-api/CommonWxGZHQrCodeLogIn/desktop/poll',
       'auth.userContext': 'cloud-api/DesktopEnterpriseController/userContext',

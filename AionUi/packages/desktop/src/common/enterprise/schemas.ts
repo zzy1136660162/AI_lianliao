@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import type {
   EnterpriseCompanySummary,
+  EnterpriseDemandSummary,
+  EnterpriseDemandTypeOption,
   EnterpriseOperation,
   EnterpriseProductSummary,
   EnterpriseProjectSummary,
@@ -23,6 +25,9 @@ const {
   describeParseError,
   normalizeCompany,
   normalizeDashboard,
+  normalizeDemandDetail,
+  normalizeDemandSummary,
+  normalizeDemandTypeOption,
   normalizeDrillItem,
   normalizePage,
   normalizeProduct,
@@ -98,6 +103,23 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
         };
       case 'project.detail':
         return { operation, data: normalizeProjectDetail(input) };
+      case 'demand.types':
+        return {
+          operation,
+          data: z
+            .array(z.unknown())
+            .parse(input)
+            .map((item): EnterpriseDemandTypeOption => normalizeDemandTypeOption(item)),
+        };
+      case 'demand.list':
+        return {
+          operation,
+          data: normalizePage<EnterpriseDemandSummary>(input, operation, (item) =>
+            normalizeDemandSummary(item, operation)
+          ),
+        };
+      case 'demand.detail':
+        return { operation, data: normalizeDemandDetail(input) };
     }
   } catch (error) {
     if (error instanceof Error && error.message.startsWith(`[${operation}]`)) throw error;
