@@ -581,8 +581,8 @@ Electron 增加 `SYSTEM_ANNOUNCEMENT` 和 `OPEN_NOTIFICATION_DETAIL` 协议映�
 - Cloud API 目标回归：58 项通过，0 failures，0 errors。
 - 后台脚本：两份 JavaScript 语法检查及 Cloud API 直连契约检查通过。
 - Python 只读工具：新工具 4 项、既有 Oracle 只读工具 7 项，共 11 项通过。
-- Electron：桌面通知目标测试 19 项通过；企业测试 TypeScript 检查通过；`npm run package` 的主进程、预加载和 Renderer 构建通过。
-- Electron 全仓 `tsc --noEmit` 仍有两处既有 `desktopVersionDownloader.ts` TS7011，与本次消息中心实现无关；目标企业类型检查与实际打包均已通过。
+- Electron：桌面通知目标测试 19 项通过；客户咨询、版本更新和通知中心整合回归 138 项通过。
+- Electron 企业测试与全仓 `tsc --noEmit` 均通过；`npm run package` 的主进程、预加载和 Renderer 构建通过。
 
 ### 19.3 数据库与真实联调状态
 
