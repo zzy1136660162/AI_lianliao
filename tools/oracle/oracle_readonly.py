@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping, Sequence
 import yaml
 
 
-PROJECTS_ROOT = Path(__file__).resolve().parents[2]
+PROJECTS_ROOT = Path(__file__).resolve().parents[3]
 CLOUD_SERVICE_ROOT = PROJECTS_ROOT / "lianshang_liaoning" / "cloud-service"
 DEFAULT_CONFIG_PATH = CLOUD_SERVICE_ROOT / "cloud-api" / "src" / "main" / "resources" / "application.yml"
 DEFAULT_DDL_PATH = CLOUD_SERVICE_ROOT / "cloud-api" / "src" / "main" / "resources" / "db" / "customer_service.sql"
@@ -332,7 +332,7 @@ def _connect(settings: ConnectionSettings, jdbc_jar_path: Path) -> Any:
         import jaydebeapi
     except ImportError as error:
         raise RuntimeError(
-            "Missing Python Oracle bridge. Run: python -m pip install -r tools/requirements-oracle-readonly.txt"
+            "Missing Python Oracle bridge. Run: python -m pip install -r tools/oracle/requirements.txt"
         ) from error
     if not jdbc_jar_path.is_file():
         raise FileNotFoundError(f"Oracle JDBC driver was not found: {jdbc_jar_path}")
