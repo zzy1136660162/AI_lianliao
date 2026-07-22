@@ -11,8 +11,13 @@ export const CUSTOMER_SERVICE_WEBSOCKET_PATH = 'cloud-api/customer-service/ws';
 /** Fixed main-to-renderer event used only after a trusted native-notification click. */
 export const CUSTOMER_SERVICE_NAVIGATE_CHANNEL = 'enterprise:customer-service:navigate-to-conversation';
 
+/** Fixed main-to-renderer event for customer-consultation notification clicks. */
+export const CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL = 'enterprise:customer-consultation:navigate';
+
 export const CUSTOMER_SERVICE_ENDPOINTS = Object.freeze({
+  customerAuth: 'customer/auth',
   staffAuth: 'staff/auth',
+  conversationOpen: 'conversation/open',
   conversationList: 'conversation/list',
   conversationDetail: 'conversation/detail',
   messageHistory: 'message/history',
@@ -22,6 +27,21 @@ export const CUSTOMER_SERVICE_ENDPOINTS = Object.freeze({
   conversationClose: 'conversation/close',
   staffCandidates: 'staff/candidates',
   websocketTicket: 'websocket/ticket',
+} as const);
+
+/** Customer consultation has a separate IPC namespace and never exposes staff-only operations. */
+export const CUSTOMER_CONSULTATION_IPC_CHANNELS = Object.freeze({
+  CONNECT: 'enterprise:customer-consultation:connect',
+  DISCONNECT: 'enterprise:customer-consultation:disconnect',
+  OPEN_CONVERSATION: 'enterprise:customer-consultation:open-conversation',
+  START_CONVERSATION: 'enterprise:customer-consultation:start-conversation',
+  GET_CONVERSATION: 'enterprise:customer-consultation:get-conversation',
+  GET_HISTORY: 'enterprise:customer-consultation:get-history',
+  SEND_MESSAGE: 'enterprise:customer-consultation:send-message',
+  MARK_READ: 'enterprise:customer-consultation:mark-read',
+  UPLOAD_IMAGE: 'enterprise:customer-consultation:upload-image',
+  CLOSE_CONVERSATION: 'enterprise:customer-consultation:close-conversation',
+  EVENT: 'enterprise:customer-consultation:event',
 } as const);
 
 /** Explicit channels prevent arbitrary renderer-selected operations. */
@@ -48,6 +68,7 @@ export const CUSTOMER_SERVICE_IPC_ERROR_MESSAGES: Readonly<Record<CustomerServic
     MISSING_ENTERPRISE_SESSION: 'Enterprise login is required for customer service.',
     AUTHENTICATION_FAILED: 'Customer-service authentication failed.',
     FORBIDDEN_STAFF: 'The current user is not an authorized customer-service agent.',
+    FORBIDDEN_CUSTOMER: 'Customer-service agents cannot use customer consultation.',
     TIMEOUT: 'Customer-service request timed out.',
     NETWORK: 'Customer-service network request failed.',
     HTTP: 'Customer-service API returned an unsuccessful HTTP status.',

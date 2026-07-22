@@ -245,6 +245,35 @@
   align-items: center;
 }
 
+.enterprise-header__actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.enterprise-header__notification-toggle,
+.enterprise-header__assistant-toggle {
+  -webkit-app-region: no-drag;
+}
+
+.enterprise-header__notification-toggle {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-base);
+  border-radius: var(--enterprise-radius-control);
+  place-items: center;
+}
+
+.enterprise-header__notification-toggle:hover {
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border-base));
+}
+
 .enterprise-header__eyebrow {
   color: var(--primary);
   font-family: var(--enterprise-font-ui);
@@ -276,7 +305,6 @@
   background: var(--bg-2);
   font: inherit;
   font-size: 12px;
-  -webkit-app-region: no-drag;
 }
 
 .enterprise-header__assistant-toggle:hover {
@@ -297,7 +325,8 @@
   grid-template-columns: minmax(0, 1fr) 0;
 }
 
-.enterprise-shell--customer-service .enterprise-shell__work-area {
+.enterprise-shell--customer-service .enterprise-shell__work-area,
+.enterprise-shell--consultation .enterprise-shell__work-area {
   grid-template-columns: minmax(0, 1fr) 0;
 }
 
@@ -309,7 +338,8 @@
   background: var(--enterprise-page-bg);
 }
 
-.enterprise-shell__main--customer-service {
+.enterprise-shell__main--customer-service,
+.enterprise-shell__main--consultation {
   overflow: hidden;
   padding: 0;
 }
@@ -331,7 +361,8 @@
   opacity: 0;
 }
 
-.enterprise-shell--customer-service .enterprise-assistant {
+.enterprise-shell--customer-service .enterprise-assistant,
+.enterprise-shell--consultation .enterprise-assistant {
   visibility: hidden;
   opacity: 0;
 }
@@ -529,7 +560,8 @@
     overflow: visible;
   }
 
-  .enterprise-shell__main--customer-service {
+  .enterprise-shell__main--customer-service,
+  .enterprise-shell__main--consultation {
     height: min(760px, calc(100vh - 230px));
     min-height: 520px;
     overflow: hidden;

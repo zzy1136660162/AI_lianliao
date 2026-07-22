@@ -157,6 +157,7 @@ export const customerServicePageSchema = <T extends z.ZodTypeAny>(itemSchema: T)
     })
     .strict();
 
+const emptyRequestSchema = z.object({}).strict();
 const conversationIdRequestSchema = z.object({ conversationId: signedBusinessIdSchema }).strict();
 
 const conversationListRequestSchema = z
@@ -280,6 +281,21 @@ export const CUSTOMER_SERVICE_COMMAND_SCHEMAS = Object.freeze({
   closeConversation: closeRequestSchema,
 });
 
+/**
+ * Customer renderer allowlist. It deliberately reuses validation rules while
+ * omitting staff queue, candidate lookup, and transfer capabilities.
+ */
+export const CUSTOMER_CONSULTATION_COMMAND_SCHEMAS = Object.freeze({
+  openConversation: emptyRequestSchema,
+  startConversation: emptyRequestSchema,
+  getConversation: conversationIdRequestSchema,
+  getHistory: messageHistoryRequestSchema,
+  sendMessage: z.discriminatedUnion('messageType', [sendTextRequestSchema, sendImageRequestSchema]),
+  markRead: markReadRequestSchema,
+  uploadImage: uploadImageRequestSchema,
+  closeConversation: closeRequestSchema,
+});
+
 const lifecyclePayloadSchema = z
   .object({
     conversationId: signedBusinessIdSchema,
@@ -314,6 +330,7 @@ const serverEnvelope = <TEvent extends string, TPayload extends z.ZodTypeAny>(ev
     .strict();
 
 export const customerServiceServerEnvelopeSchema = z.discriminatedUnion('event', [
+  serverEnvelope('connection.state', customerServiceConnectionSnapshotSchema),
   serverEnvelope(
     'connection.ready',
     z

@@ -1,0 +1,97 @@
+.page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  gap: 18px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.eyebrow {
+  color: var(--primary);
+  font-family: var(--enterprise-font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.header h1 {
+  margin: 7px 0 8px;
+  color: var(--enterprise-text-primary);
+  font-family: var(--enterprise-font-ui);
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.header p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.card {
+  border: 1px solid var(--enterprise-border) !important;
+  border-radius: var(--enterprise-radius-card) !important;
+  background: var(--enterprise-surface) !important;
+  box-shadow: var(--enterprise-shadow-card);
+}
+
+.state {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.release {
+  display: grid;
+  gap: 18px;
+}
+
+.releaseHeading {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.latest {
+  color: var(--enterprise-text-primary);
+  font-family: var(--enterprise-font-ui);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.releaseHeading p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.meta {
+  padding-top: 2px;
+}
+
+.notes {
+  display: block;
+  max-width: 680px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .header,
+  .releaseHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

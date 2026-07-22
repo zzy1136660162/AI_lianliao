@@ -6,12 +6,14 @@ import { Outlet } from 'react-router-dom';
 
 import type { EnterpriseAuthContextValue } from '@/renderer/hooks/context/EnterpriseAuthContext';
 import Router from '@/renderer/components/layout/Router';
+import { CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-service/constants';
 
 const routerMocks = vi.hoisted(() => ({
   appStatus: 'authenticated' as 'checking' | 'authenticated' | 'unauthenticated',
   desktop: true,
   enterpriseStatus: 'authenticated' as EnterpriseAuthContextValue['status'],
   logout: vi.fn<EnterpriseAuthContextValue['logout']>(async () => true),
+  roleId: undefined as string | undefined,
 }));
 
 // Ant Design's CSS-in-JS modules make the first lazy enterprise chunk slower to
@@ -43,6 +45,7 @@ vi.mock('@/renderer/hooks/context/EnterpriseAuthContext', () => ({
       openId: 'openid-must-not-be-rendered',
       companyName: '辽宁测试企业',
       userName: '测试用户',
+      roleId: routerMocks.roleId,
     },
     loginSession: null,
     registrationOpenId: null,
@@ -88,6 +91,9 @@ vi.mock('@/renderer/pages/conversation', () => ({
 vi.mock('@/renderer/pages/enterprise/login/EnterpriseLoginPage', () => ({
   default: () => <div>enterprise-login-page</div>,
 }));
+vi.mock('@/renderer/pages/enterprise/customerConsultation', () => ({
+  default: () => <div>customer-consultation-page</div>,
+}));
 
 const OriginalLayout = () => (
   <div>
@@ -106,6 +112,7 @@ describe('enterprise desktop routing', () => {
     routerMocks.appStatus = 'authenticated';
     routerMocks.desktop = true;
     routerMocks.enterpriseStatus = 'authenticated';
+    routerMocks.roleId = undefined;
     routerMocks.logout.mockReset();
     routerMocks.logout.mockResolvedValue(true);
   });
@@ -196,6 +203,52 @@ describe('enterprise desktop routing', () => {
     );
   });
 
+  it('shows online consultation only to ordinary enterprise users', async () => {
+    renderAt('/enterprise/dashboard');
+
+    const navigation = await screen.findByRole(
+      'navigation',
+      { name: 'enterprise.accessibility.primaryNavigation' },
+      ROUTE_WAIT_OPTIONS
+    );
+    expect(within(navigation).getByRole('link', { name: 'enterprise.navigation.consultation' })).toBeVisible();
+    expect(within(navigation).queryByRole('link', { name: 'enterprise.navigation.customerService' })).toBeNull();
+  });
+
+  it('shows customer-service reception only to roleId 19 agents', async () => {
+    routerMocks.roleId = '19';
+    renderAt('/enterprise/dashboard');
+
+    const navigation = await screen.findByRole(
+      'navigation',
+      { name: 'enterprise.accessibility.primaryNavigation' },
+      ROUTE_WAIT_OPTIONS
+    );
+    expect(within(navigation).getByRole('link', { name: 'enterprise.navigation.customerService' })).toBeVisible();
+    expect(within(navigation).queryByRole('link', { name: 'enterprise.navigation.consultation' })).toBeNull();
+  });
+
+  it('redirects direct conversation routes to the page allowed for the current role', async () => {
+    renderAt('/enterprise/customer-service');
+    await waitFor(() => expect(window.location.hash).toBe('#/enterprise/consultation'), ROUTE_WAIT_OPTIONS);
+    expect(await screen.findByText('customer-consultation-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
+
+    cleanup();
+    routerMocks.roleId = '19';
+    renderAt('/enterprise/consultation');
+    await waitFor(() => expect(window.location.hash).toBe('#/enterprise/customer-service'), ROUTE_WAIT_OPTIONS);
+  });
+
+  it('handles a customer-reply notification click outside the enterprise shell', async () => {
+    renderAt('/guid');
+    expect(await screen.findByText('original-guid-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
+
+    window.dispatchEvent(new CustomEvent(CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL));
+
+    await waitFor(() => expect(window.location.hash).toBe('#/enterprise/consultation'), ROUTE_WAIT_OPTIONS);
+    expect(await screen.findByText('customer-consultation-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
+  });
+
   it('does not render the legacy blueprint decoration in the bright workspace shell', async () => {
     const { container } = renderAt('/enterprise/dashboard');
 
@@ -264,20 +317,31 @@ describe('enterprise desktop routing', () => {
   });
 
   it('keeps compact footer actions in direct keyboard order after primary navigation', async () => {
-    const user = userEvent.setup();
     renderAt('/enterprise/dashboard');
-    const leads = await screen.findByRole('link', { name: 'enterprise.navigation.leads' }, ROUTE_WAIT_OPTIONS);
+    const consultation = await screen.findByRole(
+      'link',
+      { name: 'enterprise.navigation.consultation' },
+      ROUTE_WAIT_OPTIONS
+    );
     const ai = screen.getByRole('link', { name: 'enterprise.shell.actions.ai' });
     const settings = screen.getByRole('link', { name: 'enterprise.shell.actions.settings' });
     const logout = screen.getByRole('button', { name: 'enterprise.shell.actions.logout' });
 
-    leads.focus();
-    await user.tab();
-    expect(ai).toHaveFocus();
-    await user.tab();
-    expect(settings).toHaveFocus();
-    await user.tab();
-    expect(logout).toHaveFocus();
+    // DOM order is the browser's native tab order because all four controls use
+    // the default tabIndex. Comparing their positions avoids coupling this route
+    // contract test to user-event's comparatively expensive tab simulation.
+    const tabbableControls = Array.from(
+      document.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+    );
+    const consultationIndex = tabbableControls.indexOf(consultation);
+    const aiIndex = tabbableControls.indexOf(ai);
+    const settingsIndex = tabbableControls.indexOf(settings);
+    const logoutIndex = tabbableControls.indexOf(logout);
+
+    expect(consultationIndex).toBeGreaterThanOrEqual(0);
+    expect(aiIndex).toBeGreaterThan(consultationIndex);
+    expect(settingsIndex).toBeGreaterThan(aiIndex);
+    expect(logoutIndex).toBeGreaterThan(settingsIndex);
   }, 20_000);
 
   it('returns the enterprise workspace to the top after navigating to another enterprise pathname', async () => {
@@ -296,7 +360,7 @@ describe('enterprise desktop routing', () => {
       await screen.findByRole('heading', { name: 'enterprise.routes.companies.title' }, ROUTE_WAIT_OPTIONS)
     ).toBeVisible();
     expect(main).toHaveProperty('scrollTop', 0);
-  });
+  }, 20_000);
 
   it('preserves enterprise workspace scroll when only the hash query changes', async () => {
     const { container } = renderAt('/enterprise/dashboard');

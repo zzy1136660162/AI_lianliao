@@ -169,6 +169,7 @@ export type CustomerServiceConnectionSnapshot = {
 
 export type CustomerServiceServerEvent =
   | 'connection.ready'
+  | 'connection.state'
   | 'conversation.snapshot'
   | 'message.ack'
   | 'message.created'
@@ -235,6 +236,7 @@ export type CustomerServiceIpcErrorCode =
   | 'MISSING_ENTERPRISE_SESSION'
   | 'AUTHENTICATION_FAILED'
   | 'FORBIDDEN_STAFF'
+  | 'FORBIDDEN_CUSTOMER'
   | 'TIMEOUT'
   | 'NETWORK'
   | 'HTTP'

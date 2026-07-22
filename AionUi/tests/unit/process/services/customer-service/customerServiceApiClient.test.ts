@@ -75,6 +75,52 @@ describe('CustomerServiceApiClient', () => {
     expect(new Headers(requests[0]?.init.headers).get('Authorization')).toBe('Bearer main-process-secret');
   });
 
+  it('authenticates a customer without an authorization header', async () => {
+    const requests: Array<{ init: RequestInit; url: string }> = [];
+    const client = new CustomerServiceApiClient({
+      environment: 'development',
+      transport: async (url, init) => {
+        requests.push({ init, url });
+        return commonResult({
+          accessToken: 'customer-memory-token',
+          expiresInSeconds: 7_200,
+          principal: {
+            type: 'CUSTOMER',
+            userId: '-7',
+            displayName: '企业用户',
+            companyId: '-18',
+            companyName: '沈阳航燃科技有限公司',
+          },
+        });
+      },
+    });
+
+    const session = await client.authenticateCustomer('  customer-open-id  ');
+
+    expect(session.principal.type).toBe('CUSTOMER');
+    expect(requests[0]?.url).toBe('http://127.0.0.1:12580/cloud-api/CustomerServiceController/customer/auth');
+    expect(JSON.parse(String(requests[0]?.init.body))).toEqual({ openId: 'customer-open-id' });
+    expect(new Headers(requests[0]?.init.headers).has('Authorization')).toBe(false);
+  });
+
+  it('opens or resumes the customer conversation with an empty body and a Bearer token', async () => {
+    const requests: Array<{ init: RequestInit; url: string }> = [];
+    const client = new CustomerServiceApiClient({
+      environment: 'development',
+      transport: async (url, init) => {
+        requests.push({ init, url });
+        return commonResult(conversation);
+      },
+    });
+
+    const result = await client.openConversation('customer-memory-token');
+
+    expect(result.conversationId).toBe('-8');
+    expect(requests[0]?.url).toBe('http://127.0.0.1:12580/cloud-api/CustomerServiceController/conversation/open');
+    expect(JSON.parse(String(requests[0]?.init.body))).toEqual({});
+    expect(new Headers(requests[0]?.init.headers).get('Authorization')).toBe('Bearer customer-memory-token');
+  });
+
   it('aborts a request at the configured deadline', async () => {
     vi.useFakeTimers();
     const client = new CustomerServiceApiClient({

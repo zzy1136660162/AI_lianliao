@@ -13,14 +13,23 @@ import { initNotificationBridge } from './notificationBridge';
 import { initWebuiBridge } from './webuiBridge';
 import { initThemeBridge } from './themeBridge';
 import {
+  initCustomerConsultationBridge,
   initCustomerServiceBridge,
+  initDesktopNotificationBridge,
+  initDesktopVersionBridge,
   initEnterpriseBridge,
+  type CustomerConsultationBridgeDependencies,
   type CustomerServiceBridgeDependencies,
+  type DesktopNotificationBridgeDependencies,
+  type DesktopVersionBridgeDependencies,
   type EnterpriseBridgeDependencies,
 } from './enterpriseBridge';
 
 export type BridgeDependencies = {
+  customerConsultation?: CustomerConsultationBridgeDependencies;
   customerService?: CustomerServiceBridgeDependencies;
+  desktopNotification?: DesktopNotificationBridgeDependencies;
+  desktopVersion?: DesktopVersionBridgeDependencies;
   enterprise?: EnterpriseBridgeDependencies;
 };
 
@@ -35,6 +44,9 @@ export function initAllBridges(deps: BridgeDependencies = {}): void {
   initThemeBridge();
   initEnterpriseBridge(deps.enterprise);
   initCustomerServiceBridge(deps.customerService);
+  initCustomerConsultationBridge(deps.customerConsultation);
+  initDesktopNotificationBridge(deps.desktopNotification);
+  initDesktopVersionBridge(deps.desktopVersion);
 }
 
 export {
@@ -46,7 +58,10 @@ export {
   initUpdateBridge,
   initWindowControlsBridge,
   initWebuiBridge,
+  initCustomerConsultationBridge,
   initCustomerServiceBridge,
+  initDesktopNotificationBridge,
+  initDesktopVersionBridge,
   initEnterpriseBridge,
 };
 export { registerWindowMaximizeListeners } from './windowControlsBridge';

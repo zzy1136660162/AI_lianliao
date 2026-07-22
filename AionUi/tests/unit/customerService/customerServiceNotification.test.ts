@@ -514,6 +514,38 @@ describe('customer-service native notification target', () => {
     expect(emitNotificationClick).toHaveBeenCalledWith({ conversation_id: 'ai-conversation-guid' });
   });
 
+  it('opens the authenticated customer consultation without accepting an external conversation ID', async () => {
+    vi.resetModules();
+    const send = vi.fn();
+    const openCustomerConsultation = vi.fn();
+    vi.doMock('@/common/platform', () => ({
+      getPlatformServices: () => ({ notification: { send } }),
+    }));
+    vi.doMock('@/common', () => ({
+      ipcBridge: {
+        notification: { clicked: { emit: vi.fn() }, show: { provider: vi.fn() } },
+      },
+    }));
+    vi.doMock('@process/utils/initStorage', () => ({
+      ProcessConfig: { get: vi.fn(async () => true) },
+    }));
+    vi.doMock('@process/utils/tray', () => ({
+      openCustomerServiceConversation: vi.fn(),
+      openCustomerConsultation,
+    }));
+    const { showNotification } = await import('@process/bridge/notificationBridge');
+
+    await showNotification({
+      title: '链辽客服',
+      body: '您收到一条客服回复',
+      customer_consultation: true,
+    });
+    const notificationOptions = send.mock.calls[0]?.[0] as { onClick?: () => void };
+    notificationOptions.onClick?.();
+
+    expect(openCustomerConsultation).toHaveBeenCalledTimes(1);
+  });
+
   it('restores, shows and focuses the main window before sending the fixed navigation event', async () => {
     vi.resetModules();
     vi.doUnmock('@process/utils/tray');
@@ -605,5 +637,46 @@ describe('customer-service native notification target', () => {
       ])
     );
     destroyTray();
+  });
+
+  it('opens customer consultation and suppresses notifications only while that route is focused', async () => {
+    vi.resetModules();
+    vi.doUnmock('@process/utils/tray');
+    vi.doMock('@/common/electronSafe', () => ({
+      electronApp: { isPackaged: false },
+      electronMenu: { buildFromTemplate: vi.fn() },
+      electronNativeImage: { createFromPath: vi.fn() },
+      electronTray: vi.fn(),
+    }));
+    vi.doMock('@/common', () => ({
+      ipcBridge: {
+        conversation: { activeCount: { invoke: vi.fn(async () => ({ count: 0 })) } },
+        database: { getUserConversations: { invoke: vi.fn(async () => ({ items: [] })) } },
+      },
+    }));
+    vi.doMock('@process/services/i18n', () => ({ default: { t: (key: string) => key } }));
+    const { CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL } = await import('@/common/enterprise/customer-service/constants');
+    const { openCustomerConsultation, setTrayMainWindow, shouldNotifyCustomerConsultationMessage } =
+      await import('@process/utils/tray');
+    let url = 'http://localhost:51031/#/enterprise/consultation';
+    const window = {
+      focus: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+      isFocused: vi.fn(() => true),
+      isMinimized: vi.fn(() => false),
+      restore: vi.fn(),
+      show: vi.fn(),
+      webContents: { getURL: vi.fn(() => url), send: vi.fn() },
+    };
+    setTrayMainWindow(window as never);
+
+    expect(shouldNotifyCustomerConsultationMessage()).toBe(false);
+    url = 'http://localhost:51031/#/enterprise/dashboard';
+    expect(shouldNotifyCustomerConsultationMessage()).toBe(true);
+    openCustomerConsultation();
+
+    expect(window.show).toHaveBeenCalledOnce();
+    expect(window.focus).toHaveBeenCalledOnce();
+    expect(window.webContents.send).toHaveBeenCalledWith(CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL);
   });
 });

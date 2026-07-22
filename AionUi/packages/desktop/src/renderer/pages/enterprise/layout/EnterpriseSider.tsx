@@ -42,6 +42,12 @@ const navigationGroups = [
       { path: '/enterprise/favorites', labelKey: 'enterprise.navigation.favorites', Icon: Star },
       { path: '/enterprise/leads', labelKey: 'enterprise.navigation.leads', Icon: FollowUpDateSort },
       {
+        path: '/enterprise/consultation',
+        labelKey: 'enterprise.navigation.consultation',
+        Icon: HeadsetOne,
+        excludedRoleId: '19',
+      },
+      {
         path: '/enterprise/customer-service',
         labelKey: 'enterprise.navigation.customerService',
         Icon: HeadsetOne,
@@ -101,9 +107,12 @@ const EnterpriseSider: React.FC = () => {
               {items
                 .filter(
                   (item) =>
-                    !('requiredRoleId' in item) ||
-                    item.requiredRoleId === undefined ||
-                    user?.roleId === item.requiredRoleId
+                    (!('requiredRoleId' in item) ||
+                      item.requiredRoleId === undefined ||
+                      user?.roleId === item.requiredRoleId) &&
+                    (!('excludedRoleId' in item) ||
+                      item.excludedRoleId === undefined ||
+                      user?.roleId !== item.excludedRoleId)
                 )
                 .map(({ path, labelKey, Icon }) => (
                   <NavLink

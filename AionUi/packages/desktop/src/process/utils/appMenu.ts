@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { ipcBridge } from '@/common';
 import type { MenuItemConstructorOptions } from 'electron';
-import { Menu, app } from 'electron';
+import { BrowserWindow, Menu, app } from 'electron';
+import { DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL } from '@/common/enterprise/desktop-notification/constants';
+import i18n from '@process/services/i18n';
 import { isDevToolsEnabled } from './devToolsPolicy';
 
 export const buildViewMenuItems = (isPackaged: boolean): MenuItemConstructorOptions[] => [
@@ -67,9 +68,13 @@ export function setupApplicationMenu(): void {
     label: 'Help',
     submenu: [
       {
-        label: 'Check for Updates...',
+        label: i18n.t('common.tray.checkUpdate'),
         click: () => {
-          ipcBridge.update.open.emit({ source: 'menu' });
+          for (const window of BrowserWindow.getAllWindows()) {
+            if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+              window.webContents.send(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, { route: '/enterprise/version-update' });
+            }
+          }
         },
       },
     ],

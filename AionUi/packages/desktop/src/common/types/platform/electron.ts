@@ -26,6 +26,22 @@ import type {
   CustomerServiceTransferRequest,
   CustomerServiceUploadImageRequest,
 } from '../../enterprise/customer-service/contracts';
+import type {
+  DesktopNotificationChangedResult,
+  DesktopNotificationConnectionSnapshot,
+  DesktopNotificationIpcResult,
+  DesktopNotificationListRequest,
+  DesktopNotificationMarkAllReadResult,
+  DesktopNotificationPage,
+  DesktopNotificationServerEnvelope,
+  DesktopNotificationUnreadCount,
+} from '../../enterprise/desktop-notification/contracts';
+import type {
+  DesktopVersionCheckResult,
+  DesktopVersionDownloadResult,
+  DesktopVersionIpcResult,
+  DesktopVersionOpenDownloadedResult,
+} from '../../enterprise/desktop-version/contracts';
 
 // WebUI 状态接口 / WebUI status interface
 export interface WebUIStatus {
@@ -85,6 +101,46 @@ export interface ElectronBridgeAPI {
       request: CustomerServiceCloseRequest
     ) => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
     onEvent: (callback: (event: CustomerServiceServerEnvelope) => void) => () => void;
+  };
+  /** Customer-only consultation bridge. Staff queue and transfer commands are intentionally absent. */
+  customerConsultation?: {
+    connect: () => Promise<CustomerServiceIpcResult<CustomerServiceConnectionSnapshot>>;
+    disconnect: () => Promise<CustomerServiceIpcResult<void>>;
+    openConversation: () => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
+    startConversation: () => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
+    getConversation: (
+      request: CustomerServiceConversationIdRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
+    getHistory: (
+      request: CustomerServiceMessageHistoryRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServicePage<CustomerServiceMessage>>>;
+    sendMessage: (request: CustomerServiceSendMessageRequest) => Promise<CustomerServiceIpcResult<string>>;
+    markRead: (request: CustomerServiceMarkReadRequest) => Promise<CustomerServiceIpcResult<CustomerServiceReadResult>>;
+    uploadImage: (
+      request: CustomerServiceUploadImageRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServiceImage>>;
+    closeConversation: (
+      request: CustomerServiceCloseRequest
+    ) => Promise<CustomerServiceIpcResult<CustomerServiceConversation>>;
+    onEvent: (callback: (event: CustomerServiceServerEnvelope) => void) => () => void;
+  };
+  /** Electron-only business notification center. OpenID and websocket tickets remain in main process. */
+  desktopNotifications?: {
+    connect: () => Promise<DesktopNotificationIpcResult<DesktopNotificationConnectionSnapshot>>;
+    disconnect: () => Promise<DesktopNotificationIpcResult<void>>;
+    list: (request: DesktopNotificationListRequest) => Promise<DesktopNotificationIpcResult<DesktopNotificationPage>>;
+    getUnreadCount: () => Promise<DesktopNotificationIpcResult<DesktopNotificationUnreadCount>>;
+    markRead: (request: {
+      notificationId: string;
+    }) => Promise<DesktopNotificationIpcResult<DesktopNotificationChangedResult>>;
+    markAllRead: () => Promise<DesktopNotificationIpcResult<DesktopNotificationMarkAllReadResult>>;
+    onEvent: (callback: (event: DesktopNotificationServerEnvelope) => void) => () => void;
+  };
+  /** Main-process-only desktop release lookup and verified installer download. */
+  desktopVersion?: {
+    check: () => Promise<DesktopVersionIpcResult<DesktopVersionCheckResult>>;
+    download: () => Promise<DesktopVersionIpcResult<DesktopVersionDownloadResult>>;
+    openDownloaded: () => Promise<DesktopVersionIpcResult<DesktopVersionOpenDownloadedResult>>;
   };
 }
 

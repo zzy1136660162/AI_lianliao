@@ -13,10 +13,21 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { z } from 'zod';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
 import {
+  CUSTOMER_CONSULTATION_IPC_CHANNELS,
+  CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL,
   CUSTOMER_SERVICE_IPC_CHANNELS,
   CUSTOMER_SERVICE_IPC_ERROR_MESSAGES,
   CUSTOMER_SERVICE_NAVIGATE_CHANNEL,
 } from '../common/enterprise/customer-service/constants';
+import {
+  DESKTOP_NOTIFICATION_IPC_CHANNELS,
+  DESKTOP_NOTIFICATION_IPC_ERROR_MESSAGES,
+  DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL,
+} from '../common/enterprise/desktop-notification/constants';
+import {
+  DESKTOP_VERSION_IPC_CHANNELS,
+  DESKTOP_VERSION_IPC_ERROR_MESSAGES,
+} from '../common/enterprise/desktop-version/constants';
 import type {
   CustomerServiceCloseRequest,
   CustomerServiceConnectionSnapshot,
@@ -38,7 +49,26 @@ import type {
   CustomerServiceTransferRequest,
   CustomerServiceUploadImageRequest,
 } from '../common/enterprise/customer-service/contracts';
+import type {
+  DesktopNotificationChangedResult,
+  DesktopNotificationConnectionSnapshot,
+  DesktopNotificationIpcErrorCode,
+  DesktopNotificationIpcResult,
+  DesktopNotificationListRequest,
+  DesktopNotificationMarkAllReadResult,
+  DesktopNotificationPage,
+  DesktopNotificationServerEnvelope,
+  DesktopNotificationUnreadCount,
+} from '../common/enterprise/desktop-notification/contracts';
+import type {
+  DesktopVersionCheckResult,
+  DesktopVersionDownloadResult,
+  DesktopVersionIpcErrorCode,
+  DesktopVersionIpcResult,
+  DesktopVersionOpenDownloadedResult,
+} from '../common/enterprise/desktop-version/contracts';
 import {
+  CUSTOMER_CONSULTATION_COMMAND_SCHEMAS,
   CUSTOMER_SERVICE_COMMAND_SCHEMAS,
   customerServiceConnectionSnapshotSchema,
   customerServiceConversationSchema,
@@ -51,6 +81,23 @@ import {
   customerServiceServerEnvelopeSchema,
   customerServiceStaffCandidateSchema,
 } from '../common/enterprise/customer-service/schemas';
+import {
+  DESKTOP_NOTIFICATION_COMMAND_SCHEMAS,
+  desktopNotificationChangedResultSchema,
+  desktopNotificationConnectionSnapshotSchema,
+  desktopNotificationIpcResultSchema,
+  desktopNotificationMarkAllReadResultSchema,
+  desktopNotificationNavigationDetailSchema,
+  desktopNotificationPageSchema,
+  desktopNotificationServerEnvelopeSchema,
+  desktopNotificationUnreadCountSchema,
+} from '../common/enterprise/desktop-notification/schemas';
+import {
+  desktopVersionCheckResultSchema,
+  desktopVersionDownloadResultSchema,
+  desktopVersionIpcResultSchema,
+  desktopVersionOpenDownloadedResultSchema,
+} from '../common/enterprise/desktop-version/schemas';
 import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '../common/enterprise/constants';
 import type {
   EnterpriseIpcErrorCode,
@@ -182,6 +229,18 @@ const customerServiceFailureResult = (code: CustomerServiceIpcErrorCode): Custom
   error: { code, message: CUSTOMER_SERVICE_IPC_ERROR_MESSAGES[code] },
 });
 
+const desktopNotificationFailureResult = (
+  code: DesktopNotificationIpcErrorCode
+): DesktopNotificationIpcResult<never> => ({
+  ok: false,
+  error: { code, message: DESKTOP_NOTIFICATION_IPC_ERROR_MESSAGES[code] },
+});
+
+const desktopVersionFailureResult = (code: DesktopVersionIpcErrorCode): DesktopVersionIpcResult<never> => ({
+  ok: false,
+  error: { code, message: DESKTOP_VERSION_IPC_ERROR_MESSAGES[code] },
+});
+
 type CustomerServicePreloadRequest = {
   schema: z.ZodTypeAny;
   value: unknown;
@@ -215,6 +274,59 @@ const invokeCustomerService = async <T>(
   return result;
 };
 
+type DesktopNotificationPreloadRequest = {
+  schema: z.ZodTypeAny;
+  value: unknown;
+};
+
+/** Validates both directions of the notification-center IPC boundary in preload. */
+const invokeDesktopNotification = async <T>(
+  channel: string,
+  responseSchema: z.ZodTypeAny,
+  request?: DesktopNotificationPreloadRequest
+): Promise<DesktopNotificationIpcResult<T>> => {
+  const args: unknown[] = [];
+  if (request) {
+    const parsedRequest = request.schema.safeParse(request.value);
+    if (!parsedRequest.success) return desktopNotificationFailureResult('INVALID_REQUEST');
+    args.push(parsedRequest.data);
+  }
+
+  let untrustedResult: unknown;
+  try {
+    untrustedResult = await ipcRenderer.invoke(channel, ...args);
+  } catch {
+    return desktopNotificationFailureResult('IPC_UNAVAILABLE');
+  }
+  const parsedResult = desktopNotificationIpcResultSchema(responseSchema).safeParse(untrustedResult);
+  if (!parsedResult.success) return desktopNotificationFailureResult('INVALID_IPC_RESPONSE');
+  const result = parsedResult.data as DesktopNotificationIpcResult<T>;
+  if (result.ok === false && result.error.message !== DESKTOP_NOTIFICATION_IPC_ERROR_MESSAGES[result.error.code]) {
+    return desktopNotificationFailureResult('INVALID_IPC_RESPONSE');
+  }
+  return result;
+};
+
+/** No renderer-provided URL or path is accepted by the desktop-version IPC surface. */
+const invokeDesktopVersion = async <T>(
+  channel: string,
+  responseSchema: z.ZodTypeAny
+): Promise<DesktopVersionIpcResult<T>> => {
+  let untrustedResult: unknown;
+  try {
+    untrustedResult = await ipcRenderer.invoke(channel);
+  } catch {
+    return desktopVersionFailureResult('IPC_UNAVAILABLE');
+  }
+  const parsedResult = desktopVersionIpcResultSchema(responseSchema).safeParse(untrustedResult);
+  if (!parsedResult.success) return desktopVersionFailureResult('INVALID_IPC_RESPONSE');
+  const result = parsedResult.data as DesktopVersionIpcResult<T>;
+  if (result.ok === false && result.error.message !== DESKTOP_VERSION_IPC_ERROR_MESSAGES[result.error.code]) {
+    return desktopVersionFailureResult('INVALID_IPC_RESPONSE');
+  }
+  return result;
+};
+
 const subscribeCustomerServiceEvents = (callback: (event: CustomerServiceServerEnvelope) => void): (() => void) => {
   if (typeof callback !== 'function') return () => undefined;
   const handler = (_event: unknown, untrustedEvent: unknown): void => {
@@ -223,6 +335,31 @@ const subscribeCustomerServiceEvents = (callback: (event: CustomerServiceServerE
   };
   ipcRenderer.on(CUSTOMER_SERVICE_IPC_CHANNELS.EVENT, handler);
   return () => ipcRenderer.off(CUSTOMER_SERVICE_IPC_CHANNELS.EVENT, handler);
+};
+
+/** Customer events use a separate channel so staff and customer runtimes cannot consume each other's stream. */
+const subscribeCustomerConsultationEvents = (
+  callback: (event: CustomerServiceServerEnvelope) => void
+): (() => void) => {
+  if (typeof callback !== 'function') return () => undefined;
+  const handler = (_event: unknown, untrustedEvent: unknown): void => {
+    const parsed = customerServiceServerEnvelopeSchema.safeParse(untrustedEvent);
+    if (parsed.success) callback(parsed.data as CustomerServiceServerEnvelope);
+  };
+  ipcRenderer.on(CUSTOMER_CONSULTATION_IPC_CHANNELS.EVENT, handler);
+  return () => ipcRenderer.off(CUSTOMER_CONSULTATION_IPC_CHANNELS.EVENT, handler);
+};
+
+const subscribeDesktopNotificationEvents = (
+  callback: (event: DesktopNotificationServerEnvelope) => void
+): (() => void) => {
+  if (typeof callback !== 'function') return () => undefined;
+  const handler = (_event: unknown, untrustedEvent: unknown): void => {
+    const parsed = desktopNotificationServerEnvelopeSchema.safeParse(untrustedEvent);
+    if (parsed.success) callback(parsed.data as DesktopNotificationServerEnvelope);
+  };
+  ipcRenderer.on(DESKTOP_NOTIFICATION_IPC_CHANNELS.EVENT, handler);
+  return () => ipcRenderer.off(DESKTOP_NOTIFICATION_IPC_CHANNELS.EVENT, handler);
 };
 
 /**
@@ -334,6 +471,108 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ),
     onEvent: subscribeCustomerServiceEvents,
   },
+  customerConsultation: {
+    connect: () =>
+      invokeCustomerService<CustomerServiceConnectionSnapshot>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.CONNECT,
+        customerServiceConnectionSnapshotSchema
+      ),
+    disconnect: () => invokeCustomerService<void>(CUSTOMER_CONSULTATION_IPC_CHANNELS.DISCONNECT, z.void()),
+    openConversation: () =>
+      invokeCustomerService<CustomerServiceConversation>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.OPEN_CONVERSATION,
+        customerServiceConversationSchema
+      ),
+    startConversation: () =>
+      invokeCustomerService<CustomerServiceConversation>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.START_CONVERSATION,
+        customerServiceConversationSchema
+      ),
+    getConversation: (request: CustomerServiceConversationIdRequest) =>
+      invokeCustomerService<CustomerServiceConversation>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.GET_CONVERSATION,
+        customerServiceConversationSchema,
+        { schema: CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.getConversation, value: request }
+      ),
+    getHistory: (request: CustomerServiceMessageHistoryRequest) =>
+      invokeCustomerService<CustomerServicePage<CustomerServiceMessage>>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.GET_HISTORY,
+        customerServicePageSchema(customerServiceMessageSchema),
+        { schema: CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.getHistory, value: request }
+      ),
+    sendMessage: (request: CustomerServiceSendMessageRequest) =>
+      invokeCustomerService<string>(CUSTOMER_CONSULTATION_IPC_CHANNELS.SEND_MESSAGE, z.string().uuid(), {
+        schema: CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.sendMessage,
+        value: request,
+      }),
+    markRead: (request: CustomerServiceMarkReadRequest) =>
+      invokeCustomerService<CustomerServiceReadResult>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.MARK_READ,
+        customerServiceReadResultSchema,
+        { schema: CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.markRead, value: request }
+      ),
+    uploadImage: (request: CustomerServiceUploadImageRequest) =>
+      invokeCustomerService<CustomerServiceImage>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.UPLOAD_IMAGE,
+        customerServiceImageSchema,
+        { schema: CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.uploadImage, value: request }
+      ),
+    closeConversation: (request: CustomerServiceCloseRequest) =>
+      invokeCustomerService<CustomerServiceConversation>(
+        CUSTOMER_CONSULTATION_IPC_CHANNELS.CLOSE_CONVERSATION,
+        customerServiceConversationSchema,
+        { schema: CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.closeConversation, value: request }
+      ),
+    onEvent: subscribeCustomerConsultationEvents,
+  },
+  desktopNotifications: {
+    connect: () =>
+      invokeDesktopNotification<DesktopNotificationConnectionSnapshot>(
+        DESKTOP_NOTIFICATION_IPC_CHANNELS.CONNECT,
+        desktopNotificationConnectionSnapshotSchema
+      ),
+    disconnect: () => invokeDesktopNotification<void>(DESKTOP_NOTIFICATION_IPC_CHANNELS.DISCONNECT, z.void()),
+    list: (request: DesktopNotificationListRequest) =>
+      invokeDesktopNotification<DesktopNotificationPage>(
+        DESKTOP_NOTIFICATION_IPC_CHANNELS.LIST,
+        desktopNotificationPageSchema,
+        { schema: DESKTOP_NOTIFICATION_COMMAND_SCHEMAS.list, value: request }
+      ),
+    getUnreadCount: () =>
+      invokeDesktopNotification<DesktopNotificationUnreadCount>(
+        DESKTOP_NOTIFICATION_IPC_CHANNELS.GET_UNREAD_COUNT,
+        desktopNotificationUnreadCountSchema
+      ),
+    markRead: (request: { notificationId: string }) =>
+      invokeDesktopNotification<DesktopNotificationChangedResult>(
+        DESKTOP_NOTIFICATION_IPC_CHANNELS.MARK_READ,
+        desktopNotificationChangedResultSchema,
+        { schema: DESKTOP_NOTIFICATION_COMMAND_SCHEMAS.markRead, value: request }
+      ),
+    markAllRead: () =>
+      invokeDesktopNotification<DesktopNotificationMarkAllReadResult>(
+        DESKTOP_NOTIFICATION_IPC_CHANNELS.MARK_ALL_READ,
+        desktopNotificationMarkAllReadResultSchema
+      ),
+    onEvent: subscribeDesktopNotificationEvents,
+  },
+  desktopVersion: {
+    check: () =>
+      invokeDesktopVersion<DesktopVersionCheckResult>(
+        DESKTOP_VERSION_IPC_CHANNELS.CHECK,
+        desktopVersionCheckResultSchema
+      ),
+    download: () =>
+      invokeDesktopVersion<DesktopVersionDownloadResult>(
+        DESKTOP_VERSION_IPC_CHANNELS.DOWNLOAD,
+        desktopVersionDownloadResultSchema
+      ),
+    openDownloaded: () =>
+      invokeDesktopVersion<DesktopVersionOpenDownloadedResult>(
+        DESKTOP_VERSION_IPC_CHANNELS.OPEN_DOWNLOADED,
+        desktopVersionOpenDownloadedResultSchema
+      ),
+  },
 });
 
 // Synchronously fetch the aioncore port and expose it to the renderer
@@ -370,5 +609,19 @@ ipcRenderer.on(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, (_event, untrustedDetail) => {
   const detail = customerServiceNavigationDetailSchema.safeParse(untrustedDetail);
   if (detail.success) {
     window.dispatchEvent(new CustomEvent(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, { detail: detail.data }));
+  }
+});
+
+// Customer notifications always open the authenticated user's own conversation;
+// no externally supplied conversation ID is accepted on this channel.
+ipcRenderer.on(CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL, () => {
+  window.dispatchEvent(new CustomEvent(CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL));
+});
+
+// Desktop notification clicks carry only a main-process-generated allowlisted route.
+ipcRenderer.on(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, (_event, untrustedDetail) => {
+  const detail = desktopNotificationNavigationDetailSchema.safeParse(untrustedDetail);
+  if (detail.success) {
+    window.dispatchEvent(new CustomEvent(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, { detail: detail.data }));
   }
 });

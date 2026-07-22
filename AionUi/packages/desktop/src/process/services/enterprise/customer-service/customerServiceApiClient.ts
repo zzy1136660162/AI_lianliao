@@ -142,12 +142,31 @@ export class CustomerServiceApiClient {
     this.transport = options.transport ?? defaultTransport;
   }
 
+  /** Authenticates a customer; the returned token stays in main-process memory. */
+  authenticateCustomer(openId: string): Promise<CustomerServiceAuthSession> {
+    return this.postJson<CustomerServiceAuthSession>(
+      CUSTOMER_SERVICE_ENDPOINTS.customerAuth,
+      { openId: parseOpenId(openId) },
+      customerServiceAuthSessionSchema
+    );
+  }
+
   /** Authenticates from the persisted enterprise openId; the returned token stays in main-process memory. */
   authenticateStaff(openId: string): Promise<CustomerServiceAuthSession> {
     return this.postJson<CustomerServiceAuthSession>(
       CUSTOMER_SERVICE_ENDPOINTS.staffAuth,
       { openId: parseOpenId(openId) },
       customerServiceAuthSessionSchema
+    );
+  }
+
+  /** Creates or resumes the authenticated customer's single open conversation. */
+  openConversation(accessToken: string): Promise<CustomerServiceConversation> {
+    return this.postJson<CustomerServiceConversation>(
+      CUSTOMER_SERVICE_ENDPOINTS.conversationOpen,
+      {},
+      customerServiceConversationSchema,
+      accessToken
     );
   }
 

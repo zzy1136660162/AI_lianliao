@@ -1,5 +1,5 @@
-import React, { Suspense } from 'react';
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import React, { Suspense, useEffect } from 'react';
+import { HashRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import AppLoader from '@renderer/components/layout/AppLoader';
 import { useAuth } from '@renderer/hooks/context/AuthContext';
 import { useEnterpriseAuth } from '@renderer/hooks/context/EnterpriseAuthContext';
@@ -7,6 +7,9 @@ import EnterprisePageState from '@renderer/pages/enterprise/layout/EnterprisePag
 import { isElectronDesktop } from '@renderer/utils/platform';
 import { useTranslation } from 'react-i18next';
 import { TEAM_MODE_ENABLED } from '@/common/config/constants';
+import { CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-service/constants';
+import { DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL } from '@/common/enterprise/desktop-notification/constants';
+import { desktopNotificationNavigationDetailSchema } from '@/common/enterprise/desktop-notification/schemas';
 const Conversation = React.lazy(() => import('@renderer/pages/conversation'));
 const Guid = React.lazy(() => import('@renderer/pages/guid'));
 const AgentSettings = React.lazy(() => import('@renderer/pages/settings/AgentSettings'));
@@ -38,6 +41,11 @@ const SupplyDemandDetailPage = React.lazy(
 );
 const DashboardPage = React.lazy(() => import('@renderer/pages/enterprise/dashboard/DashboardPage'));
 const CustomerServiceWorkbench = React.lazy(() => import('@renderer/pages/enterprise/customerService'));
+const CustomerConsultationPage = React.lazy(() => import('@renderer/pages/enterprise/customerConsultation'));
+const DesktopNotificationCenterPage = React.lazy(
+  () => import('@renderer/pages/enterprise/notifications/DesktopNotificationCenterPage')
+);
+const VersionUpdatePage = React.lazy(() => import('@renderer/pages/enterprise/notifications/VersionUpdatePage'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -75,6 +83,22 @@ const EnterpriseProtectedLayout: React.FC = () => {
   if (status === 'checking') return <AppLoader />;
   if (status !== 'authenticated') return <Navigate to='/enterprise/login' replace />;
   return withRouteFallback(EnterpriseShell);
+};
+
+type EnterpriseConversationRoleRouteProps = React.PropsWithChildren<{
+  audience: 'customer' | 'staff';
+}>;
+
+/** Keeps customer consultation and staff reception mutually exclusive, including direct URLs. */
+const EnterpriseConversationRoleRoute: React.FC<EnterpriseConversationRoleRouteProps> = ({ audience, children }) => {
+  const { status, user } = useEnterpriseAuth();
+  if (status === 'checking') return <AppLoader />;
+  if (status !== 'authenticated') return <Navigate to='/enterprise/login' replace />;
+
+  const isStaff = user?.roleId === '19';
+  if (audience === 'staff' && !isStaff) return <Navigate to='/enterprise/consultation' replace />;
+  if (audience === 'customer' && isStaff) return <Navigate to='/enterprise/customer-service' replace />;
+  return <>{children}</>;
 };
 
 const RootRoute: React.FC = () => {
@@ -125,69 +149,126 @@ const FallbackRoute: React.FC = () => {
   return <Navigate to={appStatus === 'authenticated' ? '/guid' : '/login'} replace />;
 };
 
+/** Handles native customer-reply clicks even when EnterpriseShell is unmounted. */
+const CustomerConsultationNotificationNavigator: React.FC = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleNavigation = (): void => {
+      void navigate('/enterprise/consultation');
+    };
+    window.addEventListener(CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL, handleNavigation);
+    return () => window.removeEventListener(CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL, handleNavigation);
+  }, [navigate]);
+
+  return null;
+};
+
+/** Uses the strict route emitted by the Electron main process after a native business-notification click. */
+const DesktopNotificationNavigator: React.FC = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleNavigation = (event: Event): void => {
+      if (!(event instanceof CustomEvent)) return;
+      const detail = desktopNotificationNavigationDetailSchema.safeParse(event.detail);
+      if (!detail.success) return;
+      void navigate(detail.data.route);
+    };
+    window.addEventListener(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, handleNavigation);
+    return () => window.removeEventListener(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, handleNavigation);
+  }, [navigate]);
+
+  return null;
+};
+
 /** Shared production route tree; the desktop entry wraps it in HashRouter while tests may provide an in-memory router. */
 export const PanelRoutes: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
   const { status } = useAuth();
 
   return (
-    <Routes>
-      <Route index element={<RootRoute />} />
-      <Route path='/enterprise/login' element={<EnterpriseLoginRoute />} />
-      <Route path='/enterprise' element={<EnterpriseProtectedLayout />}>
-        <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
-        <Route path='dashboard' element={withRouteFallback(DashboardPage)} />
-        <Route path='companies' element={withRouteFallback(CompanyListPage)} />
-        <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
-        <Route path='products' element={withRouteFallback(ProductListPage)} />
-        <Route path='products/:productId' element={withRouteFallback(ProductDetailPage)} />
-        <Route path='projects' element={withRouteFallback(ProjectPage)} />
-        <Route path='projects/:hpInfoId' element={withRouteFallback(ProjectDetailPage)} />
-        <Route path='supply-demand' element={withRouteFallback(SupplyDemandListPage)} />
-        <Route path='supply-demand/:typeId/:demandId' element={withRouteFallback(SupplyDemandDetailPage)} />
-        <Route path='customer-service' element={withRouteFallback(CustomerServiceWorkbench)} />
-        {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
+    <>
+      <CustomerConsultationNotificationNavigator />
+      <DesktopNotificationNavigator />
+      <Routes>
+        <Route index element={<RootRoute />} />
+        <Route path='/enterprise/login' element={<EnterpriseLoginRoute />} />
+        <Route path='/enterprise' element={<EnterpriseProtectedLayout />}>
+          <Route index element={<Navigate to='/enterprise/dashboard' replace />} />
+          <Route path='dashboard' element={withRouteFallback(DashboardPage)} />
+          <Route path='companies' element={withRouteFallback(CompanyListPage)} />
+          <Route path='companies/:companyId' element={withRouteFallback(CompanyDetailPage)} />
+          <Route path='products' element={withRouteFallback(ProductListPage)} />
+          <Route path='products/:productId' element={withRouteFallback(ProductDetailPage)} />
+          <Route path='projects' element={withRouteFallback(ProjectPage)} />
+          <Route path='projects/:hpInfoId' element={withRouteFallback(ProjectDetailPage)} />
+          <Route path='supply-demand' element={withRouteFallback(SupplyDemandListPage)} />
+          <Route path='supply-demand/:typeId/:demandId' element={withRouteFallback(SupplyDemandDetailPage)} />
+          <Route path='notifications' element={withRouteFallback(DesktopNotificationCenterPage)} />
+          <Route path='version-update' element={withRouteFallback(VersionUpdatePage)} />
           <Route
-            key={path}
-            path={path}
-            element={<EnterprisePlaceholderPage titleKey={titleKey} descriptionKey={descriptionKey} />}
+            path='consultation'
+            element={
+              <EnterpriseConversationRoleRoute audience='customer'>
+                {withRouteFallback(CustomerConsultationPage)}
+              </EnterpriseConversationRoleRoute>
+            }
           />
-        ))}
-        <Route path='*' element={<Navigate to='/enterprise/dashboard' replace />} />
-      </Route>
-      <Route
-        path='/login'
-        element={status === 'authenticated' ? <Navigate to='/guid' replace /> : withRouteFallback(LoginPage)}
-      />
-      <Route element={<ProtectedLayout layout={layout} />}>
-        <Route path='/guid' element={withRouteFallback(Guid)} />
-        <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
+          <Route
+            path='customer-service'
+            element={
+              <EnterpriseConversationRoleRoute audience='staff'>
+                {withRouteFallback(CustomerServiceWorkbench)}
+              </EnterpriseConversationRoleRoute>
+            }
+          />
+          {ENTERPRISE_PLACEHOLDER_ROUTES.map(([path, titleKey, descriptionKey]) => (
+            <Route
+              key={path}
+              path={path}
+              element={<EnterprisePlaceholderPage titleKey={titleKey} descriptionKey={descriptionKey} />}
+            />
+          ))}
+          <Route path='*' element={<Navigate to='/enterprise/dashboard' replace />} />
+        </Route>
         <Route
-          path='/team/:id'
-          element={TEAM_MODE_ENABLED ? withRouteFallback(TeamIndex) : <Navigate to='/guid' replace />}
+          path='/login'
+          element={status === 'authenticated' ? <Navigate to='/guid' replace /> : withRouteFallback(LoginPage)}
         />
-        <Route path='/settings/model' element={withRouteFallback(ModeSettings)} />
-        <Route path='/settings/assistants' element={withRouteFallback(AssistantSettings)} />
-        <Route path='/settings/agent' element={withRouteFallback(AgentSettings)} />
-        <Route path='/settings/agent/:id/repair' element={withRouteFallback(AgentRepairPage)} />
-        <Route path='/settings/capabilities' element={withRouteFallback(CapabilitiesSettings)} />
-        <Route path='/settings/capabilities/skills/import-history' element={withRouteFallback(CapabilitiesSettings)} />
-        {/* Legacy routes — redirect to the merged /settings/capabilities page */}
-        <Route path='/settings/skills-hub' element={<Navigate to='/settings/capabilities?tab=skills' replace />} />
-        <Route path='/settings/tools' element={<Navigate to='/settings/capabilities?tab=tools' replace />} />
-        <Route path='/settings/appearance' element={withRouteFallback(AppearanceSettings)} />
-        <Route path='/settings/display' element={<Navigate to='/settings/appearance' replace />} />
-        <Route path='/settings/webui' element={withRouteFallback(WebuiSettings)} />
-        <Route path='/settings/pet' element={withRouteFallback(PetSettings)} />
-        <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
-        <Route path='/settings/about' element={withRouteFallback(SystemSettings)} />
-        <Route path='/settings/ext/:tabId' element={withRouteFallback(ExtensionSettingsPage)} />
-        <Route path='/settings' element={<Navigate to='/settings/model' replace />} />
-        <Route path='/test/components' element={withRouteFallback(ComponentsShowcase)} />
-        <Route path='/scheduled' element={withRouteFallback(ScheduledTasksPage)} />
-        <Route path='/scheduled/:job_id' element={withRouteFallback(TaskDetailPage)} />
-      </Route>
-      <Route path='*' element={<FallbackRoute />} />
-    </Routes>
+        <Route element={<ProtectedLayout layout={layout} />}>
+          <Route path='/guid' element={withRouteFallback(Guid)} />
+          <Route path='/conversation/:id' element={withRouteFallback(Conversation)} />
+          <Route
+            path='/team/:id'
+            element={TEAM_MODE_ENABLED ? withRouteFallback(TeamIndex) : <Navigate to='/guid' replace />}
+          />
+          <Route path='/settings/model' element={withRouteFallback(ModeSettings)} />
+          <Route path='/settings/assistants' element={withRouteFallback(AssistantSettings)} />
+          <Route path='/settings/agent' element={withRouteFallback(AgentSettings)} />
+          <Route path='/settings/agent/:id/repair' element={withRouteFallback(AgentRepairPage)} />
+          <Route path='/settings/capabilities' element={withRouteFallback(CapabilitiesSettings)} />
+          <Route
+            path='/settings/capabilities/skills/import-history'
+            element={withRouteFallback(CapabilitiesSettings)}
+          />
+          {/* Legacy routes — redirect to the merged /settings/capabilities page */}
+          <Route path='/settings/skills-hub' element={<Navigate to='/settings/capabilities?tab=skills' replace />} />
+          <Route path='/settings/tools' element={<Navigate to='/settings/capabilities?tab=tools' replace />} />
+          <Route path='/settings/appearance' element={withRouteFallback(AppearanceSettings)} />
+          <Route path='/settings/display' element={<Navigate to='/settings/appearance' replace />} />
+          <Route path='/settings/webui' element={withRouteFallback(WebuiSettings)} />
+          <Route path='/settings/pet' element={withRouteFallback(PetSettings)} />
+          <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
+          <Route path='/settings/about' element={withRouteFallback(SystemSettings)} />
+          <Route path='/settings/ext/:tabId' element={withRouteFallback(ExtensionSettingsPage)} />
+          <Route path='/settings' element={<Navigate to='/settings/model' replace />} />
+          <Route path='/test/components' element={withRouteFallback(ComponentsShowcase)} />
+          <Route path='/scheduled' element={withRouteFallback(ScheduledTasksPage)} />
+          <Route path='/scheduled/:job_id' element={withRouteFallback(TaskDetailPage)} />
+        </Route>
+        <Route path='*' element={<FallbackRoute />} />
+      </Routes>
+    </>
   );
 };
 

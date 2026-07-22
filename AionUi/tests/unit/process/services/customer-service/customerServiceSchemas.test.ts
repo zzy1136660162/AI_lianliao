@@ -3,6 +3,11 @@ import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CUSTOMER_CONSULTATION_IPC_CHANNELS,
+  CUSTOMER_SERVICE_ENDPOINTS,
+} from '@/common/enterprise/customer-service/constants';
+import {
+  CUSTOMER_CONSULTATION_COMMAND_SCHEMAS,
   CUSTOMER_SERVICE_COMMAND_SCHEMAS,
   customerServiceConversationSchema,
   customerServiceServerEnvelopeSchema,
@@ -40,6 +45,34 @@ const conversationFixture = {
 } as const;
 
 describe('customer-service schemas', () => {
+  it('keeps customer authentication and conversation opening on fixed endpoints', () => {
+    expect(CUSTOMER_SERVICE_ENDPOINTS.customerAuth).toBe('customer/auth');
+    expect(CUSTOMER_SERVICE_ENDPOINTS.conversationOpen).toBe('conversation/open');
+    expect(CUSTOMER_CONSULTATION_IPC_CHANNELS.OPEN_CONVERSATION).toBe(
+      'enterprise:customer-consultation:open-conversation'
+    );
+  });
+
+  it('exposes a customer-only command allowlist', () => {
+    expect(Object.keys(CUSTOMER_CONSULTATION_COMMAND_SCHEMAS).toSorted()).toEqual(
+      [
+        'closeConversation',
+        'getConversation',
+        'getHistory',
+        'markRead',
+        'openConversation',
+        'startConversation',
+        'sendMessage',
+        'uploadImage',
+      ].toSorted()
+    );
+    expect(CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.openConversation.parse({})).toEqual({});
+    expect(CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.startConversation.parse({})).toEqual({});
+    expect(CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.openConversation.safeParse({ accessToken: 'secret' }).success).toBe(
+      false
+    );
+  });
+
   it('keeps negative and 19-digit business identifiers as strings', () => {
     expect(signedBusinessIdSchema.parse('-19')).toBe('-19');
     expect(signedBusinessIdSchema.parse('9223372036854775808')).toBe('9223372036854775808');
