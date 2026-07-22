@@ -55,9 +55,11 @@ tools/
 
 导入脚本固定读取紧急采购表头，并按以下规则写入 `J_COMMON_DEMAND`：
 
-- `SEQ_DEMAND.NEXTVAL` 写入主键 `NO`；
+- 读取当前 `MAX(NO)`，连续分配 `MAX(NO)+1` 到 `MAX(NO)+7`，不使用序列；
+- 如并发写入造成主键冲突，整批回滚、重新读取最大值并重试；
 - `TYPE=22`、`IS_CHECK=1`、`DEL_SIGN=0`、`DEMAND_STATE=0`；
 - `PARAM3` 为采购数量，`PARAM5` 为产品参数及要求，`PARAM6` 为照片附件；
+- `INTRO` 保留“其他详细说明”原文，并将其中联系人、手机号分别写入 `CONTACT_PERSON`、`CONTACT_TEL`；无法解析则拒绝整批导入；
 - 按类型、需求名称、企业名称检查未删除的重复数据；
 - 所有行在一个事务中提交，任意失败则整体回滚。
 

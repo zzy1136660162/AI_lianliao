@@ -2,3 +2,5 @@ JayDeBeApi==1.2.3
 # JPype 1.7 rejects Java 8; pin the bridge version used by this JDK 8 project.
 JPype1==1.5.2
 PyYAML>=6.0,<7.0
+pandas>=2.2,<3.0
+openpyxl>=3.1,<4.0

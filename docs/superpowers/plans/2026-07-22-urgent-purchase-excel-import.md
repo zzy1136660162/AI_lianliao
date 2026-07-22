@@ -115,9 +115,9 @@ Run the importer unit-test module and expect all pure validation tests to pass.
 
 Use fake connection/cursor objects to prove:
 
-- dry-run never executes `SEQ_DEMAND.NEXTVAL`, `INSERT`, or `commit`;
-- active duplicates abort before sequence use;
-- execute inserts all rows with `TYPE=22`, `IS_CHECK=1`, `DEL_SIGN=0`, `COMPANY_ID=400496`;
+- dry-run 不分配 `MAX(NO)+1`，也不执行 `INSERT` 或调用 `commit`；
+- active duplicates abort before ID allocation;
+- execute inserts all rows with `TYPE=22`, `IS_CHECK=1`, `DEL_SIGN=0`, `COMPANY_ID=400496` and non-empty contact fields;
 - any insert failure calls `rollback` and never calls `commit`;
 - successful execute commits exactly once and returns seven generated `NO` values.
 
@@ -132,10 +132,11 @@ Implement fixed SQL only. Duplicate detection must use bind parameters for `(TYP
 ```sql
 INSERT INTO J_COMMON_DEMAND (
     NO, COMPANY_NAME, CITY, DISTRICT, ADDRESS, DEMAND_NAME, INTRO,
+    CONTACT_PERSON, CONTACT_TEL,
     IS_CHECK, TYPE, PARAM3, PARAM5, PARAM6, DEMAND_STATE, BUDGET,
     COMPANY_ID, GRAB_NUM, DEL_SIGN, INPUT_TIME, END_TIME
 ) VALUES (
-    SEQ_DEMAND.NEXTVAL, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?,
     1, 22, ?, ?, ?, 0, ?,
     400496, 0, 0,
     TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS'),
@@ -143,7 +144,7 @@ INSERT INTO J_COMMON_DEMAND (
 )
 ```
 
-Fetch the generated key with a separate `SELECT SEQ_DEMAND.CURRVAL FROM DUAL` on the same connection. Before commit, query the generated keys and require exactly seven rows with the fixed public fields.
+显式关闭 JDBC 自动提交，读取 `MAX(NO)` 后连续分配 7 个编号。从“其他详细说明”提取联系人和手机号写入 `CONTACT_PERSON`、`CONTACT_TEL`；无法提取则终止。发生 `ORA-00001` 时整体回滚并重新读取最大值，初次执行后最多重试 3 次。提交前查询生成的 7 个编号并逐列核对业务字段与公开状态。
 
 - [ ] **Step 4: Implement CLI safety boundary**
 
@@ -227,7 +228,7 @@ Run all tool unit tests, `git diff --check`, and `git status --short`. Confirm u
 
 - [ ] **Step 1: Document importer usage and safety flags**
 
-Add dry-run and `--execute` examples, fixed mapping, duplicate behavior, rollback behavior, and the fact that `SEQ_DEMAND.NEXTVAL` populates `NO`.
+Add dry-run and `--execute` examples, fixed mapping, duplicate behavior, rollback behavior, and the `MAX(NO)+1` ID allocation rule.
 
 - [ ] **Step 2: Report import receipt**
 
