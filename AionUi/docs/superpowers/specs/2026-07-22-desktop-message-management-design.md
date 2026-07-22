@@ -566,3 +566,28 @@ Electron 增加 `SYSTEM_ANNOUNCEMENT` 和 `OPEN_NOTIFICATION_DETAIL` 协议映�
 - 如果未来需要精准推送，新增受众规则和受众快照，不能修改已经发布消息的接收人集合。
 
 这些扩展继续复用消息任务到通知快照的发布边界，不改变历史通知和接收人记录。
+
+## 19. 实施记录（2026-07-22）
+
+### 19.1 已实现范围
+
+- Cloud API 已实现人工消息任务、状态机、立即发布、定时调度、失败恢复、撤销、逐接收人审计及管理接口。
+- 后台 `desktop_notification` 模块已升级为消息管理、推送记录和投递明细三部分，所有 Ajax 请求继续使用 `CLOUD_URL + cloud-api/...`。
+- Electron 已实现系统公告协议、未知内容类型失败上报、送达与桌面提醒回执、受控详情跳转和多行纯文本详情。
+- 新增 `E:/ZZY_PROJECT/AI_lianliao/tools/verify_desktop_message_schema.py`，仅固定查询 `USER_TABLES`、`USER_TAB_COLUMNS`、`USER_INDEXES`、`USER_CONSTRAINTS` 和 `USER_SEQUENCES`；事务以 `SET TRANSACTION READ ONLY` 开始并始终回滚。
+
+### 19.2 自动化验证结果
+
+- Cloud API 目标回归：58 项通过，0 failures，0 errors。
+- 后台脚本：两份 JavaScript 语法检查及 Cloud API 直连契约检查通过。
+- Python 只读工具：新工具 4 项、既有 Oracle 只读工具 7 项，共 11 项通过。
+- Electron：桌面通知目标测试 19 项通过；企业测试 TypeScript 检查通过；`npm run package` 的主进程、预加载和 Renderer 构建通过。
+- Electron 全仓 `tsc --noEmit` 仍有两处既有 `desktopVersionDownloader.ts` TS7011，与本次消息中心实现无关；目标企业类型检查与实际打包均已通过。
+
+### 19.3 数据库与真实联调状态
+
+- 增量迁移尚未执行；本轮没有执行 DDL、DML，也没有发布测试消息。
+- 迁移脚本：`E:/ZZY_PROJECT/lianshang_liaoning/cloud-service/cloud-api/src/main/resources/db/desktop_message_management_migration.sql`。
+- 对 `cloud-api/src/main/resources/application.yml` 默认 Oracle 数据源执行固定只读检查后，结果为 `migrationComplete: false`。
+- 当前缺少 `J_CY_DESKTOP_MSG_TASK`、`SEQ_J_CY_DESKTOP_MSG_TASK`、三项任务索引和任务表相关约束；`J_CY_DESKTOP_NOTIFICATION` 还缺少 `CONTENT_TYPE`、`EXTENSION_JSON` 与 `CK_J_CY_DN_CONTENT`。
+- 因数据库迁移尚未获得本轮明确执行确认，真实发布、定时任务、撤销、WebSocket 和 Electron 端到端联调均记录为“未执行”，不能视为通过。
