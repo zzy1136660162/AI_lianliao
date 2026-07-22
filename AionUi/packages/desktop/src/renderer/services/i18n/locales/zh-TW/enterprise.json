@@ -99,6 +99,7 @@
     "supplyDemand": "供需對接",
     "favorites": "Favorites",
     "leads": "Follow-ups",
+    "consultation": "Online consultation",
     "customerService": "Customer service"
   },
   "shell": {
@@ -169,6 +170,10 @@
     "leads": {
       "title": "Opportunity follow-ups",
       "description": "Opportunity follow-ups will be enabled in the next product phase."
+    },
+    "consultation": {
+      "title": "Online consultation",
+      "description": "Chat with a real Lianliao service agent about enterprise services and platform use."
     },
     "customerService": {
       "title": "Customer service",
@@ -594,6 +599,82 @@
       "description": "The enterprise service did not return a valid project record. Try again."
     }
   },
+  "consultation": {
+    "eyebrow": "LIANLIAO HUMAN SERVICE",
+    "title": "Online consultation",
+    "description": "Ask enterprise-service questions here and receive replies in real time.",
+    "trustNote": "Enterprise identity verified · Secure session",
+    "chat": {
+      "title": "Chat with Lianliao support",
+      "description": "Text and images are supported; history is restored automatically."
+    },
+    "accessibility": { "timeline": "Consultation message history", "composer": "Consultation message composer" },
+    "timeline": {
+      "loading": "Connecting to a service agent",
+      "unavailable": "The consultation is temporarily unavailable",
+      "empty": "Send your first message to begin",
+      "loadOlder": "Load earlier messages",
+      "newMessages": "New reply",
+      "customer": "Me",
+      "staff": "Lianliao support",
+      "imageAlt": "Consultation image"
+    },
+    "composer": {
+      "placeholder": "Enter your question",
+      "image": "Send image",
+      "hint": "Enter to send, Shift + Enter for a new line",
+      "send": "Send",
+      "closed": "This consultation has ended. Start a new one to continue."
+    },
+    "profile": {
+      "unassigned": "Lianliao support",
+      "subtitle": "Enterprise service advisor",
+      "company": "Current enterprise",
+      "notProvided": "Not provided",
+      "serviceType": "Service type",
+      "realPerson": "Human support",
+      "servicePromise": "Service note",
+      "promiseText": "Support provides guidance based on your enterprise identity and platform context."
+    },
+    "status": {
+      "waiting": "Assigning a service agent",
+      "active": "Your service agent is online",
+      "reconnecting": "Restoring the connection; message history is safe",
+      "closed": "This consultation has ended"
+    },
+    "connection": {
+      "idle": "Waiting to connect",
+      "connecting": "Connecting",
+      "connected": "Realtime connection active",
+      "reconnecting": "Reconnecting automatically",
+      "disconnected": "Disconnected"
+    },
+    "delivery": { "sending": "Sending", "delivered": "Sent", "failed": "Failed" },
+    "actions": {
+      "retry": "Reconnect",
+      "retryMessage": "Retry",
+      "close": "End consultation",
+      "startNew": "Start new consultation"
+    },
+    "closure": {
+      "closedAt": "結束時間",
+      "closedReason": "結束說明",
+      "defaultReason": "本次服務已結束"
+    },
+    "closeConfirm": {
+      "title": "確認結束本次諮詢？",
+      "description": "結束後本次記錄將保留為唯讀，如有新問題可重新發起諮詢。",
+      "confirm": "確認結束",
+      "cancel": "繼續諮詢"
+    },
+    "errors": {
+      "initialize": "Unable to connect to support right now. Please retry.",
+      "history": "Unable to load earlier messages.",
+      "send": "Message failed to send. Please retry.",
+      "upload": "Image failed to send. Check its format and size.",
+      "close": "Unable to end this consultation. Please retry."
+    }
+  },
   "customerService": {
     "title": "Customer service",
     "queue": { "eyebrow": "Lianliao live support" },
@@ -693,6 +774,70 @@
       "candidates": "Transfer candidates could not be loaded.",
       "transfer": "The conversation could not be transferred. Its data may have changed; try again.",
       "close": "The conversation could not be closed. Its data may have changed; try again."
+    }
+  },
+  "versionUpdate": {
+    "eyebrow": "LIANLIAO AI DESKTOP",
+    "title": "Version update",
+    "description": "Check the Lianliao AI installer for this device. Downloads require your confirmation and are saved to the system Downloads folder.",
+    "currentVersion": "Current version {{version}}",
+    "latestVersion": "Latest version {{version}}",
+    "packageInfo": "{{platform}} · {{architecture}} · {{size}}",
+    "packageSize": "{{size}} MB",
+    "force": "This is a required update",
+    "forceDescription": "To continue using the Liaoning Industrial Cloud City workbench, confirm downloading the latest installer first.",
+    "releaseNotes": "Release notes",
+    "checking": "Checking for updates",
+    "upToDate": "You are already on the latest version",
+    "noRelease": "No update package is available for this device",
+    "checkFailed": "The update could not be checked. Please try again later.",
+    "downloadFailed": "The installer download or integrity check failed. Please try again later.",
+    "downloading": "Downloading and verifying installer",
+    "downloadComplete": "Installer downloaded to {{path}}",
+    "openPromptTitle": "Installer downloaded",
+    "openPromptDescription": "Open the installer now to continue updating?",
+    "openFailed": "The installer could not be opened. Open it manually from the system Downloads folder.",
+    "actions": {
+      "check": "Check for updates",
+      "download": "Confirm download",
+      "open": "Open installer",
+      "later": "Install later"
+    }
+  },
+  "notifications": {
+    "eyebrow": "Desktop business updates",
+    "title": "Notification center",
+    "description": "Review enterprise updates, project opportunities, supply-demand activity, membership changes, and customer-service reminders from this signed-in desktop account.",
+    "listLabel": "Business notifications",
+    "unread": "Unread",
+    "unreadCount": "{{count}} unread",
+    "loading": "Loading notifications",
+    "actions": {
+      "refresh": "Refresh",
+      "markAllRead": "Mark all read",
+      "markRead": "Mark as read",
+      "open": "Open"
+    },
+    "types": {
+      "version_update": "Version update",
+      "supply_demand_match": "Supply-demand",
+      "project_opportunity": "Project opportunity",
+      "enterprise_code_review": "Enterprise code",
+      "membership_points": "Membership",
+      "customer_service": "Customer service",
+      "system_announcement": "系統公告"
+    },
+    "empty": {
+      "title": "No notifications yet",
+      "description": "New desktop business updates will appear here."
+    },
+    "error": {
+      "title": "Notifications could not be loaded",
+      "description": "Check the enterprise service connection and try again."
+    },
+    "detail": {
+      "title": "通知詳情",
+      "unavailable": "此通知不存在、已失效或暫時無法查看。"
     }
   }
 }

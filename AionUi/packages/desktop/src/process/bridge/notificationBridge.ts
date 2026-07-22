@@ -14,8 +14,14 @@
 import { getPlatformServices } from '@/common/platform';
 import { ipcBridge } from '@/common';
 import { signedBusinessIdSchema } from '@/common/enterprise/customer-service/schemas';
+import type { DesktopNotificationAction } from '@/common/enterprise/desktop-notification/contracts';
+import { desktopNotificationNativeTargetSchema } from '@/common/enterprise/desktop-notification/schemas';
 import { ProcessConfig } from '@process/utils/initStorage';
-import { openCustomerServiceConversation } from '@process/utils/tray';
+import {
+  openCustomerConsultation,
+  openCustomerServiceConversation,
+  openDesktopNotification,
+} from '@process/utils/tray';
 import path from 'path';
 import fs from 'fs';
 
@@ -24,6 +30,13 @@ export type MainProcessNotificationOptions = {
   body: string;
   conversation_id?: string;
   customer_service_conversation_id?: string;
+  customer_consultation?: boolean;
+  /** Trusted main-process target for a business notification. It is never accepted from renderer IPC. */
+  desktop_notification?: {
+    action: DesktopNotificationAction;
+    businessId: string | null;
+    notificationId: string;
+  };
 };
 
 /**
@@ -54,25 +67,40 @@ export async function showNotification({
   body,
   conversation_id,
   customer_service_conversation_id,
-}: MainProcessNotificationOptions): Promise<void> {
+  customer_consultation,
+  desktop_notification,
+}: MainProcessNotificationOptions): Promise<boolean> {
   // Check if notification is enabled
   const notificationEnabled = await ProcessConfig.get('system.notificationEnabled');
   if (notificationEnabled === false) {
-    return;
+    return false;
   }
 
   const iconPath = getNotificationIcon();
   const customerServiceConversationId = signedBusinessIdSchema.safeParse(customer_service_conversation_id);
-  const onClick = customerServiceConversationId.success
-    ? (): void => openCustomerServiceConversation(customerServiceConversationId.data)
-    : conversation_id
-      ? (): void => ipcBridge.notification.clicked.emit({ conversation_id })
-      : undefined;
+  const desktopNotificationTarget = desktopNotificationNativeTargetSchema.safeParse(desktop_notification);
+  const onClick =
+    customer_consultation === true
+      ? (): void => openCustomerConsultation()
+      : customerServiceConversationId.success
+        ? (): void => openCustomerServiceConversation(customerServiceConversationId.data)
+        : desktopNotificationTarget.success && desktopNotificationTarget.data.action !== undefined
+          ? (): void =>
+              openDesktopNotification({
+                action: desktopNotificationTarget.data.action,
+                businessId: desktopNotificationTarget.data.businessId ?? null,
+                notificationId: desktopNotificationTarget.data.notificationId,
+              })
+          : conversation_id
+            ? (): void => ipcBridge.notification.clicked.emit({ conversation_id })
+            : undefined;
 
   try {
     getPlatformServices().notification.send({ title, body, icon: iconPath, onClick });
+    return true;
   } catch (error) {
     console.error('[Notification] Error creating notification:', error);
+    return false;
   }
 }
 

@@ -14,7 +14,12 @@ import {
 import * as path from 'path';
 import { ipcBridge } from '@/common';
 import { AI_PRODUCT_NAME } from '@/common/config/constants';
-import { CUSTOMER_SERVICE_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-service/constants';
+import {
+  CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL,
+  CUSTOMER_SERVICE_NAVIGATE_CHANNEL,
+} from '@/common/enterprise/customer-service/constants';
+import { DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL } from '@/common/enterprise/desktop-notification/constants';
+import type { DesktopNotificationAction } from '@/common/enterprise/desktop-notification/contracts';
 import i18n from '@process/services/i18n';
 
 let tray: TrayInstance | null = null;
@@ -23,6 +28,8 @@ let isQuitting = false;
 let mainWindowRef: BrowserWindow | null = null;
 let cachedActiveCount = 0;
 let customerServiceUnreadCount = 0;
+let customerConsultationUnreadCount = 0;
+let desktopNotificationUnreadCount = 0;
 
 const showAndFocusMainWindow = (): BrowserWindow | null => {
   if (!mainWindowRef || mainWindowRef.isDestroyed()) return null;
@@ -39,11 +46,105 @@ const showAndFocusMainWindow = (): BrowserWindow | null => {
 export const shouldNotifyCustomerServiceMessage = (): boolean =>
   !mainWindowRef || mainWindowRef.isDestroyed() || mainWindowRef.isMinimized() || !mainWindowRef.isFocused();
 
+const isCustomerConsultationRouteVisible = (): boolean => {
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) return false;
+  try {
+    const hashPath = new URL(mainWindowRef.webContents.getURL()).hash.slice(1).split('?')[0];
+    return hashPath === '/enterprise/consultation';
+  } catch {
+    return false;
+  }
+};
+
+/** Customer notifications are suppressed only while the focused consultation page is visible. */
+export const shouldNotifyCustomerConsultationMessage = (): boolean =>
+  !mainWindowRef ||
+  mainWindowRef.isDestroyed() ||
+  mainWindowRef.isMinimized() ||
+  !mainWindowRef.isFocused() ||
+  !isCustomerConsultationRouteVisible();
+
+const isDesktopNotificationRouteVisible = (): boolean => {
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) return false;
+  try {
+    const hashPath = new URL(mainWindowRef.webContents.getURL()).hash.slice(1).split('?')[0];
+    return hashPath === '/enterprise/notifications';
+  } catch {
+    return false;
+  }
+};
+
+/** Business notifications are quiet only while the focused notification center is already visible. */
+export const shouldNotifyDesktopNotification = (): boolean =>
+  !mainWindowRef ||
+  mainWindowRef.isDestroyed() ||
+  mainWindowRef.isMinimized() ||
+  !mainWindowRef.isFocused() ||
+  !isDesktopNotificationRouteVisible();
+
 /** Restores the desktop shell before handing a validated conversation ID to the renderer. */
 export const openCustomerServiceConversation = (conversationId: string): void => {
   if (!/^-?[1-9][0-9]{0,18}$/.test(conversationId)) return;
   const window = showAndFocusMainWindow();
   window?.webContents.send(CUSTOMER_SERVICE_NAVIGATE_CHANNEL, { conversationId });
+};
+
+/** Opens the authenticated customer's own consultation without accepting an external business ID. */
+export const openCustomerConsultation = (): void => {
+  const window = showAndFocusMainWindow();
+  window?.webContents.send(CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL);
+};
+
+/**
+ * Converts a validated backend action to a fixed enterprise route before it reaches preload.
+ * No raw URL or arbitrary identifier from a native notification is ever forwarded to the renderer.
+ */
+export const openDesktopNotification = (input: {
+  action: DesktopNotificationAction;
+  businessId: string | null;
+  notificationId: string;
+}): void => {
+  const hasBusinessId = typeof input.businessId === 'string' && /^-?[1-9][0-9]{0,18}$/.test(input.businessId);
+  const hasNotificationId = /^-?[1-9][0-9]{0,18}$/.test(input.notificationId);
+  let route: string | undefined;
+  switch (input.action) {
+    case 'OPEN_SUPPLY_DEMAND':
+      route = '/enterprise/supply-demand';
+      break;
+    case 'OPEN_PROJECT':
+      route = hasBusinessId ? `/enterprise/projects/${input.businessId}` : undefined;
+      break;
+    case 'OPEN_COMPANY':
+      route = hasBusinessId ? `/enterprise/companies/${input.businessId}` : undefined;
+      break;
+    case 'OPEN_PRODUCT':
+      route = hasBusinessId ? `/enterprise/products/${input.businessId}` : undefined;
+      break;
+    case 'OPEN_MEMBERSHIP':
+      route = '/enterprise/dashboard';
+      break;
+    case 'OPEN_CUSTOMER_SERVICE':
+      route = hasBusinessId ? `/enterprise/customer-service?conversationId=${input.businessId}` : undefined;
+      break;
+    case 'OPEN_VERSION_UPDATE':
+      route = '/enterprise/version-update';
+      break;
+    case 'OPEN_NOTIFICATION_DETAIL':
+      route = hasNotificationId ? `/enterprise/notifications?notificationId=${input.notificationId}` : undefined;
+      break;
+    default:
+      route = undefined;
+  }
+  if (!route) return;
+  const window = showAndFocusMainWindow();
+  window?.webContents.send(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, { route });
+};
+
+const getRealtimeServiceUnread = (): { count: number; labelKey: string } => {
+  const count = customerServiceUnreadCount + customerConsultationUnreadCount + desktopNotificationUnreadCount;
+  if (desktopNotificationUnreadCount > 0) return { count, labelKey: 'enterprise.notifications.title' };
+  if (customerConsultationUnreadCount > 0) return { count, labelKey: 'enterprise.consultation.title' };
+  return { count, labelKey: 'enterprise.customerService.title' };
 };
 
 export const setTrayMainWindow = (win: BrowserWindow): void => {
@@ -145,8 +246,9 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   }
 
   template.push({ type: 'separator' });
+  const realtimeUnread = getRealtimeServiceUnread();
   template.push({
-    label: `${i18n.t('enterprise.customerService.title')}: ${customerServiceUnreadCount}`,
+    label: `${i18n.t(realtimeUnread.labelKey)}: ${realtimeUnread.count}`,
     enabled: false,
   });
   template.push({
@@ -218,7 +320,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
     label: i18n.t('common.tray.checkUpdate'),
     click: () => {
       showAndFocusMainWindow();
-      mainWindowRef?.webContents.send('tray:check-update');
+      mainWindowRef?.webContents.send(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, { route: '/enterprise/version-update' });
     },
   });
   template.push({ type: 'separator' });
@@ -286,10 +388,10 @@ const rebuildTrayMenu = (): void => {
 
 const updateTrayPresentation = (): void => {
   if (!tray) return;
-  const unreadLabel = `${i18n.t('enterprise.customerService.title')}: ${customerServiceUnreadCount}`;
-  tray.setToolTip(customerServiceUnreadCount > 0 ? `${AI_PRODUCT_NAME} · ${unreadLabel}` : AI_PRODUCT_NAME);
-  if (process.platform === 'darwin')
-    tray.setTitle(customerServiceUnreadCount > 0 ? String(customerServiceUnreadCount) : '');
+  const realtimeUnread = getRealtimeServiceUnread();
+  const unreadLabel = `${i18n.t(realtimeUnread.labelKey)}: ${realtimeUnread.count}`;
+  tray.setToolTip(realtimeUnread.count > 0 ? `${AI_PRODUCT_NAME} · ${unreadLabel}` : AI_PRODUCT_NAME);
+  if (process.platform === 'darwin') tray.setTitle(realtimeUnread.count > 0 ? String(realtimeUnread.count) : '');
 };
 
 /** Updates the existing tray in place; creating or recreating the Tray is deliberately avoided. */
@@ -297,6 +399,24 @@ export const setCustomerServiceUnreadCount = (count: number): void => {
   const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
   if (normalizedCount === customerServiceUnreadCount) return;
   customerServiceUnreadCount = normalizedCount;
+  updateTrayPresentation();
+  rebuildTrayMenu();
+};
+
+/** Updates the customer-side unread source without mixing it with staff queue counts. */
+export const setCustomerConsultationUnreadCount = (count: number): void => {
+  const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+  if (normalizedCount === customerConsultationUnreadCount) return;
+  customerConsultationUnreadCount = normalizedCount;
+  updateTrayPresentation();
+  rebuildTrayMenu();
+};
+
+/** Adds the notification-center unread source without merging it into customer-service queue state. */
+export const setDesktopNotificationUnreadCount = (count: number): void => {
+  const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0;
+  if (normalizedCount === desktopNotificationUnreadCount) return;
+  desktopNotificationUnreadCount = normalizedCount;
   updateTrayPresentation();
   rebuildTrayMenu();
 };

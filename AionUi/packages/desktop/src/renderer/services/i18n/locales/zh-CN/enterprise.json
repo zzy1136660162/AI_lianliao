@@ -99,6 +99,7 @@
     "supplyDemand": "供需对接",
     "favorites": "我的收藏",
     "leads": "商机跟进",
+    "consultation": "在线咨询",
     "customerService": "客服接待"
   },
   "shell": {
@@ -169,6 +170,10 @@
     "leads": {
       "title": "商机跟进",
       "description": "商机跟进能力将在下一产品阶段启用。"
+    },
+    "consultation": {
+      "title": "在线咨询",
+      "description": "与链辽真人客服实时沟通，咨询企业服务与平台使用问题。"
     },
     "customerService": {
       "title": "客服接待",
@@ -579,6 +584,89 @@
       "description": "企业服务未返回有效的项目档案，请重试。"
     }
   },
+  "consultation": {
+    "eyebrow": "链辽真人服务",
+    "title": "在线咨询",
+    "description": "企业服务问题可在这里直接咨询，客服回复会实时送达。",
+    "trustNote": "企业身份已验证 · 会话安全连接",
+    "chat": {
+      "title": "与链辽客服沟通",
+      "description": "支持文字和图片，历史消息会自动恢复。"
+    },
+    "accessibility": {
+      "timeline": "在线咨询消息记录",
+      "composer": "在线咨询消息输入区"
+    },
+    "timeline": {
+      "loading": "正在连接真人客服",
+      "unavailable": "暂时无法建立咨询会话",
+      "empty": "发送第一条消息，开始本次咨询",
+      "loadOlder": "加载更早消息",
+      "newMessages": "有新回复",
+      "customer": "我",
+      "staff": "链辽客服",
+      "imageAlt": "咨询消息图片"
+    },
+    "composer": {
+      "placeholder": "请输入想咨询的问题",
+      "image": "发送图片",
+      "hint": "Enter 发送，Shift + Enter 换行",
+      "send": "发送消息",
+      "closed": "本次咨询已结束，如需继续请发起新咨询。"
+    },
+    "profile": {
+      "unassigned": "链辽专属客服",
+      "subtitle": "真人企业服务顾问",
+      "company": "当前企业",
+      "notProvided": "暂未提供",
+      "serviceType": "服务方式",
+      "realPerson": "真人在线",
+      "servicePromise": "服务说明",
+      "promiseText": "客服会结合企业身份与平台业务，为您提供针对性说明。"
+    },
+    "status": {
+      "waiting": "正在为您分配专属客服",
+      "active": "客服在线，正在为您服务",
+      "reconnecting": "连接正在恢复，消息记录不会丢失",
+      "closed": "本次咨询已结束"
+    },
+    "connection": {
+      "idle": "等待连接",
+      "connecting": "正在连接",
+      "connected": "实时连接正常",
+      "reconnecting": "正在自动重连",
+      "disconnected": "连接已断开"
+    },
+    "delivery": {
+      "sending": "发送中",
+      "delivered": "已发送",
+      "failed": "发送失败"
+    },
+    "actions": {
+      "retry": "重新连接",
+      "retryMessage": "重试",
+      "close": "结束本次咨询",
+      "startNew": "发起新咨询"
+    },
+    "closure": {
+      "closedAt": "结束时间",
+      "closedReason": "结束说明",
+      "defaultReason": "本次服务已结束"
+    },
+    "closeConfirm": {
+      "title": "确认结束本次咨询？",
+      "description": "结束后本次记录将保留为只读，如有新问题可重新发起咨询。",
+      "confirm": "确认结束",
+      "cancel": "继续咨询"
+    },
+    "errors": {
+      "initialize": "暂时无法连接真人客服，请稍后重试。",
+      "history": "暂时无法加载更早消息。",
+      "send": "消息发送失败，请重试。",
+      "upload": "图片发送失败，请确认格式和大小后重试。",
+      "close": "暂时无法结束本次咨询，请重试。"
+    }
+  },
   "customerService": {
     "title": "客服接待",
     "queue": {
@@ -712,6 +800,70 @@
     "error": {
       "title": "暂时无法加载产品详情",
       "description": "企业服务未返回有效的产品档案，请重试。"
+    }
+  },
+  "versionUpdate": {
+    "eyebrow": "链辽AI 桌面端",
+    "title": "版本更新",
+    "description": "检查适用于当前设备的链辽AI 安装包。下载前需要你的确认，安装包将保存到系统“下载”目录。",
+    "currentVersion": "当前版本 {{version}}",
+    "latestVersion": "最新版本 {{version}}",
+    "packageInfo": "{{platform}} · {{architecture}} · {{size}}",
+    "packageSize": "{{size}} MB",
+    "force": "此版本为强制更新",
+    "forceDescription": "为继续使用链上辽宁·产业云城，请先确认下载最新版安装包。",
+    "releaseNotes": "更新说明",
+    "checking": "正在检查更新",
+    "upToDate": "当前已是最新版本",
+    "noRelease": "暂未找到适用于当前设备的更新包",
+    "checkFailed": "暂时无法检查版本更新，请稍后重试。",
+    "downloadFailed": "安装包下载或校验失败，请稍后重试。",
+    "downloading": "正在下载并校验安装包",
+    "downloadComplete": "安装包已下载到 {{path}}",
+    "openPromptTitle": "安装包已下载",
+    "openPromptDescription": "是否立即打开安装包并继续更新？",
+    "openFailed": "暂时无法打开安装包，请在系统“下载”目录中手动打开。",
+    "actions": {
+      "check": "检查更新",
+      "download": "确认下载",
+      "open": "打开安装包",
+      "later": "稍后安装"
+    }
+  },
+  "notifications": {
+    "eyebrow": "桌面业务提醒",
+    "title": "通知中心",
+    "description": "集中查看当前桌面登录账号的企业动态、在建项目商机、供需对接、会员变动和客服提醒。",
+    "listLabel": "业务通知列表",
+    "unread": "未读",
+    "unreadCount": "未读 {{count}} 条",
+    "loading": "正在加载通知",
+    "actions": {
+      "refresh": "刷新",
+      "markAllRead": "全部标为已读",
+      "markRead": "标为已读",
+      "open": "查看详情"
+    },
+    "types": {
+      "version_update": "版本更新",
+      "supply_demand_match": "供需对接",
+      "project_opportunity": "项目商机",
+      "enterprise_code_review": "企业码",
+      "membership_points": "会员服务",
+      "customer_service": "在线客服",
+      "system_announcement": "系统公告"
+    },
+    "empty": {
+      "title": "暂时没有通知",
+      "description": "新的桌面业务提醒将显示在这里。"
+    },
+    "error": {
+      "title": "通知加载失败",
+      "description": "请检查企业服务连接后重试。"
+    },
+    "detail": {
+      "title": "通知详情",
+      "unavailable": "该通知不存在、已失效或暂时无法查看。"
     }
   }
 }

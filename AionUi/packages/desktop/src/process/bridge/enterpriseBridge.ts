@@ -2,15 +2,24 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { types as nodeTypes } from 'node:util';
 
-import { app, BrowserWindow, ipcMain as electronIpcMain } from 'electron';
+import { app, BrowserWindow, ipcMain as electronIpcMain, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
 
 import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '@/common/enterprise/constants';
 import {
+  CUSTOMER_CONSULTATION_IPC_CHANNELS,
   CUSTOMER_SERVICE_IPC_CHANNELS,
   CUSTOMER_SERVICE_IPC_ERROR_MESSAGES,
 } from '@/common/enterprise/customer-service/constants';
+import {
+  DESKTOP_NOTIFICATION_IPC_CHANNELS,
+  DESKTOP_NOTIFICATION_IPC_ERROR_MESSAGES,
+} from '@/common/enterprise/desktop-notification/constants';
+import {
+  DESKTOP_VERSION_IPC_CHANNELS,
+  DESKTOP_VERSION_IPC_ERROR_MESSAGES,
+} from '@/common/enterprise/desktop-version/constants';
 import type {
   CustomerServiceCloseRequest,
   CustomerServiceConnectionSnapshot,
@@ -33,6 +42,7 @@ import type {
   CustomerServiceUploadImageRequest,
 } from '@/common/enterprise/customer-service/contracts';
 import {
+  CUSTOMER_CONSULTATION_COMMAND_SCHEMAS,
   CUSTOMER_SERVICE_COMMAND_SCHEMAS,
   customerServiceConnectionSnapshotSchema,
   customerServiceConversationSchema,
@@ -43,6 +53,38 @@ import {
   customerServiceServerEnvelopeSchema,
   customerServiceStaffCandidateSchema,
 } from '@/common/enterprise/customer-service/schemas';
+import type {
+  DesktopNotificationChangedResult,
+  DesktopNotificationConnectionSnapshot,
+  DesktopNotificationIpcErrorCode,
+  DesktopNotificationIpcResult,
+  DesktopNotificationListRequest,
+  DesktopNotificationMarkAllReadResult,
+  DesktopNotificationPage,
+  DesktopNotificationServerEnvelope,
+  DesktopNotificationUnreadCount,
+} from '@/common/enterprise/desktop-notification/contracts';
+import type {
+  DesktopVersionCheckResult,
+  DesktopVersionDownloadResult,
+  DesktopVersionIpcErrorCode,
+  DesktopVersionIpcResult,
+  DesktopVersionOpenDownloadedResult,
+} from '@/common/enterprise/desktop-version/contracts';
+import {
+  DESKTOP_NOTIFICATION_COMMAND_SCHEMAS,
+  desktopNotificationChangedResultSchema,
+  desktopNotificationConnectionSnapshotSchema,
+  desktopNotificationMarkAllReadResultSchema,
+  desktopNotificationPageSchema,
+  desktopNotificationServerEnvelopeSchema,
+  desktopNotificationUnreadCountSchema,
+} from '@/common/enterprise/desktop-notification/schemas';
+import {
+  desktopVersionCheckResultSchema,
+  desktopVersionDownloadResultSchema,
+  desktopVersionOpenDownloadedResultSchema,
+} from '@/common/enterprise/desktop-version/schemas';
 import type {
   EnterpriseIpcErrorCode,
   EnterpriseIpcResult,
@@ -60,13 +102,32 @@ import i18n from '@process/services/i18n';
 import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
 import { enterpriseSessionEvents } from '@process/services/enterprise/enterpriseSessionEvents';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
+import { CustomerConsultationGateway } from '@process/services/enterprise/customer-service/customerConsultationGateway';
 import {
   CustomerServiceGateway,
   type CustomerServiceGatewayEventListener,
 } from '@process/services/enterprise/customer-service/customerServiceGateway';
 import { CustomerServiceApiError } from '@process/services/enterprise/customer-service/customerServiceApiClient';
+import {
+  DesktopNotificationGateway,
+  type DesktopNotificationGatewayEventListener,
+} from '@process/services/enterprise/desktop-notification/desktopNotificationGateway';
+import { DesktopNotificationApiError } from '@process/services/enterprise/desktop-notification/desktopNotificationApiClient';
+import {
+  DesktopVersionGateway,
+  DesktopVersionGatewayError,
+} from '@process/services/enterprise/desktop-version/desktopVersionGateway';
+import { DesktopVersionApiError } from '@process/services/enterprise/desktop-version/desktopVersionApiClient';
+import { DesktopVersionDownloadError } from '@process/services/enterprise/desktop-version/desktopVersionDownloader';
 import { showNotification } from '@process/bridge/notificationBridge';
-import { setCustomerServiceUnreadCount, shouldNotifyCustomerServiceMessage } from '@process/utils/tray';
+import {
+  setCustomerConsultationUnreadCount,
+  setCustomerServiceUnreadCount,
+  setDesktopNotificationUnreadCount,
+  shouldNotifyCustomerConsultationMessage,
+  shouldNotifyCustomerServiceMessage,
+  shouldNotifyDesktopNotification,
+} from '@process/utils/tray';
 
 type EnterpriseIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<EnterpriseIpcResult<unknown>>;
 
@@ -128,6 +189,74 @@ export type CustomerServiceBridgeDependencies = {
   ipcMain?: CustomerServiceIpcMain;
   senderGuard?: (event: unknown) => boolean;
   eventSink?: (event: CustomerServiceServerEnvelope) => void;
+};
+
+/** Narrow customer-side gateway used by the consultation IPC namespace. */
+export type CustomerConsultationBridgeGateway = {
+  connect: () => Promise<CustomerServiceConnectionSnapshot>;
+  disconnect: () => Promise<void>;
+  openConversation: () => Promise<CustomerServiceConversation>;
+  startConversation: () => Promise<CustomerServiceConversation>;
+  getConversation: (request: CustomerServiceConversationIdRequest) => Promise<CustomerServiceConversation>;
+  getHistory: (request: CustomerServiceMessageHistoryRequest) => Promise<CustomerServicePage<CustomerServiceMessage>>;
+  sendMessage: (request: CustomerServiceSendMessageRequest) => string;
+  markRead: (request: CustomerServiceMarkReadRequest) => Promise<CustomerServiceReadResult>;
+  uploadImage: (request: CustomerServiceUploadImageRequest) => Promise<CustomerServiceImage>;
+  closeConversation: (request: CustomerServiceCloseRequest) => Promise<CustomerServiceConversation>;
+  subscribe: (listener: (event: CustomerServiceServerEnvelope) => void) => () => void;
+};
+
+export type CustomerConsultationBridgeDependencies = {
+  gateway?: CustomerConsultationBridgeGateway;
+  ipcMain?: CustomerServiceIpcMain;
+  senderGuard?: (event: unknown) => boolean;
+  eventSink?: (event: CustomerServiceServerEnvelope) => void;
+};
+
+type DesktopNotificationIpcHandler = (
+  event: unknown,
+  ...args: unknown[]
+) => Promise<DesktopNotificationIpcResult<unknown>>;
+
+export type DesktopNotificationIpcMain = {
+  handle: (channel: string, handler: DesktopNotificationIpcHandler) => void;
+  removeHandler: (channel: string) => void;
+};
+
+export type DesktopNotificationBridgeGateway = {
+  connect: () => Promise<DesktopNotificationConnectionSnapshot>;
+  disconnect: () => Promise<void>;
+  list: (request: DesktopNotificationListRequest) => Promise<DesktopNotificationPage>;
+  getUnreadCount: () => Promise<DesktopNotificationUnreadCount>;
+  markRead: (notificationId: string) => Promise<DesktopNotificationChangedResult>;
+  markAllRead: () => Promise<DesktopNotificationMarkAllReadResult>;
+  subscribe: (listener: DesktopNotificationGatewayEventListener) => () => void;
+};
+
+export type DesktopNotificationBridgeDependencies = {
+  gateway?: DesktopNotificationBridgeGateway;
+  ipcMain?: DesktopNotificationIpcMain;
+  senderGuard?: (event: unknown) => boolean;
+  eventSink?: (event: DesktopNotificationServerEnvelope) => void;
+};
+
+type DesktopVersionIpcHandler = (event: unknown, ...args: unknown[]) => Promise<DesktopVersionIpcResult<unknown>>;
+
+export type DesktopVersionIpcMain = {
+  handle: (channel: string, handler: DesktopVersionIpcHandler) => void;
+  removeHandler: (channel: string) => void;
+};
+
+export type DesktopVersionBridgeGateway = {
+  check: () => Promise<DesktopVersionCheckResult>;
+  downloadLatest: () => Promise<DesktopVersionDownloadResult>;
+  openDownloadedInstaller: () => Promise<DesktopVersionOpenDownloadedResult>;
+};
+
+export type DesktopVersionBridgeDependencies = {
+  gateway?: DesktopVersionBridgeGateway;
+  ipcMain?: DesktopVersionIpcMain;
+  senderGuard?: (event: unknown) => boolean;
 };
 
 type EnterpriseOperation = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>;
@@ -682,6 +811,7 @@ const normalizeCustomerServiceBridgeError = (error: unknown): CustomerServiceIpc
   if (error instanceof CustomerServiceApiError) {
     if (error.status === 401 || error.code === 'UNAUTHORIZED') return 'UNAUTHORIZED';
     if (error.code === 'MISSING_ENTERPRISE_SESSION') return 'MISSING_ENTERPRISE_SESSION';
+    if (error.code === 'FORBIDDEN_CUSTOMER') return 'FORBIDDEN_CUSTOMER';
     if (error.code === 'FORBIDDEN_STAFF' || error.status === 403) return 'FORBIDDEN_STAFF';
     if (Object.prototype.hasOwnProperty.call(CUSTOMER_SERVICE_IPC_ERROR_MESSAGES, error.code)) {
       return error.code as CustomerServiceIpcErrorCode;
@@ -714,7 +844,7 @@ const getDefaultCustomerServiceGateway = (): CustomerServiceBridgeGateway => {
     sessionStore: getDefaultSessionStore(),
     desktopIntegration: {
       shouldNotify: shouldNotifyCustomerServiceMessage,
-      showMessageNotification: ({ conversationId, message }) => {
+      showMessageNotification: async ({ conversationId, message }) => {
         const fallbackTitle = i18n.t('enterprise.customerService.title');
         const title = message.senderName?.trim() || fallbackTitle;
         const rawBody =
@@ -724,7 +854,7 @@ const getDefaultCustomerServiceGateway = (): CustomerServiceBridgeGateway => {
               ? i18n.t('enterprise.customerService.timeline.imageAlt')
               : i18n.t('enterprise.customerService.list.noPreview');
         const body = rawBody.length > 120 ? `${rawBody.slice(0, 120)}…` : rawBody;
-        return showNotification({
+        await showNotification({
           title,
           body,
           customer_service_conversation_id: conversationId,
@@ -848,4 +978,355 @@ export function initCustomerServiceBridge(dependencies: CustomerServiceBridgeDep
     const parsed = customerServiceServerEnvelopeSchema.safeParse(untrustedEvent);
     if (parsed.success) eventSink(parsed.data as CustomerServiceServerEnvelope);
   });
+}
+
+let defaultCustomerConsultationGateway: CustomerConsultationBridgeGateway | undefined;
+let unsubscribeCustomerConsultationBridgeEvents: (() => void) | undefined;
+
+const broadcastCustomerConsultationEvent = (event: CustomerServiceServerEnvelope): void => {
+  const expectedUrl = getExpectedRendererUrl();
+  if (!expectedUrl) return;
+  for (const window of BrowserWindow.getAllWindows()) {
+    try {
+      if (
+        !window.isDestroyed() &&
+        !window.webContents.isDestroyed() &&
+        hasExactRendererLocation(window.webContents.getURL(), expectedUrl)
+      ) {
+        window.webContents.send(CUSTOMER_CONSULTATION_IPC_CHANNELS.EVENT, event);
+      }
+    } catch {
+      // A closing window is skipped without interrupting delivery to other windows.
+    }
+  }
+};
+
+const getDefaultCustomerConsultationGateway = (): CustomerConsultationBridgeGateway => {
+  defaultCustomerConsultationGateway ??= new CustomerConsultationGateway({
+    sessionStore: getDefaultSessionStore(),
+    desktopIntegration: {
+      shouldNotify: shouldNotifyCustomerConsultationMessage,
+      showMessageNotification: async ({ message }) => {
+        const title = message.senderName?.trim() || i18n.t('enterprise.consultation.timeline.staff');
+        // Keep message content off desktop lock screens. A fixed localized
+        // summary still tells the customer why the notification appeared.
+        const body = i18n.t('enterprise.consultation.timeline.newMessages');
+        await showNotification({ title, body, customer_consultation: true });
+      },
+      setUnreadCount: setCustomerConsultationUnreadCount,
+    },
+    isPackaged: app.isPackaged,
+  });
+  return defaultCustomerConsultationGateway;
+};
+
+/** Registers the customer-only IPC surface under the enterprise sender boundary. */
+export function initCustomerConsultationBridge(dependencies: CustomerConsultationBridgeDependencies = {}): void {
+  const gateway = dependencies.gateway ?? getDefaultCustomerConsultationGateway();
+  const ipcMain = dependencies.ipcMain ?? (electronIpcMain as unknown as CustomerServiceIpcMain);
+  const senderGuard =
+    dependencies.senderGuard ?? ((event: unknown) => isTrustedEnterpriseSender(event as IpcMainInvokeEvent));
+  const eventSink = dependencies.eventSink ?? broadcastCustomerConsultationEvent;
+
+  const createHandler =
+    (
+      inputSchema: z.ZodTypeAny | undefined,
+      outputSchema: z.ZodTypeAny,
+      operation: (input: unknown) => unknown | Promise<unknown>
+    ): CustomerServiceIpcHandler =>
+    async (event, ...args) => {
+      if (!senderGuard(event)) return customerServiceFailure('UNTRUSTED_SENDER');
+      try {
+        let input: unknown;
+        if (inputSchema) {
+          if (args.length !== 1) return customerServiceFailure('INVALID_REQUEST');
+          input = inputSchema.parse(args[0]);
+        } else if (args.length !== 0) {
+          return customerServiceFailure('INVALID_REQUEST');
+        }
+        const output = outputSchema.safeParse(await operation(input));
+        if (!output.success) return customerServiceFailure('INVALID_RESPONSE');
+        return { ok: true, data: output.data };
+      } catch (error) {
+        return customerServiceFailure(normalizeCustomerServiceBridgeError(error));
+      }
+    };
+
+  const handlers: Array<[string, CustomerServiceIpcHandler]> = [
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.CONNECT,
+      createHandler(undefined, customerServiceConnectionSnapshotSchema, () => gateway.connect()),
+    ],
+    [CUSTOMER_CONSULTATION_IPC_CHANNELS.DISCONNECT, createHandler(undefined, z.void(), () => gateway.disconnect())],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.OPEN_CONVERSATION,
+      createHandler(undefined, customerServiceConversationSchema, () => gateway.openConversation()),
+    ],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.START_CONVERSATION,
+      createHandler(undefined, customerServiceConversationSchema, () => gateway.startConversation()),
+    ],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.GET_CONVERSATION,
+      createHandler(
+        CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.getConversation,
+        customerServiceConversationSchema,
+        (request) => gateway.getConversation(request as CustomerServiceConversationIdRequest)
+      ),
+    ],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.GET_HISTORY,
+      createHandler(
+        CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.getHistory,
+        customerServicePageSchema(customerServiceMessageSchema),
+        (request) => gateway.getHistory(request as CustomerServiceMessageHistoryRequest)
+      ),
+    ],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.SEND_MESSAGE,
+      createHandler(CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.sendMessage, z.string().uuid(), (request) =>
+        gateway.sendMessage(request as CustomerServiceSendMessageRequest)
+      ),
+    ],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.MARK_READ,
+      createHandler(CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.markRead, customerServiceReadResultSchema, (request) =>
+        gateway.markRead(request as CustomerServiceMarkReadRequest)
+      ),
+    ],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.UPLOAD_IMAGE,
+      createHandler(CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.uploadImage, customerServiceImageSchema, (request) =>
+        gateway.uploadImage(request as CustomerServiceUploadImageRequest)
+      ),
+    ],
+    [
+      CUSTOMER_CONSULTATION_IPC_CHANNELS.CLOSE_CONVERSATION,
+      createHandler(
+        CUSTOMER_CONSULTATION_COMMAND_SCHEMAS.closeConversation,
+        customerServiceConversationSchema,
+        (request) => gateway.closeConversation(request as CustomerServiceCloseRequest)
+      ),
+    ],
+  ];
+
+  for (const [channel] of handlers) ipcMain.removeHandler(channel);
+  for (const [channel, handler] of handlers) ipcMain.handle(channel, handler);
+
+  unsubscribeCustomerConsultationBridgeEvents?.();
+  unsubscribeCustomerConsultationBridgeEvents = gateway.subscribe((untrustedEvent) => {
+    const parsed = customerServiceServerEnvelopeSchema.safeParse(untrustedEvent);
+    if (parsed.success) eventSink(parsed.data as CustomerServiceServerEnvelope);
+  });
+}
+
+let defaultDesktopNotificationGateway: DesktopNotificationBridgeGateway | undefined;
+let unsubscribeDesktopNotificationBridgeEvents: (() => void) | undefined;
+
+const desktopNotificationFailure = (code: DesktopNotificationIpcErrorCode): DesktopNotificationIpcResult<never> => ({
+  ok: false,
+  error: { code, message: DESKTOP_NOTIFICATION_IPC_ERROR_MESSAGES[code] },
+});
+
+const normalizeDesktopNotificationBridgeError = (error: unknown): DesktopNotificationIpcErrorCode => {
+  if (error instanceof z.ZodError) return 'INVALID_REQUEST';
+  if (error instanceof DesktopNotificationApiError) {
+    if (error.code === 'MISSING_ENTERPRISE_SESSION' || error.status === 401) return 'MISSING_ENTERPRISE_SESSION';
+    if (Object.prototype.hasOwnProperty.call(DESKTOP_NOTIFICATION_IPC_ERROR_MESSAGES, error.code)) {
+      return error.code as DesktopNotificationIpcErrorCode;
+    }
+    if (error.status >= 400) return error.status === 408 ? 'TIMEOUT' : 'API_FAILURE';
+  }
+  return 'REQUEST_FAILED';
+};
+
+const broadcastDesktopNotificationEvent = (event: DesktopNotificationServerEnvelope): void => {
+  const expectedUrl = getExpectedRendererUrl();
+  if (!expectedUrl) return;
+  for (const window of BrowserWindow.getAllWindows()) {
+    try {
+      if (
+        !window.isDestroyed() &&
+        !window.webContents.isDestroyed() &&
+        hasExactRendererLocation(window.webContents.getURL(), expectedUrl)
+      ) {
+        window.webContents.send(DESKTOP_NOTIFICATION_IPC_CHANNELS.EVENT, event);
+      }
+    } catch {
+      // A closing window is skipped without interrupting other trusted renderer windows.
+    }
+  }
+};
+
+const getDefaultDesktopNotificationGateway = (): DesktopNotificationBridgeGateway => {
+  defaultDesktopNotificationGateway ??= new DesktopNotificationGateway({
+    sessionStore: getDefaultSessionStore(),
+    desktopIntegration: {
+      shouldNotify: shouldNotifyDesktopNotification,
+      showNotification: ({ notification }) => {
+        // Customer-service notification content is intentionally replaced even
+        // if an upstream publisher accidentally included a message preview.
+        const body =
+          notification.type === 'CUSTOMER_SERVICE'
+            ? i18n.t('enterprise.customerService.timeline.newMessages')
+            : (notification.content?.trim() || notification.title).slice(0, 160);
+        return showNotification({
+          title: notification.title,
+          body,
+          desktop_notification: notification.action
+            ? {
+                action: notification.action,
+                businessId: notification.businessId,
+                notificationId: notification.notificationId,
+              }
+            : undefined,
+        });
+      },
+      setUnreadCount: setDesktopNotificationUnreadCount,
+    },
+    isPackaged: app.isPackaged,
+  });
+  return defaultDesktopNotificationGateway;
+};
+
+/** Registers the notification-center IPC allowlist at the same enterprise sender boundary as the workbench. */
+export function initDesktopNotificationBridge(dependencies: DesktopNotificationBridgeDependencies = {}): void {
+  const gateway = dependencies.gateway ?? getDefaultDesktopNotificationGateway();
+  const ipcMain = dependencies.ipcMain ?? (electronIpcMain as unknown as DesktopNotificationIpcMain);
+  const senderGuard =
+    dependencies.senderGuard ?? ((event: unknown) => isTrustedEnterpriseSender(event as IpcMainInvokeEvent));
+  const eventSink = dependencies.eventSink ?? broadcastDesktopNotificationEvent;
+
+  const createHandler =
+    (
+      inputSchema: z.ZodTypeAny | undefined,
+      outputSchema: z.ZodTypeAny,
+      operation: (input: unknown) => unknown | Promise<unknown>
+    ): DesktopNotificationIpcHandler =>
+    async (event, ...args) => {
+      if (!senderGuard(event)) return desktopNotificationFailure('UNTRUSTED_SENDER');
+      try {
+        let input: unknown;
+        if (inputSchema) {
+          if (args.length !== 1) return desktopNotificationFailure('INVALID_REQUEST');
+          input = inputSchema.parse(args[0]);
+        } else if (args.length !== 0) {
+          return desktopNotificationFailure('INVALID_REQUEST');
+        }
+        const output = outputSchema.safeParse(await operation(input));
+        if (!output.success) return desktopNotificationFailure('INVALID_RESPONSE');
+        return { ok: true, data: output.data };
+      } catch (error) {
+        return desktopNotificationFailure(normalizeDesktopNotificationBridgeError(error));
+      }
+    };
+
+  const handlers: Array<[string, DesktopNotificationIpcHandler]> = [
+    [
+      DESKTOP_NOTIFICATION_IPC_CHANNELS.CONNECT,
+      createHandler(undefined, desktopNotificationConnectionSnapshotSchema, () => gateway.connect()),
+    ],
+    [DESKTOP_NOTIFICATION_IPC_CHANNELS.DISCONNECT, createHandler(undefined, z.void(), () => gateway.disconnect())],
+    [
+      DESKTOP_NOTIFICATION_IPC_CHANNELS.LIST,
+      createHandler(DESKTOP_NOTIFICATION_COMMAND_SCHEMAS.list, desktopNotificationPageSchema, (request) =>
+        gateway.list(request as DesktopNotificationListRequest)
+      ),
+    ],
+    [
+      DESKTOP_NOTIFICATION_IPC_CHANNELS.GET_UNREAD_COUNT,
+      createHandler(undefined, desktopNotificationUnreadCountSchema, () => gateway.getUnreadCount()),
+    ],
+    [
+      DESKTOP_NOTIFICATION_IPC_CHANNELS.MARK_READ,
+      createHandler(DESKTOP_NOTIFICATION_COMMAND_SCHEMAS.markRead, desktopNotificationChangedResultSchema, (request) =>
+        gateway.markRead((request as { notificationId: string }).notificationId)
+      ),
+    ],
+    [
+      DESKTOP_NOTIFICATION_IPC_CHANNELS.MARK_ALL_READ,
+      createHandler(undefined, desktopNotificationMarkAllReadResultSchema, () => gateway.markAllRead()),
+    ],
+  ];
+
+  for (const [channel] of handlers) ipcMain.removeHandler(channel);
+  for (const [channel, handler] of handlers) ipcMain.handle(channel, handler);
+
+  unsubscribeDesktopNotificationBridgeEvents?.();
+  unsubscribeDesktopNotificationBridgeEvents = gateway.subscribe((untrustedEvent) => {
+    const parsed = desktopNotificationServerEnvelopeSchema.safeParse(untrustedEvent);
+    if (parsed.success) eventSink(parsed.data as DesktopNotificationServerEnvelope);
+  });
+}
+
+let defaultDesktopVersionGateway: DesktopVersionBridgeGateway | undefined;
+
+const desktopVersionFailure = (code: DesktopVersionIpcErrorCode): DesktopVersionIpcResult<never> => ({
+  ok: false,
+  error: { code, message: DESKTOP_VERSION_IPC_ERROR_MESSAGES[code] },
+});
+
+const normalizeDesktopVersionBridgeError = (error: unknown): DesktopVersionIpcErrorCode => {
+  if (error instanceof DesktopVersionGatewayError) return error.code;
+  if (error instanceof DesktopVersionDownloadError) return error.code;
+  if (error instanceof DesktopVersionApiError) {
+    if (error.code === 'MISSING_ENTERPRISE_SESSION' || error.status === 401) return 'MISSING_ENTERPRISE_SESSION';
+    return error.code;
+  }
+  return 'REQUEST_FAILED';
+};
+
+const getDefaultDesktopVersionGateway = (): DesktopVersionBridgeGateway => {
+  defaultDesktopVersionGateway ??= new DesktopVersionGateway({
+    sessionStore: getDefaultSessionStore(),
+    runtime: {
+      getVersion: () => app.getVersion(),
+      getPath: (name) => app.getPath(name),
+      platform: process.platform,
+      arch: process.arch,
+      openPath: (filePath) => shell.openPath(filePath),
+    },
+    isPackaged: app.isPackaged,
+  });
+  return defaultDesktopVersionGateway;
+};
+
+/**
+ * Exposes only a no-argument update flow to a trusted enterprise renderer.
+ * Installer URL, hash, OpenID and final file selection all remain in the main process.
+ */
+export function initDesktopVersionBridge(dependencies: DesktopVersionBridgeDependencies = {}): void {
+  const gateway = dependencies.gateway ?? getDefaultDesktopVersionGateway();
+  const ipcMain = dependencies.ipcMain ?? (electronIpcMain as unknown as DesktopVersionIpcMain);
+  const senderGuard =
+    dependencies.senderGuard ?? ((event: unknown) => isTrustedEnterpriseSender(event as IpcMainInvokeEvent));
+
+  const createHandler =
+    (outputSchema: z.ZodTypeAny, operation: () => unknown | Promise<unknown>): DesktopVersionIpcHandler =>
+    async (event, ...args) => {
+      if (!senderGuard(event)) return desktopVersionFailure('UNTRUSTED_SENDER');
+      if (args.length !== 0) return desktopVersionFailure('INVALID_REQUEST');
+      try {
+        const output = outputSchema.safeParse(await operation());
+        if (!output.success) return desktopVersionFailure('INVALID_RESPONSE');
+        return { ok: true, data: output.data };
+      } catch (error) {
+        return desktopVersionFailure(normalizeDesktopVersionBridgeError(error));
+      }
+    };
+
+  const handlers: Array<[string, DesktopVersionIpcHandler]> = [
+    [DESKTOP_VERSION_IPC_CHANNELS.CHECK, createHandler(desktopVersionCheckResultSchema, () => gateway.check())],
+    [
+      DESKTOP_VERSION_IPC_CHANNELS.DOWNLOAD,
+      createHandler(desktopVersionDownloadResultSchema, () => gateway.downloadLatest()),
+    ],
+    [
+      DESKTOP_VERSION_IPC_CHANNELS.OPEN_DOWNLOADED,
+      createHandler(desktopVersionOpenDownloadedResultSchema, () => gateway.openDownloadedInstaller()),
+    ],
+  ];
+
+  for (const [channel] of handlers) ipcMain.removeHandler(channel);
+  for (const [channel, handler] of handlers) ipcMain.handle(channel, handler);
 }

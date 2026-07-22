@@ -82,6 +82,7 @@ export const desktopNotificationNativeTargetSchema = z
   .object({
     action: z.enum(DESKTOP_NOTIFICATION_ACTIONS),
     businessId: nullableBusinessIdSchema,
+    notificationId: desktopNotificationBusinessIdSchema,
   })
   .strict();
 
@@ -94,6 +95,7 @@ const desktopNotificationRouteSchema = z
       value === '/enterprise/dashboard' ||
       value === '/enterprise/version-update' ||
       value === '/settings/system' ||
+      /^\/enterprise\/notifications\?notificationId=-?[1-9][0-9]{0,18}$/.test(value) ||
       /^\/enterprise\/(projects|companies|products)\/-?[1-9][0-9]{0,18}$/.test(value) ||
       /^\/enterprise\/customer-service\?conversationId=-?[1-9][0-9]{0,18}$/.test(value),
     'Desktop notification route is invalid.'
