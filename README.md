@@ -113,10 +113,10 @@ GitHub 只执行仓库根目录 `.github/workflows` 中的工作流。本仓库�
 2. 打开 GitHub 仓库的 `Actions` 页面。
 3. 选择 `Release LianLiaoAIPC Windows`。
 4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.27`。
-5. 运行成功后，在该次运行页面底部下载保留 30 天的 Actions Artifact。
+5. 运行成功且 GitHub Artifact 配额可用时，在该次运行页面底部下载保留 30 天的 Actions Artifact。
 6. 在 Releases 页面下载长期保留的 `desktop-v2.1.27` 正式安装包和 `SHA256SUMS`。
 
-正式发布同时使用 Actions Artifact 和 GitHub Release。Artifact 用于测试，不得作为数据库中的长期安装地址；Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
+正式发布优先完成 GitHub Release，再删除旧 AIPC Artifact 并尝试上传当前 Artifact，确保最多只保留一个。Artifact 仅用于测试，不得作为数据库中的长期安装地址；若 GitHub 删除旧 Artifact 后尚未重新计算额度，Release 仍会正常发布，运行摘要会显示 Artifact 上传警告。Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
 
 ## 桌面安装包发布位置
 

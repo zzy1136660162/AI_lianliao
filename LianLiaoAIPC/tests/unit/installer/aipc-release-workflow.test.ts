@@ -34,9 +34,12 @@ describe('LianLiaoAIPC Windows release workflow', () => {
     expect(workflow).toContain('desktop-v$version');
     expect(workflow).toContain('--draft');
     expect(workflow).toContain('--draft=false');
+    expect(workflow).toContain('Remove previous desktop artifacts');
+    expect(workflow).toContain('continue-on-error: true');
     expect(workflow).toContain('SHA256SUMS');
     expect(workflow).toContain("if: failure() && steps.draft.outputs.created == 'true'");
     expect(workflow).toContain("if ($isDraft -eq 'true')");
+    expect(workflow.indexOf('Publish GitHub Release')).toBeLessThan(workflow.indexOf('Upload Actions artifact'));
   });
 
   it('does not embed credentials or fall back to upstream Core assets', () => {

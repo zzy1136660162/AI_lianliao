@@ -145,15 +145,6 @@ jobs:
           - Release tag: ``${{ steps.release.outputs.tag }}``
           "@ >> $env:GITHUB_STEP_SUMMARY
 
-      - name: Upload Actions artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.release.outputs.artifact }}
-          path: LianLiaoAIPC/release-assets/*
-          if-no-files-found: error
-          retention-days: 30
-          compression-level: 0
-
       - name: Create draft GitHub Release
         id: draft
         shell: pwsh
@@ -209,6 +200,46 @@ jobs:
         env:
           TAG: ${{ steps.release.outputs.tag }}
         run: gh release edit $env:TAG --repo '${{ github.repository }}' --draft=false
+
+      - name: Remove previous desktop artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactIds = @(
+            gh api --paginate 'repos/${{ github.repository }}/actions/artifacts?per_page=100' `
+              --jq '.artifacts[] | select(.name | startswith("LianLiaoAIPC-")) | .id'
+          )
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to list existing LianLiaoAIPC Actions artifacts.'
+          }
+          foreach ($artifactId in $artifactIds) {
+            gh api --method DELETE "repos/${{ github.repository }}/actions/artifacts/$artifactId"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to delete previous LianLiaoAIPC artifact $artifactId."
+            }
+          }
+
+      - name: Upload Actions artifact
+        id: artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.release.outputs.artifact }}
+          path: LianLiaoAIPC/release-assets/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Report Actions artifact quota delay
+        if: steps.artifact.outcome == 'failure'
+        shell: pwsh
+        run: |
+          Write-Warning 'GitHub Release is published, but the Actions artifact upload failed. GitHub may need 6-12 hours to recalculate storage after old artifacts are deleted.'
+          @"
+          > [!WARNING]
+          > GitHub Release 已发布，但 Actions Artifact 因存储额度或服务状态上传失败。
+          > GitHub 删除旧 Artifact 后可能需要 6-12 小时重新计算额度；安装包仍可从 Release 下载。
+          "@ >> $env:GITHUB_STEP_SUMMARY
 
       - name: Remove incomplete draft after failure
         if: failure() && steps.draft.outputs.created == 'true'
