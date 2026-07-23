@@ -120,7 +120,17 @@ function acpToolPlatformExecutableParts(platform, runtimeKey, toolId) {
   if (platform !== 'win32') return null;
 
   if (toolId === 'codex-acp') {
-    return ['node_modules', '@zed-industries', `codex-acp-${runtimeKey}`, 'bin', 'codex-acp.exe'];
+    const rustTarget =
+      runtimeKey === 'win32-x64'
+        ? 'x86_64-pc-windows-msvc'
+        : runtimeKey === 'win32-arm64'
+          ? 'aarch64-pc-windows-msvc'
+          : null;
+    if (!rustTarget) return null;
+
+    // codex-acp 1.x 使用 JavaScript 作为 ACP 入口，并通过 @openai/codex
+    // 的平台包启动原生 Codex CLI；不再包含旧版 @zed-industries 可执行文件。
+    return ['node_modules', '@openai', `codex-${runtimeKey}`, 'vendor', rustTarget, 'bin', 'codex.exe'];
   }
 
   if (toolId === 'claude-agent-acp') {

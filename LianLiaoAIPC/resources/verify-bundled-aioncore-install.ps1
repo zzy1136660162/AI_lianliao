@@ -142,10 +142,17 @@ function Test-BundledResourcesOnce {
   }
 
   $acpRoot = Join-Path $managedRoot 'acp'
+  $codexRustTarget = if ($RuntimeKey -eq 'win32-arm64') {
+    'aarch64-pc-windows-msvc'
+  } else {
+    'x86_64-pc-windows-msvc'
+  }
   $tools = @(
     @{
       id = 'codex-acp'
-      executable = "node_modules\@zed-industries\codex-acp-$RuntimeKey\bin\codex-acp.exe"
+      # codex-acp 1.x uses a JavaScript entrypoint. Also verify the native
+      # @openai/codex platform binary that the entrypoint launches.
+      executable = "node_modules\@openai\codex-$RuntimeKey\vendor\$codexRustTarget\bin\codex.exe"
     },
     @{
       id = 'claude-agent-acp'

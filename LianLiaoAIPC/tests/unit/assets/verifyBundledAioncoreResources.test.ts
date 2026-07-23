@@ -72,10 +72,18 @@ describe('verifyBundledAioncoreResources', () => {
     codexRoot = createManagedAcpToolFixture({
       managedResourcesDir,
       toolId: 'codex-acp',
-      version: '0.14.0',
+      version: '1.1.2',
       runtimeKey: 'win32-x64',
-      entrypoint: 'node_modules/@zed-industries/codex-acp-win32-x64/bin/codex-acp.exe',
-      platformExecutableParts: ['node_modules', '@zed-industries', 'codex-acp-win32-x64', 'bin', 'codex-acp.exe'],
+      entrypoint: 'node_modules/@agentclientprotocol/codex-acp/dist/index.js',
+      platformExecutableParts: [
+        'node_modules',
+        '@openai',
+        'codex-win32-x64',
+        'vendor',
+        'x86_64-pc-windows-msvc',
+        'bin',
+        'codex.exe',
+      ],
     });
 
     createManagedAcpToolFixture({
@@ -207,12 +215,12 @@ describe('verifyBundledAioncoreResources', () => {
     });
 
     expect(result.missing).toContain(
-      'bundled-aioncore/win32-x64/managed-resources/acp/codex-acp/0.14.0/win32-x64/manifest.json'
+      'bundled-aioncore/win32-x64/managed-resources/acp/codex-acp/1.1.2/win32-x64/manifest.json'
     );
   });
 
   it('reports missing managed ACP entrypoint declared by manifest', () => {
-    rmSync(join(codexRoot, 'node_modules', '@zed-industries', 'codex-acp-win32-x64', 'bin', 'codex-acp.exe'));
+    rmSync(join(codexRoot, 'node_modules', '@agentclientprotocol', 'codex-acp', 'dist', 'index.js'));
 
     const result = verifyBundledAioncoreResources({
       resourcesDir,
@@ -221,7 +229,32 @@ describe('verifyBundledAioncoreResources', () => {
     });
 
     expect(result.missing).toContain(
-      'bundled-aioncore/win32-x64/managed-resources/acp/codex-acp/0.14.0/win32-x64/node_modules/@zed-industries/codex-acp-win32-x64/bin/codex-acp.exe'
+      'bundled-aioncore/win32-x64/managed-resources/acp/codex-acp/1.1.2/win32-x64/node_modules/@agentclientprotocol/codex-acp/dist/index.js'
+    );
+  });
+
+  it('reports missing native Codex CLI required by codex-acp on Windows', () => {
+    rmSync(
+      join(
+        codexRoot,
+        'node_modules',
+        '@openai',
+        'codex-win32-x64',
+        'vendor',
+        'x86_64-pc-windows-msvc',
+        'bin',
+        'codex.exe'
+      )
+    );
+
+    const result = verifyBundledAioncoreResources({
+      resourcesDir,
+      electronPlatformName: 'win32',
+      targetArch: 'x64',
+    });
+
+    expect(result.missing).toContain(
+      'bundled-aioncore/win32-x64/managed-resources/acp/codex-acp/1.1.2/win32-x64/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe'
     );
   });
 });
