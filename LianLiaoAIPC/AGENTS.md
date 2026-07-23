@@ -9,6 +9,7 @@
 - 数据迁移只复制和校验，禁止自动删除旧 `AionUi*` 目录。
 - 新链接生成 `lianliao://`，但必须继续解析 `aionui://`。
 - 正式构建只能使用 `zzy1136660162/AI_lianliao` Release 和 `aioncore-release-lock.json` 中的 SHA256；禁止上游和 `latest` 回退。
+- 私有 Release 下载只允许通过已登录的 `gh` CLI 或进程环境中的 `GH_TOKEN` / `GITHUB_TOKEN` 鉴权；严禁把令牌写入源码、文档、日志或 Git 历史。
 - `aioncore.exe`、`@aionui/*` 包名、存储键、REST/WS/MCP 契约属于内部兼容标识，不做品牌式批量重命名。
 
 All contributors (human and AI) must follow [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR. ([Chinese version](CONTRIBUTING.zh.md))

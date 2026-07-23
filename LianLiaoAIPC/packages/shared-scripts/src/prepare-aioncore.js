@@ -178,22 +178,6 @@ function getDownloadUrl(assetName, releaseTag) {
   return `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/${releaseTag}/${assetName}`;
 }
 
-function downloadFile(url, outputPath) {
-  console.log(`  Downloading LianLiaoAICore from ${url}`);
-  if (process.platform === 'win32') {
-    const ps = `$ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri '${url}' -OutFile '${outputPath.replace(/'/g, "''")}'`;
-    execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
-      timeout: 120000,
-    });
-    return;
-  }
-  try {
-    execFileSync('curl', ['-L', '--fail', '--silent', '--show-error', '-o', outputPath, url], { timeout: 120000 });
-  } catch {
-    execFileSync('wget', ['-q', '-O', outputPath, url], { timeout: 120000 });
-  }
-}
-
 function sha256File(filePath) {
   const hash = crypto.createHash('sha256');
   hash.update(fs.readFileSync(filePath));
@@ -260,6 +244,41 @@ function getGitHubToken() {
   return process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
 }
 
+function getReleaseByTagApiPath(releaseTag) {
+  return `repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/tags/${encodeURIComponent(releaseTag)}`;
+}
+
+function getReleaseAssetApiPath(assetId) {
+  return `repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/assets/${assetId}`;
+}
+
+function getGitHubAuthenticationHint() {
+  return [
+    'The LianLiaoAICore release is stored in a private GitHub repository.',
+    'Authenticate with `gh auth login`, or set GH_TOKEN/GITHUB_TOKEN in the current build environment.',
+    'If GitHub requires a proxy, set HTTPS_PROXY/HTTP_PROXY before running the build.',
+    'Never commit a GitHub token to the repository.',
+  ].join(' ');
+}
+
+function escapeCurlConfigValue(value) {
+  return String(value).replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+}
+
+/**
+ * Build curl configuration on stdin so a GitHub token never appears in the
+ * process command line. GitHub tokens use a restricted character set, but the
+ * escaping keeps this helper safe for future credential formats as well.
+ */
+function getGitHubCurlConfig(accept) {
+  const lines = [`header = "Accept: ${escapeCurlConfigValue(accept)}"`, 'header = "X-GitHub-Api-Version: 2022-11-28"'];
+  const token = getGitHubToken();
+  if (token) {
+    lines.push(`header = "Authorization: Bearer ${escapeCurlConfigValue(token)}"`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
 function githubApiGetJson(apiPath) {
   const token = getGitHubToken();
 
@@ -278,28 +297,28 @@ function githubApiGetJson(apiPath) {
     // gh CLI not available or failed — fall back to curl.
   }
 
-  const headers = ['-H', 'Accept: application/vnd.github+json'];
-  if (token) {
-    headers.push('-H', `Authorization: Bearer ${token}`);
-  }
-
   const url = `https://api.github.com/${apiPath}`;
-  const out = execFileSync('curl', ['-fsSL', ...headers, url], {
+  const out = execFileSync('curl', ['--config', '-', '-fsSL', url], {
     encoding: 'utf-8',
+    input: getGitHubCurlConfig('application/vnd.github+json'),
     timeout: 15000,
   });
   return JSON.parse(out);
 }
 
-function downloadFileWithAuth(url, outputPath) {
+/**
+ * Download an authenticated GitHub API resource without exposing the token in
+ * logs. curl is preferred on supported build platforms; an authenticated
+ * GitHub CLI session is the fallback.
+ */
+function downloadFileWithAuth(url, outputPath, options = {}) {
   const token = getGitHubToken();
-  const headers = ['-H', 'Accept: application/vnd.github+json'];
-  if (token) {
-    headers.push('-H', `Authorization: Bearer ${token}`);
-  }
+  const accept = options.accept || 'application/vnd.github+json';
+  const ghApiPath = options.ghApiPath || url;
 
   try {
-    execFileSync('curl', ['-L', '--fail', '--silent', '--show-error', ...headers, '-o', outputPath, url], {
+    execFileSync('curl', ['--config', '-', '-L', '--fail', '--silent', '--show-error', '-o', outputPath, url], {
+      input: getGitHubCurlConfig(accept),
       timeout: 120000,
     });
     return;
@@ -307,13 +326,76 @@ function downloadFileWithAuth(url, outputPath) {
     // curl may be unavailable in some local environments; try gh before failing.
   }
 
-  execFileSync('gh', ['api', url, '--output', outputPath], {
-    timeout: 120000,
-    env: {
-      ...process.env,
-      GH_TOKEN: token || process.env.GH_TOKEN,
-    },
+  let outputFd = null;
+  try {
+    outputFd = fs.openSync(outputPath, 'w');
+    execFileSync('gh', ['api', ghApiPath, '-H', `Accept: ${accept}`], {
+      timeout: 120000,
+      stdio: ['ignore', outputFd, 'inherit'],
+      env: {
+        ...process.env,
+        GH_TOKEN: token || process.env.GH_TOKEN,
+      },
+    });
+  } catch (error) {
+    if (outputFd !== null) {
+      fs.closeSync(outputFd);
+      outputFd = null;
+    }
+    fs.rmSync(outputPath, { force: true });
+    throw new Error(`Unable to download the private GitHub asset. ${getGitHubAuthenticationHint()}`, {
+      cause: error,
+    });
+  } finally {
+    if (outputFd !== null) fs.closeSync(outputFd);
+  }
+}
+
+/**
+ * Resolve a release asset through the GitHub API. Private release assets cannot
+ * be fetched reliably from browser_download_url because GitHub returns a
+ * disguised 404 for anonymous requests.
+ */
+function resolveReleaseAsset(assetName, releaseTag) {
+  let release;
+  try {
+    release = githubApiGetJson(getReleaseByTagApiPath(releaseTag));
+  } catch (error) {
+    throw new Error(
+      `Unable to read LianLiaoAICore release ${releaseTag} from GitHub. ${getGitHubAuthenticationHint()}`,
+      { cause: error }
+    );
+  }
+
+  const asset = Array.isArray(release?.assets)
+    ? release.assets.find((candidate) => candidate?.name === assetName)
+    : null;
+  if (!asset?.id) {
+    const availableAssets = Array.isArray(release?.assets)
+      ? release.assets
+          .map((candidate) => candidate?.name)
+          .filter(Boolean)
+          .join(', ')
+      : '';
+    throw new Error(
+      `LianLiaoAICore release ${releaseTag} does not contain asset ${assetName}. Available assets: ${availableAssets || '(none)'}.`
+    );
+  }
+  return asset;
+}
+
+function downloadReleaseAsset(assetName, releaseTag, outputPath) {
+  const asset = resolveReleaseAsset(assetName, releaseTag);
+  const apiPath = getReleaseAssetApiPath(asset.id);
+  const apiUrl = `https://api.github.com/${apiPath}`;
+
+  console.log(`  Downloading LianLiaoAICore release ${releaseTag} asset ${assetName}`);
+  downloadFileWithAuth(apiUrl, outputPath, {
+    accept: 'application/octet-stream',
+    ghApiPath: apiPath,
   });
+
+  return asset.browser_download_url || getDownloadUrl(assetName, releaseTag);
 }
 
 function listActionsArtifacts(runId) {
@@ -389,7 +471,6 @@ function downloadAndExtractActionsArtifact(platform, arch, runId) {
 }
 
 function downloadAndExtract(platform, arch, releaseTag, assetName, expectedSha256) {
-  const url = getDownloadUrl(assetName, releaseTag);
   const tempDir = path.join(os.tmpdir(), 'aioncore-prepare', releaseTag, `${platform}-${arch}`);
   const archivePath = path.join(tempDir, assetName);
   const extractDir = path.join(tempDir, 'extracted');
@@ -397,7 +478,7 @@ function downloadAndExtract(platform, arch, releaseTag, assetName, expectedSha25
   removeDirectorySafe(tempDir);
   ensureDirectory(tempDir);
 
-  downloadFile(url, archivePath);
+  const url = downloadReleaseAsset(assetName, releaseTag, archivePath);
   const actualSha256 = assertSha256(archivePath, expectedSha256);
   extractArchive(archivePath, extractDir, platform);
 
@@ -542,6 +623,9 @@ module.exports = {
   assertSha256,
   getAssetName,
   getDownloadUrl,
+  getGitHubAuthenticationHint,
+  getReleaseAssetApiPath,
+  getReleaseByTagApiPath,
   getActionsArtifactMissingMessage,
   getActionsArtifactName,
   moveExistingDirectoryAside,

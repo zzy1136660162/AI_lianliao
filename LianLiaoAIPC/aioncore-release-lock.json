@@ -6,19 +6,19 @@
   "assets": {
     "win32-x64": {
       "name": "lianliao-aicore-v0.1.47-x86_64-pc-windows-msvc.zip",
-      "sha256": ""
+      "sha256": "bb866d05163f19837e8685646ea799daeee977c6abb698d9b87927cbe8cf6a18"
     },
     "darwin-x64": {
       "name": "lianliao-aicore-v0.1.47-x86_64-apple-darwin.tar.gz",
-      "sha256": ""
+      "sha256": "d8acdd2f5960bfae86ff0d055291a2269042c45e51bf026d5025e8b7f1175556"
     },
     "darwin-arm64": {
       "name": "lianliao-aicore-v0.1.47-aarch64-apple-darwin.tar.gz",
-      "sha256": ""
+      "sha256": "c0a4c341ce3b410e3101d48f0a4b3e83ce86ebe6e8105c541bcf1c10daa0de5d"
     },
     "linux-x64": {
       "name": "lianliao-aicore-v0.1.47-x86_64-unknown-linux-gnu.tar.gz",
-      "sha256": ""
+      "sha256": "9975878891c32d019c6a0a0944ee8f5c2e6e67f476019a1893c539b1be96a35d"
     }
   }
 }

@@ -4,6 +4,10 @@
 
 Core 固定从 [zzy1136660162/AI_lianliao Releases](https://github.com/zzy1136660162/AI_lianliao/releases) 获取，并由 [`aioncore-release-lock.json`](./aioncore-release-lock.json) 锁定版本和 SHA256。禁止在正式构建中回退到上游 Release 或 `latest`。
 
+由于当前 GitHub 仓库是私有仓库，本地执行 `npm run build-win` 等安装包构建命令前，需要先运行 `gh auth login`，或仅在当前构建环境设置 `GH_TOKEN` / `GITHUB_TOKEN`。令牌只从环境读取，禁止写入源码、配置、README、日志或 Git 历史。
+
+需要使用当前开发代理时，请在同一个 PowerShell 会话设置 `$env:HTTPS_PROXY='http://127.0.0.1:7897'` 和 `$env:HTTP_PROXY='http://127.0.0.1:7897'`。
+
 > 本项目基于开源 AionUi/AionCore 持续开发。内部 `@aionui/*` 包名、`aioncore.exe` 和协议兼容标识会按迁移策略保留，不代表系统品牌仍使用 AionUi。
 
 <p align="center">

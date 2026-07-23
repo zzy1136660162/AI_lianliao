@@ -93,7 +93,11 @@ AionUi-Dev-2 -> LianLiaoAIPC-Dev-2
 
 正式桌面构建不使用 `latest`，也不回退到 `iOfficeAI/AionCore`。缺少资产或 SHA256 时会明确失败。
 
-当前 `v0.1.47` lock 中的 SHA256 仍为空，这是发布前的安全状态：在本仓库 GitHub Release 生成四个平台的真实 Core 资产并回填校验值之前，正式安装器构建应当失败，不能用占位校验值绕过。
+`v0.1.47` 已完成四个平台 Core 资产发布，`LianLiaoAIPC/aioncore-release-lock.json` 已回填 GitHub Release 展示的真实 SHA256。后续桌面构建会按运行平台下载固定资产并执行完整性校验；版本、文件名或 SHA256 任一不匹配时都会立即失败。
+
+仓库当前为私有仓库，本地构建桌面安装包前必须完成 GitHub 鉴权。推荐执行 `gh auth login`；CI 或临时 PowerShell 会话也可以设置 `GH_TOKEN` / `GITHUB_TOKEN`。构建脚本只从进程环境读取令牌，通过 GitHub API 下载私有 Release 资产，不会把令牌写入仓库、清单或日志。已经暴露在聊天、截图或终端记录中的令牌必须立即撤销，不能继续使用。
+
+当前开发网络需要本地代理时，先在同一个 PowerShell 会话设置 `$env:HTTPS_PROXY='http://127.0.0.1:7897'` 和 `$env:HTTP_PROXY='http://127.0.0.1:7897'`，再执行 GitHub 登录与桌面构建。
 
 ### GitHub Actions 目录约定
 

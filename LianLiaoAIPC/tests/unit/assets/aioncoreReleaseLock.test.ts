@@ -27,6 +27,9 @@ const releaseLockTools = require(resolve(projectRoot, 'scripts/verifyAioncoreRel
 const prepareTools = require(resolve(projectRoot, 'packages/shared-scripts/src/prepare-aioncore.js')) as {
   assertSha256(filePath: string, expectedSha256: string): string;
   getDownloadUrl(assetName: string, releaseTag: string): string;
+  getGitHubAuthenticationHint(): string;
+  getReleaseAssetApiPath(assetId: number): string;
+  getReleaseByTagApiPath(releaseTag: string): string;
   sha256File(filePath: string): string;
 };
 
@@ -49,17 +52,30 @@ describe('LianLiaoAICore release lock', () => {
     expect(Object.values(lock.assets).every((asset) => asset.name.startsWith('lianliao-aicore-v0.1.47-'))).toBe(true);
   });
 
-  it('blocks formal asset resolution until a real SHA256 is recorded', () => {
-    expect(() => releaseLockTools.getLockedAsset(projectRoot, 'win32-x64')).toThrow(
-      'LianLiaoAICore SHA256 is not published for win32-x64'
-    );
-    expect(() => releaseLockTools.getLockedAsset(projectRoot, 'win32-x64', { requireChecksum: false })).not.toThrow();
+  it('resolves formal assets only with a published SHA256', () => {
+    const { asset } = releaseLockTools.getLockedAsset(projectRoot, 'win32-x64');
+
+    expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(asset.sha256).toBe('bb866d05163f19837e8685646ea799daeee977c6abb698d9b87927cbe8cf6a18');
   });
 
   it('builds download URLs only from the Chain Liao repository', () => {
     expect(prepareTools.getDownloadUrl('lianliao-aicore-v0.1.47-x86_64-pc-windows-msvc.zip', 'aicore-v0.1.47')).toBe(
       'https://github.com/zzy1136660162/AI_lianliao/releases/download/aicore-v0.1.47/lianliao-aicore-v0.1.47-x86_64-pc-windows-msvc.zip'
     );
+    expect(prepareTools.getReleaseByTagApiPath('aicore-v0.1.47')).toBe(
+      'repos/zzy1136660162/AI_lianliao/releases/tags/aicore-v0.1.47'
+    );
+    expect(prepareTools.getReleaseAssetApiPath(123456)).toBe('repos/zzy1136660162/AI_lianliao/releases/assets/123456');
+  });
+
+  it('explains private release authentication without storing a token', () => {
+    const hint = prepareTools.getGitHubAuthenticationHint();
+
+    expect(hint).toContain('gh auth login');
+    expect(hint).toContain('GH_TOKEN/GITHUB_TOKEN');
+    expect(hint).toContain('HTTPS_PROXY/HTTP_PROXY');
+    expect(hint).toContain('Never commit');
   });
 
   it('accepts the correct SHA256 and rejects a mismatch', () => {
