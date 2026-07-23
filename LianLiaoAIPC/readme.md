@@ -8,6 +8,8 @@ Core 固定从 [zzy1136660162/AI_lianliao Releases](https://github.com/zzy113666
 
 需要使用当前开发代理时，请在同一个 PowerShell 会话设置 `$env:HTTPS_PROXY='http://127.0.0.1:7897'` 和 `$env:HTTP_PROXY='http://127.0.0.1:7897'`。
 
+Windows x64 正式安装包由根目录 `.github/workflows/lianliao-aipc-release.yml` 构建。手动输入版本必须与本目录 `package.json` 一致；成功后同时生成保留 30 天的 Actions Artifact 和 `desktop-v<version>` GitHub Release。当前安装包尚未配置 Windows 代码签名证书，测试安装时可能出现 SmartScreen 提示。
+
 > 本项目基于开源 AionUi/AionCore 持续开发。内部 `@aionui/*` 包名、`aioncore.exe` 和协议兼容标识会按迁移策略保留，不代表系统品牌仍使用 AionUi。
 
 <p align="center">

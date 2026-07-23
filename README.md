@@ -107,6 +107,17 @@ GitHub 只执行仓库根目录 `.github/workflows` 中的工作流。本仓库�
 - `LianLiaoAICore` 和 `LianLiaoAIPC` 子目录不再各自保存 `.github/workflows`，避免维护无效或重复配置。
 - 工作流通过 `working-directory` 和 `paths` 指向对应子项目。
 
+## LianLiaoAIPC GitHub Actions 发布
+
+1. 确认 `LianLiaoAIPC/package.json` 中的版本已经提交到 `master`。
+2. 打开 GitHub 仓库的 `Actions` 页面。
+3. 选择 `Release LianLiaoAIPC Windows`。
+4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.27`。
+5. 运行成功后，在该次运行页面底部下载保留 30 天的 Actions Artifact。
+6. 在 Releases 页面下载长期保留的 `desktop-v2.1.27` 正式安装包和 `SHA256SUMS`。
+
+正式发布同时使用 Actions Artifact 和 GitHub Release。Artifact 用于测试，不得作为数据库中的长期安装地址；Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
+
 ## 桌面安装包发布位置
 
 链辽桌面安装包上传服务器：
