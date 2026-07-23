@@ -1,5 +1,6 @@
 /.idea/
 /.codex-build-cache/
+/.worktrees/
 /.superpowers/
 /LianLiaoAIPC/.codex-build-backups/
 /LianLiaoAIPC/release-desktop/
