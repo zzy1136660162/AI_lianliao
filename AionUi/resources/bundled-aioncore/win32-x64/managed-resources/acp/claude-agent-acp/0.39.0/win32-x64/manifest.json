@@ -1,6 +1,0 @@
-{
-  "entrypoint": "node_modules/@agentclientprotocol/claude-agent-acp/dist/index.js",
-  "path_entries": [
-    "node_modules/.bin"
-  ]
-}

@@ -1,0 +1,160 @@
+name: Release LianLiaoAICore
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: LianLiaoAICore version without the v prefix
+        required: true
+        type: string
+  push:
+    tags:
+      - "aicore-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+    steps:
+      - name: Resolve release version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="${REF_NAME#aicore-v}"
+          fi
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid semantic version: ${VERSION}" >&2
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "release_tag=aicore-v${VERSION}" >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: aioncore.exe
+            archive: zip
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            binary: aioncore
+            archive: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            binary: aioncore
+            archive: tar.gz
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            binary: aioncore
+            archive: tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: LianLiaoAICore
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain and target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.95.0
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: LianLiaoAICore -> target
+          shared-key: lianliao-aicore-${{ matrix.target }}
+
+      - name: Build Windows release binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: cargo build --release --target ${{ matrix.target }} -p aionui-app
+
+      - name: Build Unix release binary
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cargo build --release --target ${{ matrix.target }} -p aionui-app
+
+      - name: Archive Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $archive = "dist/lianliao-aicore-v${env:VERSION}-${env:TARGET}.zip"
+          Compress-Archive -LiteralPath "target/${env:TARGET}/release/${env:BINARY}" -DestinationPath $archive -Force
+
+      - name: Archive Unix binary
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          BINARY: ${{ matrix.binary }}
+        run: |
+          mkdir -p dist
+          tar -C "target/${TARGET}/release" -czf \
+            "dist/lianliao-aicore-v${VERSION}-${TARGET}.tar.gz" \
+            "${BINARY}"
+
+      - name: Upload platform archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: lianliao-aicore-${{ matrix.target }}
+          path: LianLiaoAICore/dist/lianliao-aicore-*
+          if-no-files-found: error
+
+  publish:
+    needs:
+      - prepare
+      - build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: lianliao-aicore-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        working-directory: artifacts
+        run: sha256sum lianliao-aicore-* > SHA256SUMS
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" artifacts/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+          else
+            gh release create "${RELEASE_TAG}" artifacts/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "LianLiaoAICore v${VERSION}" \
+              --notes "链辽 AI Core 多平台发布。桌面端构建必须使用 aioncore-release-lock.json 固定资产和 SHA256。"
+          fi

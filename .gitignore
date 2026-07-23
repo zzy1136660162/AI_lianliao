@@ -1,4 +1,11 @@
 /.idea/
+/.codex-build-cache/
+/.superpowers/
+/LianLiaoAIPC/.codex-build-backups/
+/LianLiaoAIPC/release-desktop/
+/LianLiaoAIPC/release-desktop-final/
+/LianLiaoAIPC/release-desktop-linux/
+/LianLiaoAIPC/resources/bundled-aioncore/
 
-/AionUi/resources/aionui sort file 2.gif
-/AionUi/resources/AionUi_team.gif
+/LianLiaoAIPC/resources/aionui sort file 2.gif
+/LianLiaoAIPC/resources/AionUi_team.gif

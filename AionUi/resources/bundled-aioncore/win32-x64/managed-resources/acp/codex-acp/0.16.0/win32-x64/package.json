@@ -1,7 +1,0 @@
-{
-  "name": "aionui-managed-acp-dev",
-  "private": true,
-  "dependencies": {
-    "@zed-industries/codex-acp": "0.16.0"
-  }
-}

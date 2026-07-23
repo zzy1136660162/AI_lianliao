@@ -1,6 +1,0 @@
-{
-  "entrypoint": "node_modules/@zed-industries/codex-acp/bin/codex-acp.js",
-  "path_entries": [
-    "node_modules/.bin"
-  ]
-}
