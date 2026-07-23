@@ -25,6 +25,9 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       LIANLIAO_RELEASE_BUILD: "1"
+      # Electron 渲染进程包含 Ant Design、ECharts 等大型依赖，Windows
+      # Runner 使用 Node 默认约 2 GB 堆会在 Vite 输出阶段耗尽内存。
+      NODE_OPTIONS: --max-old-space-size=6144
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
