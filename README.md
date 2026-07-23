@@ -85,17 +85,17 @@ AionUi-Dev-2 -> LianLiaoAIPC-Dev-2
 
 发布流程：
 
-1. 在 GitHub Actions 运行 `Release LianLiaoAICore`，输入不带 `v` 的版本号，例如 `0.1.47`；或推送 `aicore-v0.1.47` 标签。
-2. 工作流生成 Windows x64、macOS x64/arm64、Linux x64 资产和 `SHA256SUMS`。
+1. 在 GitHub Actions 运行 `Release LianLiaoAICore`，输入不带 `v` 的版本号，例如 `0.1.48`；或推送 `aicore-v0.1.48` 标签。
+2. 工作流生成 Windows x64/ARM64、macOS x64/ARM64、Linux x64 资产和 `SHA256SUMS`。
 3. 将每个平台的真实 SHA256 写入 `LianLiaoAIPC/aioncore-release-lock.json`。
 4. 运行 `node scripts/verifyAioncoreReleaseLock.js`。
 5. 再构建桌面安装包。
 
 正式桌面构建不使用 `latest`，也不回退到 `iOfficeAI/AionCore`。缺少资产或 SHA256 时会明确失败。
 
-`v0.1.47` 已完成四个平台 Core 资产发布，`LianLiaoAIPC/aioncore-release-lock.json` 已回填 GitHub Release 展示的真实 SHA256。后续桌面构建会按运行平台下载固定资产并执行完整性校验；版本、文件名或 SHA256 任一不匹配时都会立即失败。
+`v0.1.48` 是桌面端五平台发布使用的 Core 版本，新增 Windows ARM64 正式资产。`LianLiaoAIPC/aioncore-release-lock.json` 必须回填 GitHub Release 中五个资产的真实 SHA256；版本、文件名或 SHA256 任一不匹配时都会立即失败。
 
-仓库当前为私有仓库，本地构建桌面安装包前必须完成 GitHub 鉴权。推荐执行 `gh auth login`；CI 或临时 PowerShell 会话也可以设置 `GH_TOKEN` / `GITHUB_TOKEN`。构建脚本只从进程环境读取令牌，通过 GitHub API 下载私有 Release 资产，不会把令牌写入仓库、清单或日志。已经暴露在聊天、截图或终端记录中的令牌必须立即撤销，不能继续使用。
+仓库公开后可以匿名下载 Release 资产；为避免 GitHub API 速率限制，本地连续构建时仍推荐执行 `gh auth login`。CI 或临时 PowerShell 会话也可以设置 `GH_TOKEN` / `GITHUB_TOKEN`。构建脚本只从进程环境读取令牌，不会把令牌写入仓库、清单或日志。已经暴露在聊天、截图或终端记录中的令牌必须立即撤销，不能继续使用。
 
 当前开发网络需要本地代理时，先在同一个 PowerShell 会话设置 `$env:HTTPS_PROXY='http://127.0.0.1:7897'` 和 `$env:HTTP_PROXY='http://127.0.0.1:7897'`，再执行 GitHub 登录与桌面构建。
 
@@ -111,12 +111,13 @@ GitHub 只执行仓库根目录 `.github/workflows` 中的工作流。本仓库�
 
 1. 确认 `LianLiaoAIPC/package.json` 中的版本已经提交到 `master`。
 2. 打开 GitHub 仓库的 `Actions` 页面。
-3. 选择 `Release LianLiaoAIPC Windows`。
-4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.27`。
-5. 运行成功且 GitHub Artifact 配额可用时，在该次运行页面底部下载保留 30 天的 Actions Artifact。
-6. 在 Releases 页面下载长期保留的 `desktop-v2.1.27` 正式安装包和 `SHA256SUMS`。
+3. 选择 `Release LianLiaoAIPC`。
+4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.28`。
+5. 工作流并行构建 Windows x64/ARM64、macOS Intel/Apple Silicon 和 Ubuntu x64；任一平台失败时 Release 保持草稿状态。
+6. 在 Releases 页面下载长期保留的 `desktop-v2.1.28` 正式安装包和 `SHA256SUMS.txt`。
+7. Actions 页面只保留一个轻量发布报告 Artifact，其中包含版本、Commit、文件大小和 SHA256，不重复保存安装包。
 
-正式发布优先完成 GitHub Release，再删除旧 AIPC Artifact 并尝试上传当前 Artifact，确保最多只保留一个。Artifact 仅用于测试，不得作为数据库中的长期安装地址；若 GitHub 删除旧 Artifact 后尚未重新计算额度，Release 仍会正常发布，运行摘要会显示 Artifact 上传警告。Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
+多平台安装包先上传到草稿 GitHub Release，资产集合和 SHA256 全部验证通过后才转为公开发布。macOS 首版使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示。Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
 
 ## 桌面安装包发布位置
 
@@ -133,3 +134,28 @@ SSH 主机：10.2.202.23
 
 - [品牌、目录及发布迁移设计](docs/superpowers/specs/2026-07-23-lianliao-desktop-core-brand-migration-design.md)
 - [品牌迁移实施计划](docs/superpowers/plans/2026-07-23-lianliao-desktop-core-brand-migration.md)
+- [桌面端多平台发布设计](docs/superpowers/specs/2026-07-23-lianliao-aipc-multiplatform-release-design.md)
+- [桌面端多平台发布实施计划](docs/superpowers/plans/2026-07-23-lianliao-aipc-multiplatform-release.md)
+
+## Cloud Service 部署位置
+
+Cloud Service 源码位于：
+
+```text
+E:\ZZY_PROJECT\lianshang_liaoning\cloud-service
+```
+
+部署清单：
+
+| 服务器 | 目录 | 服务 |
+| --- | --- | --- |
+| `10.2.202.23` | `/mnt/web` | `cloud-admin`、`cloud-api`、`cloud-common-api`、`cloud-gateway`、`cloud-graph`、`cloud-log-service`、`cloud-lsln-cjrh-admin`、`cloud-oss`、`cloud-resource`、`cloud-solr` |
+| `10.2.24.13` | `/mnt/web/spring-cloud-jars` | `cloud-admin`、`cloud-api`、`cloud-gateway`、`cloud-log-service`、`cloud-lsln-cjrh-admin`、`cloud-oss` |
+
+两个部署目录都使用目录内的 `bootstrap.sh` 管理服务。只重启 API：
+
+```bash
+./bootstrap.sh restart cloud-api
+```
+
+不带服务名的 `./bootstrap.sh restart` 会重启目录内全部 JAR。部署时应先上传临时文件、核对文件大小和 SHA256、备份原文件，再替换并执行单服务重启。
