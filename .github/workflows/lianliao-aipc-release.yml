@@ -1,0 +1,209 @@
+name: Release LianLiaoAIPC Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Desktop version without v, for example 2.1.27
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lianliao-aipc-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  release-windows:
+    name: Build and publish Windows x64
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: LianLiaoAIPC
+    env:
+      GH_TOKEN: ${{ github.token }}
+      LIANLIAO_RELEASE_BUILD: '1'
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Validate release input
+        id: release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ inputs.version }}'.Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version must use x.y.z format without v. Received: $version"
+          }
+          if ('${{ github.ref_name }}' -ne 'master') {
+            throw 'Formal desktop releases must run from master.'
+          }
+
+          $package = Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json
+          if ($package.version -ne $version) {
+            throw "Input version $version does not match package.json version $($package.version)."
+          }
+
+          $tag = "desktop-v$version"
+          gh release view $tag --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release $tag already exists and will not be overwritten."
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "installer=LianLiaoAIPC-$version-win-x64.exe" >> $env:GITHUB_OUTPUT
+          "artifact=LianLiaoAIPC-$version-windows-x64" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        shell: pwsh
+        run: bun install --frozen-lockfile
+
+      - name: Verify Core release lock
+        shell: pwsh
+        run: node scripts/verifyAioncoreReleaseLock.js
+
+      - name: Build Windows x64 installer
+        shell: pwsh
+        run: bun run build-win:x64
+
+      - name: Verify installer and generate SHA256
+        id: package
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          INSTALLER_NAME: ${{ steps.release.outputs.installer }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Join-Path 'out' $env:INSTALLER_NAME
+          if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            throw "Expected installer was not generated: $source"
+          }
+
+          $assets = Join-Path $PWD 'release-assets'
+          New-Item -ItemType Directory -Force -Path $assets | Out-Null
+          Get-ChildItem -LiteralPath $assets -Force | Remove-Item -Force
+
+          $installer = Join-Path $assets $env:INSTALLER_NAME
+          Copy-Item -LiteralPath $source -Destination $installer
+
+          $sha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$sha256  $env:INSTALLER_NAME" |
+            Set-Content -LiteralPath (Join-Path $assets 'SHA256SUMS') -Encoding ascii
+
+          $files = @(Get-ChildItem -LiteralPath $assets -File)
+          if ($files.Count -ne 2) {
+            throw "Expected exactly two staged release files, found $($files.Count)."
+          }
+          foreach ($expected in @($env:INSTALLER_NAME, 'SHA256SUMS')) {
+            if ($expected -notin $files.Name) {
+              throw "Missing staged release file: $expected"
+            }
+          }
+
+          $size = (Get-Item -LiteralPath $installer).Length
+          "sha256=$sha256" >> $env:GITHUB_OUTPUT
+          "size=$size" >> $env:GITHUB_OUTPUT
+
+          @"
+          ## LianLiaoAIPC Windows build
+
+          - Version: ``$env:VERSION``
+          - Commit: ``${{ github.sha }}``
+          - Installer: ``$env:INSTALLER_NAME``
+          - Size: ``$size`` bytes
+          - SHA256: ``$sha256``
+          - Artifact: ``${{ steps.release.outputs.artifact }}``
+          - Release tag: ``${{ steps.release.outputs.tag }}``
+          "@ >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.release.outputs.artifact }}
+          path: LianLiaoAIPC/release-assets/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+      - name: Create draft GitHub Release
+        id: draft
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+          INSTALLER_NAME: ${{ steps.release.outputs.installer }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          @"
+          ## 链上辽宁·产业云城 AI桌面平台 v$env:VERSION
+
+          - 支持平台：Windows x64
+          - 安装包：``$env:INSTALLER_NAME``
+          - LianLiaoAICore：由 ``LianLiaoAIPC/aioncore-release-lock.json`` 固定版本和 SHA256
+          - 完整性校验：下载后请使用同页 ``SHA256SUMS`` 校验
+          - 签名说明：当前安装包尚未配置 Windows 代码签名证书，Windows SmartScreen 可能显示安全提示
+          "@ | Set-Content -LiteralPath release-notes.md -Encoding utf8
+
+          gh release create $env:TAG `
+            --repo '${{ github.repository }}' `
+            --target '${{ github.sha }}' `
+            --title "链上辽宁·产业云城 AI桌面平台 v$env:VERSION" `
+            --notes-file release-notes.md `
+            --draft
+          "created=true" >> $env:GITHUB_OUTPUT
+
+      - name: Upload and verify Release assets
+        shell: pwsh
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          INSTALLER_NAME: ${{ steps.release.outputs.installer }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release upload $env:TAG `
+            (Join-Path 'release-assets' $env:INSTALLER_NAME) `
+            (Join-Path 'release-assets' 'SHA256SUMS') `
+            --repo '${{ github.repository }}'
+
+          $actual = @(gh release view $env:TAG --repo '${{ github.repository }}' --json assets --jq '.assets[].name')
+          $expected = @($env:INSTALLER_NAME, 'SHA256SUMS')
+          if ($actual.Count -ne 2) {
+            throw "Expected two Release assets, found $($actual.Count): $($actual -join ', ')"
+          }
+          foreach ($name in $expected) {
+            if ($name -notin $actual) {
+              throw "Release asset verification failed; missing $name."
+            }
+          }
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: gh release edit $env:TAG --repo '${{ github.repository }}' --draft=false
+
+      - name: Remove incomplete draft after failure
+        if: failure() && steps.draft.outputs.created == 'true'
+        shell: pwsh
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          $isDraft = gh release view $env:TAG --repo '${{ github.repository }}' --json isDraft --jq '.isDraft'
+          if ($isDraft -eq 'true') {
+            gh release delete $env:TAG --repo '${{ github.repository }}' --cleanup-tag --yes
+          } else {
+            Write-Host "Release $env:TAG is not a draft; cleanup will not delete it."
+          }
