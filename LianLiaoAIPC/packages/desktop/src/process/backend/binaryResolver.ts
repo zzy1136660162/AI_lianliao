@@ -3,7 +3,7 @@
  *
  * Search order:
  *  1. Development environment override
- *  2. Bundled with app (production)
+ *  2. Project resources in development or packaged resources in production
  *  3. System PATH
  */
 
@@ -88,6 +88,16 @@ function resolveDevelopmentOverride(
 }
 
 /**
+ * Electron's `process.resourcesPath` points to Electron's own installation
+ * while running `electron-vite dev`. Development builds must instead resolve
+ * the Core prepared under this repository's `resources` directory.
+ */
+function resolveBundledResourcesPath(context: BackendBinaryResolveContext): string | undefined {
+  if (context.isPackaged) return context.resourcesPath;
+  return join(resolve(context.appPath), 'resources');
+}
+
+/**
  * Resolve the aioncore binary path.
  * Returns the absolute path to the binary, or throws if not found.
  */
@@ -103,7 +113,7 @@ export function resolveBinaryPath(context: BackendBinaryResolveContext): string 
   const override = resolveDevelopmentOverride(context, diagnostics);
   if (override) return override;
 
-  const bundled = bundledPath(context.resourcesPath, runtimeKey, binaryName, diagnostics);
+  const bundled = bundledPath(resolveBundledResourcesPath(context), runtimeKey, binaryName, diagnostics);
   if (bundled) return bundled;
 
   // A packaged client must run exactly the Core bundled and verified during

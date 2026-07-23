@@ -39,6 +39,22 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "release_tag=aicore-v${VERSION}" >> "${GITHUB_OUTPUT}"
 
+      - name: Ensure draft GitHub Release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists; platform assets will be replaced."
+          else
+            gh release create "${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "LianLiaoAICore v${VERSION}" \
+              --notes "链辽 AI Core 多平台发布。桌面端构建必须使用 aioncore-release-lock.json 固定资产和 SHA256。" \
+              --draft
+          fi
+
   build:
     needs: prepare
     strategy:
@@ -67,19 +83,13 @@ jobs:
         working-directory: LianLiaoAICore
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Rust toolchain and target
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.95.0
           targets: ${{ matrix.target }}
-
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: LianLiaoAICore -> target
-          shared-key: lianliao-aicore-${{ matrix.target }}
 
       - name: Build Windows release binary
         if: runner.os == 'Windows'
@@ -118,12 +128,22 @@ jobs:
             "dist/lianliao-aicore-v${VERSION}-${TARGET}.tar.gz" \
             "${BINARY}"
 
-      - name: Upload platform archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: lianliao-aicore-${{ matrix.target }}
-          path: LianLiaoAICore/dist/lianliao-aicore-*
-          if-no-files-found: error
+      # 直接上传草稿 Release，避免依赖 GitHub Actions artifact 存储配额。
+      - name: Upload platform archive to draft Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: |
+          shopt -s nullglob
+          archives=(dist/lianliao-aicore-*)
+          if [[ ${#archives[@]} -ne 1 ]]; then
+            echo "Expected exactly one platform archive, found ${#archives[@]}" >&2
+            exit 1
+          fi
+          gh release upload "${RELEASE_TAG}" "${archives[0]}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
 
   publish:
     needs:
@@ -131,30 +151,48 @@ jobs:
       - build
     runs-on: ubuntu-latest
     steps:
-      - name: Download all archives
-        uses: actions/download-artifact@v4
-        with:
-          pattern: lianliao-aicore-*
-          path: artifacts
-          merge-multiple: true
-
-      - name: Generate SHA256SUMS
-        working-directory: artifacts
-        run: sha256sum lianliao-aicore-* > SHA256SUMS
-
-      - name: Create or update GitHub Release
+      - name: Download platform archives from draft Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
-          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_TAG}" artifacts/* \
-              --repo "${GITHUB_REPOSITORY}" \
-              --clobber
-          else
-            gh release create "${RELEASE_TAG}" artifacts/* \
-              --repo "${GITHUB_REPOSITORY}" \
-              --title "LianLiaoAICore v${VERSION}" \
-              --notes "链辽 AI Core 多平台发布。桌面端构建必须使用 aioncore-release-lock.json 固定资产和 SHA256。"
-          fi
+          mkdir -p artifacts
+          gh release download "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "lianliao-aicore-v${{ needs.prepare.outputs.version }}-*" \
+            --dir artifacts
+
+          expected_assets=(
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip"
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz"
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz"
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz"
+          )
+          for asset in "${expected_assets[@]}"; do
+            if [[ ! -f "artifacts/${asset}" ]]; then
+              echo "Missing required Release asset: ${asset}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Generate SHA256SUMS
+        working-directory: artifacts
+        run: |
+          sha256sum \
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip" \
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz" \
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz" \
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz" \
+            > SHA256SUMS
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: |
+          gh release upload "${RELEASE_TAG}" artifacts/SHA256SUMS \
+            --repo "${GITHUB_REPOSITORY}" \
+            --clobber
+          gh release edit "${RELEASE_TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --draft=false

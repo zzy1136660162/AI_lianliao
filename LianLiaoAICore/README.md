@@ -31,7 +31,7 @@ cargo run -p aionui-app -- --help
 .github/workflows/lianliao-aicore-release.yml
 ```
 
-子目录 `LianLiaoAICore/.github/workflows` 来自上游项目，只用于比较和吸收上游变更；GitHub 不会从子目录执行这些 workflow。
+GitHub 只执行仓库根目录中的工作流。Core 与桌面端的 CI/Release 均应统一维护在根目录 `.github/workflows`；`LianLiaoAICore` 和 `LianLiaoAIPC` 子目录不单独创建 `.github/workflows`。
 
 正式发布资产：
 

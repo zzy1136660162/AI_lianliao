@@ -95,6 +95,14 @@ AionUi-Dev-2 -> LianLiaoAIPC-Dev-2
 
 当前 `v0.1.47` lock 中的 SHA256 仍为空，这是发布前的安全状态：在本仓库 GitHub Release 生成四个平台的真实 Core 资产并回填校验值之前，正式安装器构建应当失败，不能用占位校验值绕过。
 
+### GitHub Actions 目录约定
+
+GitHub 只执行仓库根目录 `.github/workflows` 中的工作流。本仓库是单仓库多项目结构，因此：
+
+- Core、桌面端及后续服务的 CI/Release 工作流统一维护在根目录 `.github/workflows`。
+- `LianLiaoAICore` 和 `LianLiaoAIPC` 子目录不再各自保存 `.github/workflows`，避免维护无效或重复配置。
+- 工作流通过 `working-directory` 和 `paths` 指向对应子项目。
+
 ## 桌面安装包发布位置
 
 链辽桌面安装包上传服务器：

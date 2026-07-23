@@ -79,8 +79,8 @@
       "requiredVersions": "需要的运行时符号：{{versions}}"
     },
     "incompleteInstallation": {
-      "title": "链辽AI 安装不完整",
-      "description": "当前安装缺少必要的本地资源，AionCore 无法启动。请下载并重新安装最新版 链辽AI；如果重新安装后仍然出现，请检查系统安全软件或杀毒软件是否隔离了 AionCore。",
+      "title": "链上辽宁·产业云城 AI桌面平台安装不完整",
+      "description": "当前安装缺少必要的本地资源，链辽 AI Core 无法启动。请下载并重新安装最新版“链上辽宁·产业云城 AI桌面平台”；如果重新安装后仍然出现，请检查系统安全软件或杀毒软件是否隔离了链辽 AI Core。",
       "downloadLatest": "下载最新版",
       "sendDiagnostics": "发送诊断报告",
       "diagnosticsSent": "诊断报告已发送",

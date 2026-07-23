@@ -27,7 +27,8 @@
 - 版本、Release tag、平台资产和 SHA256 由 `LianLiaoAIPC/aioncore-release-lock.json` 统一锁定。
 - SHA256 缺失或不匹配必须使构建失败，不得降级为警告。
 - 本地 Core 只能通过 `LIANLIAO_AICORE_LOCAL_BINARY` 显式启用；`LIANLIAO_RELEASE_BUILD=1` 时必须拒绝。
-- 根目录 `.github/workflows/lianliao-aicore-release.yml` 是当前仓库有效的 Core 发布工作流；子目录中的上游 workflow 仅作参考。
+- 根目录 `.github/workflows/lianliao-aicore-release.yml` 是当前仓库有效的 Core 发布工作流。
+- GitHub Actions 必须统一放在仓库根目录 `.github/workflows`；不得在 `LianLiaoAICore` 或 `LianLiaoAIPC` 子目录维护看似可执行但实际无效的 workflow。
 
 ## 文件修改
 

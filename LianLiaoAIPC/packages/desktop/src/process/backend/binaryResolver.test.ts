@@ -18,7 +18,7 @@ const binaryName = process.platform === 'win32' ? 'aioncore.exe' : 'aioncore';
 
 function createContext(overrides: Partial<BackendBinaryResolveContext> = {}): BackendBinaryResolveContext {
   return {
-    appPath: '/repo/AionUi',
+    appPath: '/repo/LianLiaoAIPC',
     env: {},
     isPackaged: false,
     resourcesPath: '/electron/resources',
@@ -77,6 +77,25 @@ describe('resolveBinaryPath', () => {
     expect(execSync).not.toHaveBeenCalled();
   });
 
+  it('uses project resources automatically in development mode', () => {
+    const appPath = resolve('/repo/LianLiaoAIPC');
+    const bundled = join(appPath, 'resources', 'bundled-aioncore', runtimeKey, binaryName);
+    vi.mocked(existsSync).mockImplementation((candidate) => candidate === bundled);
+
+    const result = resolveBinaryPath(
+      createContext({
+        appPath,
+        resourcesPath: '/electron/runtime/resources',
+      })
+    );
+
+    expect(result).toBe(bundled);
+    expect(existsSync).not.toHaveBeenCalledWith(
+      join('/electron/runtime/resources', 'bundled-aioncore', runtimeKey, binaryName)
+    );
+    expect(execSync).not.toHaveBeenCalled();
+  });
+
   it('ignores the development environment override in a packaged build', () => {
     const resourcesPath = '/app/resources';
     const bundled = join(resourcesPath, 'bundled-aioncore', runtimeKey, binaryName);
@@ -111,7 +130,8 @@ describe('resolveBinaryPath', () => {
   });
 
   it('attaches bundled path diagnostics when aioncore cannot be resolved', () => {
-    const resourcesPath = '/app/resources';
+    const appPath = resolve('/app');
+    const resourcesPath = join(appPath, 'resources');
     const bundledDir = join(resourcesPath, 'bundled-aioncore');
     const runtimeDir = join(bundledDir, runtimeKey);
     const checkedBundledPath = join(runtimeDir, binaryName);
@@ -126,10 +146,10 @@ describe('resolveBinaryPath', () => {
       throw new Error('not found on PATH');
     });
 
-    expect(() => resolveBinaryPath(createContext({ resourcesPath }))).toThrow('Cannot find "aioncore" binary');
+    expect(() => resolveBinaryPath(createContext({ appPath, resourcesPath }))).toThrow('Cannot find "aioncore" binary');
 
     try {
-      resolveBinaryPath(createContext({ resourcesPath }));
+      resolveBinaryPath(createContext({ appPath, resourcesPath }));
     } catch (error) {
       expect(error).toMatchObject({
         name: 'BackendBinaryResolveError',
