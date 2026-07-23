@@ -24,7 +24,7 @@ jobs:
         working-directory: LianLiaoAIPC
     env:
       GH_TOKEN: ${{ github.token }}
-      LIANLIAO_RELEASE_BUILD: '1'
+      LIANLIAO_RELEASE_BUILD: "1"
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
@@ -61,7 +61,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
