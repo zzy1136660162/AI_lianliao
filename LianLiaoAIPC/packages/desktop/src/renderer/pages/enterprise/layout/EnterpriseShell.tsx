@@ -31,7 +31,9 @@ const EnterpriseShellContent: React.FC = () => {
   const mainRef = useRef<HTMLElement>(null);
   const rendererReminderIdsRef = useRef(new Set<string>());
   const rendererReminderIdOrderRef = useRef<string[]>([]);
-  const [assistantOpen, setAssistantOpen] = useState(true);
+  // Each enterprise-workbench entry starts with maximum space for business data.
+  // Users can expand the assistant for the current mounted session; the choice is intentionally not persisted.
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
   const [forcedRelease, setForcedRelease] = useState<DesktopVersionRelease | null>(null);
   const [forceDownloading, setForceDownloading] = useState(false);

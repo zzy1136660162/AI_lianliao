@@ -285,26 +285,58 @@ describe('enterprise desktop routing', () => {
     expect(container).not.toHaveTextContent('raw-session-secret');
   });
 
-  it('lets keyboard and pointer users collapse and restore the assistant slot', async () => {
+  it('starts with the assistant collapsed and lets users expand and collapse it for the current shell session', async () => {
     renderAt('/enterprise/dashboard');
 
-    const hideButton = await screen.findByRole(
+    const showButton = await screen.findByRole(
       'button',
       {
-        name: 'enterprise.assistant.actions.hide',
+        name: 'enterprise.assistant.actions.show',
       },
       ROUTE_WAIT_OPTIONS
     );
-    const assistant = screen.getByRole('complementary', {
-      name: 'enterprise.accessibility.assistant',
-    });
-    expect(hideButton).toHaveAttribute('aria-expanded', 'true');
-
-    await userEvent.click(hideButton);
+    const assistant = document.getElementById('enterprise-assistant-panel');
+    expect(assistant).not.toBeNull();
+    expect(showButton).toHaveAttribute('aria-expanded', 'false');
     expect(assistant).toHaveAttribute('aria-hidden', 'true');
 
-    await userEvent.click(screen.getByRole('button', { name: 'enterprise.assistant.actions.show' }));
+    await userEvent.click(showButton);
+    const hideButton = screen.getByRole('button', { name: 'enterprise.assistant.actions.hide' });
+    expect(hideButton).toHaveAttribute('aria-expanded', 'true');
     expect(assistant).toHaveAttribute('aria-hidden', 'false');
+
+    await userEvent.click(hideButton);
+    expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.show' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(assistant).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('returns to the collapsed default after the enterprise shell is remounted', async () => {
+    const view = renderAt('/enterprise/dashboard');
+    await userEvent.click(
+      await screen.findByRole(
+        'button',
+        { name: 'enterprise.assistant.actions.show' },
+        ROUTE_WAIT_OPTIONS
+      )
+    );
+    expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.hide' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+
+    view.unmount();
+    renderAt('/enterprise/dashboard');
+
+    expect(
+      await screen.findByRole(
+        'button',
+        { name: 'enterprise.assistant.actions.show' },
+        ROUTE_WAIT_OPTIONS
+      )
+    ).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('keeps identity and assistant controls available to compact-window users', async () => {
@@ -313,7 +345,7 @@ describe('enterprise desktop routing', () => {
     const companyIdentity = await screen.findAllByText('辽宁测试企业');
     companyIdentity.forEach((element) => expect(element).toBeVisible());
     screen.getAllByText('测试用户').forEach((element) => expect(element).toBeVisible());
-    expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.hide' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.show' })).toBeVisible();
   });
 
   it('keeps compact footer actions in direct keyboard order after primary navigation', async () => {
