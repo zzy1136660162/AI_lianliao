@@ -61,6 +61,9 @@ jobs:
           if ($releaseLookupExitCode -ne 1) {
             throw "Unable to check whether Release $tag exists (exit code $releaseLookupExitCode)."
           }
+          # pwsh 会保留上一个原生命令的退出码；确认“未找到”符合预期后必须清零，
+          # 否则步骤末尾仍会被 Actions 判定为失败。
+          $global:LASTEXITCODE = 0
 
           "version=$version" >> $env:GITHUB_OUTPUT
           "tag=$tag" >> $env:GITHUB_OUTPUT
