@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.48 (2026-07-23)
+
+- 增加 Windows ARM64 (`aarch64-pc-windows-msvc`) 正式发布产物。
+- 保持 Windows x64、macOS Intel、macOS Apple Silicon 和 Linux x64 发布兼容。
+
 ## [0.1.47](https://github.com/iOfficeAI/AionCore/compare/v0.1.46...v0.1.47) (2026-07-14)
 
 
