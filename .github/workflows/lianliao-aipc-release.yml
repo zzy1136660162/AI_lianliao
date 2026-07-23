@@ -341,7 +341,7 @@ jobs:
           done
 
       - name: Upload Actions artifact
-        id: report-artifact
+        id: report_artifact
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -367,7 +367,7 @@ jobs:
             echo "- Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Platforms: Windows x64/ARM64, macOS x64/ARM64, Ubuntu x64"
-            if [[ "${{ steps.report-artifact.outcome }}" != "success" ]]; then
+            if [[ "${{ steps.report_artifact.outcome }}" != "success" ]]; then
               echo "- Actions Artifact: upload failed; formal Release assets are unaffected"
             else
               echo "- Actions Artifact: one lightweight release report"
