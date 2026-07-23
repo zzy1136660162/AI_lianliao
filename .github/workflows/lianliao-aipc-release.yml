@@ -48,9 +48,18 @@ jobs:
           }
 
           $tag = "desktop-v$version"
+          # 未发布过同名 Release 是正常状态。临时放宽原生命令错误处理，
+          # 让脚本读取 gh 的退出码 1，而不是被 PowerShell 提前终止。
+          $strictErrorActionPreference = $ErrorActionPreference
+          $ErrorActionPreference = 'SilentlyContinue'
           gh release view $tag --repo '${{ github.repository }}' *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $releaseLookupExitCode = $LASTEXITCODE
+          $ErrorActionPreference = $strictErrorActionPreference
+          if ($releaseLookupExitCode -eq 0) {
             throw "Release $tag already exists and will not be overwritten."
+          }
+          if ($releaseLookupExitCode -ne 1) {
+            throw "Unable to check whether Release $tag exists (exit code $releaseLookupExitCode)."
           }
 
           "version=$version" >> $env:GITHUB_OUTPUT

@@ -20,6 +20,8 @@ describe('LianLiaoAIPC Windows release workflow', () => {
     expect(workflow).toContain('bun install --frozen-lockfile');
     expect(workflow).toContain('GH_TOKEN: ${{ github.token }}');
     expect(workflow).toContain('LIANLIAO_RELEASE_BUILD: "1"');
+    expect(workflow).toContain("$ErrorActionPreference = 'SilentlyContinue'");
+    expect(workflow).toContain('$releaseLookupExitCode = $LASTEXITCODE');
     expect(workflow).toContain('node scripts/verifyAioncoreReleaseLock.js');
     expect(workflow).toContain('bun run build-win:x64');
   });
