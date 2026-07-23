@@ -118,26 +118,33 @@ jobs:
             runner: windows-latest
             runtime: win32-x64
             command: bun run build-win:x64
+            source_suffixes: win-x64.exe
             asset_suffixes: win-x64.exe
           - key: windows-arm64
             runner: windows-11-arm
             runtime: win32-arm64
             command: bun run build-win:arm64
+            source_suffixes: win-arm64.exe
             asset_suffixes: win-arm64.exe
           - key: macos-x64
             runner: macos-15-intel
             runtime: darwin-x64
             command: bun run build-mac:x64
+            source_suffixes: mac-x64.dmg mac-x64.zip
             asset_suffixes: mac-x64.dmg mac-x64.zip
           - key: macos-arm64
             runner: macos-15
             runtime: darwin-arm64
             command: bun run build-mac:arm64
+            source_suffixes: mac-arm64.dmg mac-arm64.zip
             asset_suffixes: mac-arm64.dmg mac-arm64.zip
           - key: linux-x64
             runner: ubuntu-22.04
             runtime: linux-x64
             command: bun run build-deb
+            # electron-builder follows Debian's amd64 architecture spelling.
+            # The public Release keeps the cross-platform x64 naming contract.
+            source_suffixes: linux-amd64.deb
             asset_suffixes: linux-x64.deb
     runs-on: ${{ matrix.runner }}
     defaults:
@@ -185,19 +192,29 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ needs.validate.outputs.version }}
+          SOURCE_SUFFIXES: ${{ matrix.source_suffixes }}
           ASSET_SUFFIXES: ${{ matrix.asset_suffixes }}
         run: |
           set -euo pipefail
           rm -rf release-assets
           mkdir -p release-assets
-          for suffix in ${ASSET_SUFFIXES}; do
-            name="LianLiaoAIPC-${VERSION}-${suffix}"
-            source="out/${name}"
+
+          read -r -a source_suffixes <<< "${SOURCE_SUFFIXES}"
+          read -r -a asset_suffixes <<< "${ASSET_SUFFIXES}"
+          if [[ "${#source_suffixes[@]}" -ne "${#asset_suffixes[@]}" ]]; then
+            echo "Source and public asset name counts differ." >&2
+            exit 1
+          fi
+
+          for ((index = 0; index < ${#source_suffixes[@]}; index++)); do
+            source_name="LianLiaoAIPC-${VERSION}-${source_suffixes[index]}"
+            asset_name="LianLiaoAIPC-${VERSION}-${asset_suffixes[index]}"
+            source="out/${source_name}"
             if [[ ! -s "${source}" ]]; then
               echo "Expected non-empty installer was not generated: ${source}" >&2
               exit 1
             fi
-            cp "${source}" "release-assets/${name}"
+            cp "${source}" "release-assets/${asset_name}"
           done
 
           staged_count="$(find release-assets -maxdepth 1 -type f | wc -l | tr -d ' ')"
@@ -213,7 +230,10 @@ jobs:
           TAG: ${{ needs.validate.outputs.tag }}
         run: |
           set -euo pipefail
-          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          assets=()
+          while IFS= read -r asset; do
+            assets+=("${asset}")
+          done < <(find release-assets -maxdepth 1 -type f -print | sort)
           if [[ "${#assets[@]}" -eq 0 ]]; then
             echo "No staged release assets found." >&2
             exit 1

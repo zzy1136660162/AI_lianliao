@@ -84,12 +84,16 @@ describe('release packaging configuration', () => {
       productName?: string;
       desktopName?: string;
       executableName?: string;
+      homepage?: string;
     };
 
     expect(packageJson.name).toBe('lianliao-ai-pc');
     expect(packageJson.productName).toBe('链上辽宁·产业云城 AI桌面平台');
     expect(packageJson.desktopName).toBe('com.lianliao.app.desktop');
     expect(packageJson.executableName).toBe('LianLiaoAIPC');
+    // Linux DEB metadata is generated through electron-builder's FPM target,
+    // which rejects packages that do not declare a public project homepage.
+    expect(packageJson.homepage).toBe('https://github.com/zzy1136660162/AI_lianliao');
   });
 
   it('uses the full desktop identity in packaging', () => {

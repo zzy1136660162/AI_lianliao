@@ -53,6 +53,18 @@ describe('LianLiaoAIPC multi-platform release workflow', () => {
     expect(workflow).not.toContain('path: LianLiaoAIPC/release-assets/*');
   });
 
+  it('uses macOS-compatible Bash while normalizing the DEB architecture name', () => {
+    const uploadStep = workflow.slice(
+      workflow.indexOf('- name: Upload platform assets to draft Release'),
+      workflow.indexOf('- name: Report platform build')
+    );
+
+    expect(uploadStep).not.toContain('mapfile');
+    expect(uploadStep).toContain('while IFS= read -r asset');
+    expect(workflow).toContain('source_suffixes: linux-amd64.deb');
+    expect(workflow).toContain('asset_suffixes: linux-x64.deb');
+  });
+
   it('pins the build toolchain and never embeds credentials or upstream Core fallbacks', () => {
     expect(workflow).toContain('node-version: "24"');
     expect(workflow).toContain('bun-version: 1.3.14');
