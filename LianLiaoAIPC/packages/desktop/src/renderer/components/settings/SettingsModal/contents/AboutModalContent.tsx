@@ -4,24 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Divider, Typography, Button, Switch, Message } from '@arco-design/web-react';
+import { Divider, Typography, Button } from '@arco-design/web-react';
 import { Github, Right } from '@icon-park/react';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import classNames from 'classnames';
 import { useSettingsViewMode } from '../settingsViewContext';
 import { isElectronDesktop, openExternalUrl } from '@/renderer/utils/platform';
 import FeedbackReportModal from './FeedbackReportModal';
-import { ipcBridge } from '@/common';
 import { AI_PRODUCT_NAME } from '@/common/config/constants';
-import { getIncludePrerelease, runUpdateCheck } from '@/renderer/components/settings/checkForUpdatesShared';
-import { UPDATE_AVAILABLE_EVENT } from '@/renderer/components/settings/useUpdateNotificationController';
-import {
-  getUpdateReadyState,
-  setUpdateReadyState,
-  subscribeUpdateReadyState,
-  type UpdateReadyState,
-} from '@/renderer/components/settings/updateReadyState';
 
 // __APP_VERSION__ is injected by electron.vite.config.ts `define:` from the
 // repo-root package.json. The previous `import packageJson from
@@ -35,26 +27,12 @@ type LinkItem =
 
 const AboutModalContent: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const viewMode = useSettingsViewMode();
   const isPageMode = viewMode === 'page';
   const isElectron = isElectronDesktop();
 
-  const [includePrerelease, setIncludePrerelease] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [updateReadyState, setLocalUpdateReadyState] = useState<UpdateReadyState>(() => getUpdateReadyState());
-  const [checking, setChecking] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('update.includePrerelease');
-    setIncludePrerelease(saved === 'true');
-  }, []);
-
-  useEffect(() => subscribeUpdateReadyState(setLocalUpdateReadyState), []);
-
-  const handlePrereleaseChange = (val: boolean) => {
-    setIncludePrerelease(val);
-    localStorage.setItem('update.includePrerelease', String(val));
-  };
 
   const openLink = async (url: string) => {
     try {
@@ -64,41 +42,9 @@ const AboutModalContent: React.FC = () => {
     }
   };
 
-  const checkUpdate = async () => {
-    if (updateReadyState.ready) {
-      if (updateReadyState.preparing) return;
-      if (updateReadyState.filePath) {
-        void ipcBridge.shell.openFile.invoke(updateReadyState.filePath);
-        return;
-      }
-      setUpdateReadyState({ ...updateReadyState, preparing: true });
-      void ipcBridge.autoUpdate.quitAndInstall.invoke().catch(() => {
-        Message.error(t('update.errors.prepareInstallFailed'));
-        setUpdateReadyState({ ...updateReadyState, preparing: false });
-      });
-      return;
-    }
-
-    if (checking) return;
-    setChecking(true);
-    try {
-      const outcome = await runUpdateCheck({
-        includePrerelease: getIncludePrerelease(),
-        fallbackVersion: __APP_VERSION__,
-        checkFailedLabel: t('update.checkFailed'),
-      });
-      if (outcome.kind === 'available') {
-        // Only reveal the bottom-right card once an update is confirmed; hand
-        // over the already-fetched outcome so the card skips the checking flash.
-        window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT, { detail: outcome }));
-      } else if (outcome.kind === 'upToDate') {
-        Message.info(t('update.alreadyLatest'));
-      } else {
-        Message.error(outcome.message || t('update.checkFailed'));
-      }
-    } finally {
-      setChecking(false);
-    }
+  const checkUpdate = () => {
+    // 路由切换会卸载设置页/弹窗，并进入数据库驱动的统一版本中心。
+    void navigate('/enterprise/version-update');
   };
 
   const linkItems: LinkItem[] = [
@@ -169,24 +115,10 @@ const AboutModalContent: React.FC = () => {
                 <Button
                   type='primary'
                   long
-                  loading={checking || updateReadyState.preparing}
-                  disabled={updateReadyState.preparing}
                   onClick={() => void checkUpdate()}
                 >
-                  {updateReadyState.preparing
-                    ? t('update.preparingInstall')
-                    : updateReadyState.ready
-                      ? t('settings.updateReadyInstall', { version: updateReadyState.version })
-                      : checking
-                        ? t('settings.checkingForUpdates')
-                        : t('settings.checkForUpdates')}
+                  {t('settings.checkForUpdates')}
                 </Button>
-                <div className='flex items-center justify-between w-full'>
-                  <Typography.Text className='text-12px text-t-secondary'>
-                    {t('settings.includePrereleaseUpdates')}
-                  </Typography.Text>
-                  <Switch size='small' checked={includePrerelease} onChange={handlePrereleaseChange} />
-                </div>
               </div>
             )}
           </div>

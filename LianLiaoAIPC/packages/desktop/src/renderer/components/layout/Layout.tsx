@@ -10,7 +10,7 @@ import PwaPullToRefresh from '@/renderer/components/layout/PwaPullToRefresh';
 import Titlebar from '@/renderer/components/layout/Titlebar';
 import { Layout as ArcoLayout, Tooltip } from '@arco-design/web-react';
 import classNames from 'classnames';
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { setGlobalNavigate } from '@/renderer/utils/navigation';
@@ -73,8 +73,6 @@ const useDebug = () => {
 
   return { onClick };
 };
-
-const UpdateModal = React.lazy(() => import('@/renderer/components/settings/UpdateModal'));
 
 const DEFAULT_SIDER_WIDTH = 260;
 const DESKTOP_COLLAPSED_WIDTH = 0;
@@ -226,9 +224,9 @@ const Layout: React.FC<{
       }
     };
 
-    // Handle check update request from tray / 托盘请求检查更新
+    // 链辽只使用企业版本中心查询数据库版本，托盘不再打开旧 AionUi 更新卡片。
     const handleCheckUpdate = () => {
-      window.dispatchEvent(new CustomEvent('aionui-open-update-modal', { detail: { source: 'tray' } }));
+      void navigate('/enterprise/version-update');
     };
 
     // Listen for tray events / 监听托盘事件
@@ -451,9 +449,6 @@ const Layout: React.FC<{
               <Outlet />
               {directorySelectionContextHolder}
               <PwaPullToRefresh />
-              <Suspense fallback={null}>
-                <UpdateModal />
-              </Suspense>
             </ArcoLayout.Content>
           </ArcoLayout>
         </div>

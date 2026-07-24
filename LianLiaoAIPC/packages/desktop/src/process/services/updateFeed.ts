@@ -7,7 +7,12 @@
 import { CdnGenericProvider } from './cdnGenericProvider';
 import type { CdnGenericProviderConfiguration } from './cdnGenericProvider';
 
-export const CDN_UPDATE_BASE_URL = 'https://static.aionui.com/releases';
+/**
+ * Legacy electron-updater feed retained only for source compatibility.
+ * Production navigation no longer initializes this channel; keeping the
+ * fallback on a Chain Liaoning-owned host prevents accidental upstream access.
+ */
+export const CDN_UPDATE_BASE_URL = 'https://cloud.lslnii.com/cloud-beiruan-ai/desktop_lianliao';
 
 export type CdnFeedOptions = CdnGenericProviderConfiguration & {
   updateProvider: typeof CdnGenericProvider;
