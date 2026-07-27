@@ -250,7 +250,7 @@ describe('Layout sider brand Home button', () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('opens the update notification directly for tray update checks', () => {
+  it('opens the database version page for tray update checks', () => {
     platformMocks.isElectronDesktopMock.mockReturnValue(true);
     const openListener = vi.fn();
     window.addEventListener('aionui-open-update-modal', openListener);
@@ -260,10 +260,8 @@ describe('Layout sider brand Home button', () => {
 
       window.dispatchEvent(new Event('tray:check-update'));
 
-      expect(navigate).not.toHaveBeenCalled();
-      expect(openListener).toHaveBeenCalledTimes(1);
-      const event = openListener.mock.calls[0][0] as CustomEvent;
-      expect(event.detail).toEqual({ source: 'tray' });
+      expect(navigate).toHaveBeenCalledWith('/enterprise/version-update');
+      expect(openListener).not.toHaveBeenCalled();
     } finally {
       window.removeEventListener('aionui-open-update-modal', openListener);
     }
