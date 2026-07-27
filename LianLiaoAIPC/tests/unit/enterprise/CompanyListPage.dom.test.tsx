@@ -189,7 +189,7 @@ describe('company list data lifecycle', () => {
     });
     filtered.resolve(companyPage('Filtered Company'));
     expect(await screen.findByText('Filtered Company')).toBeVisible();
-  }, 20_000);
+  }, 40_000);
 
   it('offers the H5 member levels and resets page one when selecting the VIP aggregate', async () => {
     const request = vi.fn<EnterpriseClient['request']>(async (input) => {

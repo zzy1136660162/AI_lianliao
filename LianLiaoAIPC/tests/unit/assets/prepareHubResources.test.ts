@@ -30,8 +30,9 @@ describe('prepareHubResources', () => {
     delete process.env.https_proxy;
     process.env.HTTPS_PROXY = 'http://127.0.0.1:7897';
 
-    expect(resolveProxyUrl('https://raw.githubusercontent.com/iOfficeAI/AionHub/dist-latest/index.json'))
-      .toBe('http://127.0.0.1:7897');
+    expect(resolveProxyUrl('https://raw.githubusercontent.com/iOfficeAI/AionHub/dist-latest/index.json')).toBe(
+      'http://127.0.0.1:7897'
+    );
   });
 
   it('does not configure an agent when no proxy is set', () => {
@@ -39,7 +40,6 @@ describe('prepareHubResources', () => {
       delete process.env[key];
     }
 
-    expect(resolveProxyUrl('https://cdn.jsdelivr.net/gh/iOfficeAI/AionHub@dist-latest/index.json'))
-      .toBeNull();
+    expect(resolveProxyUrl('https://cdn.jsdelivr.net/gh/iOfficeAI/AionHub@dist-latest/index.json')).toBeNull();
   });
 });

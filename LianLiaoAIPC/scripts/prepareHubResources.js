@@ -42,9 +42,10 @@ function ensureDir(dir) {
  */
 function resolveProxyUrl(url) {
   const protocol = new URL(url).protocol;
-  const names = protocol === 'https:'
-    ? ['HTTPS_PROXY', 'https_proxy', 'ALL_PROXY', 'all_proxy']
-    : ['HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy'];
+  const names =
+    protocol === 'https:'
+      ? ['HTTPS_PROXY', 'https_proxy', 'ALL_PROXY', 'all_proxy']
+      : ['HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy'];
   for (const name of names) {
     const value = process.env[name];
     if (value && value.trim()) {
@@ -84,11 +85,11 @@ function downloadUrl(url, destPath) {
       const options = proxyUrl ? { agent: new HttpsProxyAgent(proxyUrl) } : undefined;
       const request = options
         ? client.get(url, options, (res) => {
-          handleResponse(res);
-        })
+            handleResponse(res);
+          })
         : client.get(url, (res) => {
-          handleResponse(res);
-        });
+            handleResponse(res);
+          });
 
       request.on('error', reject);
 

@@ -1,1 +1,7 @@
 mobile/
+# Local release outputs and bundled runtime caches are generated artifacts.
+.codex-build-backups/
+release-desktop/
+release-desktop-final/
+release-desktop-linux/
+resources/bundled-aioncore/

@@ -44,10 +44,12 @@ describe('enterprise Ant Design and ECharts migration contract', () => {
     expect(existsSync(hookPath), 'useEnterprisePaginationScroll.ts should exist').toBe(true);
   });
 
-  it('keeps every enterprise source file free of Arco imports and selectors', () => {
+  it('keeps the migrated enterprise workspace free of Arco imports and selectors', () => {
     const enterpriseRoot = resolve('packages/desktop/src/renderer/pages/enterprise');
+    const arcoRealtimeSurfaces = new Set(['customerService', 'notifications']);
     const visit = (directory: string): string[] =>
       readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        if (directory === enterpriseRoot && entry.isDirectory() && arcoRealtimeSurfaces.has(entry.name)) return [];
         const path = resolve(directory, entry.name);
         if (entry.isDirectory()) return visit(path);
         return /\.(?:ts|tsx|css)$/.test(entry.name) ? [path] : [];

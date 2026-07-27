@@ -135,7 +135,7 @@ describe('AutoUpdaterService', () => {
 
     expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledWith({
       provider: 'custom',
-      url: 'https://static.aionui.com/releases',
+      url: 'https://cloud.lslnii.com/cloud-beiruan-ai/desktop_lianliao',
       updateProvider: CdnGenericProvider,
     });
   });

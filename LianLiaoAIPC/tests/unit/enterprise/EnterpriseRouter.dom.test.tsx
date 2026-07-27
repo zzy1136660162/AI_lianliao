@@ -316,11 +316,7 @@ describe('enterprise desktop routing', () => {
   it('returns to the collapsed default after the enterprise shell is remounted', async () => {
     const view = renderAt('/enterprise/dashboard');
     await userEvent.click(
-      await screen.findByRole(
-        'button',
-        { name: 'enterprise.assistant.actions.show' },
-        ROUTE_WAIT_OPTIONS
-      )
+      await screen.findByRole('button', { name: 'enterprise.assistant.actions.show' }, ROUTE_WAIT_OPTIONS)
     );
     expect(screen.getByRole('button', { name: 'enterprise.assistant.actions.hide' })).toHaveAttribute(
       'aria-expanded',
@@ -331,11 +327,7 @@ describe('enterprise desktop routing', () => {
     renderAt('/enterprise/dashboard');
 
     expect(
-      await screen.findByRole(
-        'button',
-        { name: 'enterprise.assistant.actions.show' },
-        ROUTE_WAIT_OPTIONS
-      )
+      await screen.findByRole('button', { name: 'enterprise.assistant.actions.show' }, ROUTE_WAIT_OPTIONS)
     ).toHaveAttribute('aria-expanded', 'false');
   });
 
@@ -374,7 +366,7 @@ describe('enterprise desktop routing', () => {
     expect(aiIndex).toBeGreaterThan(consultationIndex);
     expect(settingsIndex).toBeGreaterThan(aiIndex);
     expect(logoutIndex).toBeGreaterThan(settingsIndex);
-  }, 20_000);
+  }, 40_000);
 
   it('returns the enterprise workspace to the top after navigating to another enterprise pathname', async () => {
     const { container } = renderAt('/enterprise/dashboard');

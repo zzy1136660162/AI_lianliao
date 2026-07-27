@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const buildScript = readFileSync('scripts/build-with-builder.js', 'utf8');
 const arm64NsisScript = readFileSync('resources/windows-installer-arm64.nsh', 'utf8');
-const prChecksWorkflow = readFileSync('.github/workflows/pr-checks.yml', 'utf8');
-const releaseWorkflow = readFileSync('.github/workflows/build-and-release.yml', 'utf8');
+const repositoryRoot = resolve(__dirname, '../../../..');
+const releaseWorkflow = readFileSync(resolve(repositoryRoot, '.github/workflows/lianliao-aipc-release.yml'), 'utf8');
 
 describe('Windows ARM64 installer hardening', () => {
   it('uses zip packaging for the ARM64 NSIS installer to avoid the Nsis7z extraction path', () => {
@@ -35,26 +36,10 @@ describe('Windows ARM64 installer hardening', () => {
     expect(arm64NsisScript).toContain('Quit');
   });
 
-  it('keeps PR build tests focused on representative platforms', () => {
-    const prBuildTestJob = prChecksWorkflow.slice(
-      prChecksWorkflow.indexOf('  build-test:'),
-      prChecksWorkflow.indexOf('  # Job 5: Test release scripts')
-    );
-
-    expect(prBuildTestJob).toContain("platform: 'macos-arm64'");
-    expect(prBuildTestJob).toContain("platform: 'windows-x64'");
-    expect(prBuildTestJob).toContain("platform: 'linux-x64'");
-    expect(prBuildTestJob).not.toContain("platform: 'windows-arm64'");
-    expect(prBuildTestJob).not.toContain("platform: 'macos-x64'");
-  });
-
   it('keeps Windows ARM64 coverage in the release build matrix', () => {
-    const releaseBuildMatrix = releaseWorkflow.slice(
-      releaseWorkflow.indexOf('matrix: >-'),
-      releaseWorkflow.indexOf('    secrets: inherit')
-    );
-
-    expect(releaseBuildMatrix).toContain('"platform":"windows-arm64"');
-    expect(releaseBuildMatrix).toContain('node scripts/build-with-builder.js arm64 --win --arm64');
+    expect(releaseWorkflow).toContain('key: windows-arm64');
+    expect(releaseWorkflow).toContain('runner: windows-11-arm');
+    expect(releaseWorkflow).toContain('runtime: win32-arm64');
+    expect(releaseWorkflow).toContain('command: bun run build-win:arm64');
   });
 });

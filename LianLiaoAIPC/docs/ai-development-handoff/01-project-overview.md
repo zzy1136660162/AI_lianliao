@@ -13,7 +13,7 @@
 
 | 仓库        | 绝对路径                                                    | 技术栈                                                               | 主要职责                                                         |
 | ----------- | ----------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Electron/AI | `E:/ZZY_PROJECT/AI_lianliao/LianLiaoAIPC`                         | Electron 37、React 19、TypeScript 5、Ant Design 6、ECharts 6、Vitest | 桌面壳、企业工作台、链辽AI、IPC、更新、托盘、通知、AionCore 启动 |
+| Electron/AI | `E:/ZZY_PROJECT/AI_lianliao/LianLiaoAIPC`                   | Electron 37、React 19、TypeScript 5、Ant Design 6、ECharts 6、Vitest | 桌面壳、企业工作台、链辽AI、IPC、更新、托盘、通知、AionCore 启动 |
 | 后端        | `E:/ZZY_PROJECT/lianshang_liaoning/cloud-service/cloud-api` | Java 8、Spring Boot 2.6.1、MyBatis、Oracle、Redis、WebSocket         | 企业查询聚合、扫码登录、真人客服、业务写接口和权限               |
 | H5          | `E:/ZZY_PROJECT/lianshang_liaoning/vip_store`               | Vue 3、TypeScript 4.9、Vite                                          | 手机企业码页面、在建项目参考实现、真人客服客户页和移动接待页     |
 

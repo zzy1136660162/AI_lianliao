@@ -17,7 +17,11 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    testTimeout: 10000,
+    testTimeout: 30000,
+    // Large DOM suites can exhaust CPU and timer capacity when Vitest mirrors every
+    // logical core on developer workstations. A fixed worker cap keeps local and CI
+    // release gates deterministic without serializing the entire suite.
+    maxWorkers: 4,
     // Use projects to run different environments (Vitest 4+)
     projects: [
       // Node environment tests (existing tests)

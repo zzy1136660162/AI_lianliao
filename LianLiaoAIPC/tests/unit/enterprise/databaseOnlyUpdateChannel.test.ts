@@ -18,9 +18,7 @@ describe('database-only desktop update channel', () => {
 
   it('routes tray and settings checks to the enterprise version center', () => {
     const layoutSource = readSource('renderer/components/layout/Layout.tsx');
-    const aboutSource = readSource(
-      'renderer/components/settings/SettingsModal/contents/AboutModalContent.tsx'
-    );
+    const aboutSource = readSource('renderer/components/settings/SettingsModal/contents/AboutModalContent.tsx');
 
     expect(layoutSource).toContain("navigate('/enterprise/version-update')");
     expect(aboutSource).toContain("navigate('/enterprise/version-update')");
