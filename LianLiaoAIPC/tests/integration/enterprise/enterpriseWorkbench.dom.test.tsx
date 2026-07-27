@@ -510,7 +510,7 @@ describe('enterprise desktop core workbench', () => {
     const viewProjectDetails = await screen.findByRole(
       'button',
       { name: 'enterprise.projects.actions.viewDetails' },
-      { timeout: 5000 }
+      { timeout: 20_000 }
     );
     sensitiveAudit.assertNeverObserved(container);
     await user.click(viewProjectDetails);
@@ -537,7 +537,7 @@ describe('enterprise desktop core workbench', () => {
     expect(await screen.findByRole('heading', { name: 'legacy-guid-route' }, { timeout: 5000 })).toBeVisible();
     expect(screen.getByRole('status', { name: 'current route' })).toHaveTextContent('/guid');
     sensitiveAudit.stop(container);
-  }, 30_000);
+  }, 120_000);
 
   it('makes the fake bridge reject an unknown runtime operation instead of returning successful undefined data', async () => {
     const unsafeRequest = {

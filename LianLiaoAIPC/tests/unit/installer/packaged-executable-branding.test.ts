@@ -38,27 +38,29 @@ describe('packaged executable branding', () => {
     expect(arm64NsisScript).toContain('Please reinstall ${PRODUCT_NAME}');
   });
 
-  it('derives Windows build process handling and output detection from package productName', () => {
+  it('derives Windows build process handling and output detection from package executableName', () => {
     const legacyReferences = buildScript.split(/\r?\n/).filter((line) => line.includes("'AionUi.exe'"));
 
     expect(buildScript).toContain('const productName = packageJson.productName || packageJson.name;');
-    expect(buildScript).toContain('const windowsExecutableName = `${productName}.exe`;');
+    expect(buildScript).toContain('const executableName = packageJson.executableName || productName;');
+    expect(buildScript).toContain('const windowsExecutableName = `${executableName}.exe`;');
     expect(buildScript).toContain('isProcessRunningWindows(windowsExecutableName)');
     expect(buildScript).toContain("path.join(outDir, 'win-unpacked', windowsExecutableName)");
     expect(legacyReferences).toHaveLength(1);
     expect(legacyReferences[0]).toContain('legacyWindowsExecutableName');
   });
 
-  it('discovers and cleans packaged executables using package productName', () => {
+  it('discovers and cleans packaged executables using package executableName', () => {
     const legacyReferences = packagedLaunchScript.split(/\r?\n/).filter((line) => line.includes("'AionUi.exe'"));
 
     expect(packagedLaunchScript).toContain("readFileSync(path.join(projectRoot, 'package.json'), 'utf8')");
     expect(packagedLaunchScript).toContain('packageJson.productName || packageJson.name');
-    expect(packagedLaunchScript).toContain('`${productName}.exe`');
-    expect(packagedLaunchScript).toContain("'Contents', 'MacOS', productName");
-    expect(packagedLaunchScript).toMatch(/for \(const name of \[\s*productName/);
-    expect(packagedLaunchScript).toContain('await killProcessByName(`${productName}.exe`);');
-    expect(packagedLaunchScript).toContain('await killProcessByName(productName);');
+    expect(packagedLaunchScript).toContain('packageJson.executableName || productName');
+    expect(packagedLaunchScript).toContain('`${executableName}.exe`');
+    expect(packagedLaunchScript).toContain("'Contents', 'MacOS', executableName");
+    expect(packagedLaunchScript).toMatch(/for \(const name of \[\s*executableName/);
+    expect(packagedLaunchScript).toContain('await killProcessByName(`${executableName}.exe`);');
+    expect(packagedLaunchScript).toContain('await killProcessByName(executableName);');
     expect(legacyReferences).toHaveLength(1);
     expect(legacyReferences[0]).toContain('LEGACY_WINDOWS_EXECUTABLE_NAME');
   });

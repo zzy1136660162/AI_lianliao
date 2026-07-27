@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.1.29](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.28...desktop-v2.1.29) (2026-07-27)
+
+### Desktop
+
+#### Features
+
+- **workspace:** add Chain Liaoning AI branding and a user-configurable global HTTP proxy
+
+#### Bug Fixes
+
+- **update:** route desktop update checks through the database-backed enterprise version center
+
+### Core ([aicore-v0.1.48](https://github.com/zzy1136660162/AI_lianliao/releases/tag/aicore-v0.1.48))
+
+#### Bug Fixes
+
+- **proxy:** preserve the configured proxy for Agent, MCP, and model subprocesses
+
+---
+
 ## [2.1.27](https://github.com/iOfficeAI/AionUi/compare/v2.1.26...v2.1.27) (2026-06-30)
 
 ### Desktop

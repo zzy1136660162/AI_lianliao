@@ -1572,6 +1572,11 @@ describe('enterprise preload surface', () => {
   });
 
   it('round-trips a real handler failure as a structured-clone-safe plain envelope', async () => {
+    const [{ registerPlatformServices }, { NodePlatformServices }] = await Promise.all([
+      import('@/common/platform'),
+      import('@/common/platform/NodePlatformServices'),
+    ]);
+    registerPlatformServices(new NodePlatformServices());
     const { EnterpriseApiError: CurrentEnterpriseApiError } =
       await import('@/process/services/enterprise/enterpriseApiClient');
     const apiClient = makeApiClient();

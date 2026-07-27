@@ -112,11 +112,7 @@ const AboutModalContent: React.FC = () => {
             {/* Check Update Section */}
             {isElectron && (
               <div className='flex flex-col items-center gap-12px w-full max-w-300px bg-fill-2 p-16px rounded-lg'>
-                <Button
-                  type='primary'
-                  long
-                  onClick={() => void checkUpdate()}
-                >
+                <Button type='primary' long onClick={() => void checkUpdate()}>
                   {t('settings.checkForUpdates')}
                 </Button>
               </div>
