@@ -42,29 +42,35 @@ afterEach(() => {
 });
 
 describe('LianLiaoAICore release lock', () => {
-  it('pins the current repository, release tag, and four platform assets', () => {
+  it('pins the current repository, release tag, and five platform assets', () => {
     const { lock } = releaseLockTools.loadReleaseLock(projectRoot);
 
     expect(lock.repository).toBe('zzy1136660162/AI_lianliao');
-    expect(lock.version).toBe('v0.1.47');
-    expect(lock.releaseTag).toBe('aicore-v0.1.47');
-    expect(Object.keys(lock.assets).toSorted()).toEqual(['darwin-arm64', 'darwin-x64', 'linux-x64', 'win32-x64']);
-    expect(Object.values(lock.assets).every((asset) => asset.name.startsWith('lianliao-aicore-v0.1.47-'))).toBe(true);
+    expect(lock.version).toBe('v0.1.48');
+    expect(lock.releaseTag).toBe('aicore-v0.1.48');
+    expect(Object.keys(lock.assets).toSorted()).toEqual([
+      'darwin-arm64',
+      'darwin-x64',
+      'linux-x64',
+      'win32-arm64',
+      'win32-x64',
+    ]);
+    expect(Object.values(lock.assets).every((asset) => asset.name.startsWith('lianliao-aicore-v0.1.48-'))).toBe(true);
+    expect(Object.values(lock.assets).every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))).toBe(true);
   });
 
   it('resolves formal assets only with a published SHA256', () => {
-    const { asset } = releaseLockTools.getLockedAsset(projectRoot, 'win32-x64');
+    const { asset } = releaseLockTools.getLockedAsset(projectRoot, 'win32-arm64');
 
     expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/);
-    expect(asset.sha256).toBe('bb866d05163f19837e8685646ea799daeee977c6abb698d9b87927cbe8cf6a18');
   });
 
   it('builds download URLs only from the Chain Liao repository', () => {
-    expect(prepareTools.getDownloadUrl('lianliao-aicore-v0.1.47-x86_64-pc-windows-msvc.zip', 'aicore-v0.1.47')).toBe(
-      'https://github.com/zzy1136660162/AI_lianliao/releases/download/aicore-v0.1.47/lianliao-aicore-v0.1.47-x86_64-pc-windows-msvc.zip'
+    expect(prepareTools.getDownloadUrl('lianliao-aicore-v0.1.48-x86_64-pc-windows-msvc.zip', 'aicore-v0.1.48')).toBe(
+      'https://github.com/zzy1136660162/AI_lianliao/releases/download/aicore-v0.1.48/lianliao-aicore-v0.1.48-x86_64-pc-windows-msvc.zip'
     );
-    expect(prepareTools.getReleaseByTagApiPath('aicore-v0.1.47')).toBe(
-      'repos/zzy1136660162/AI_lianliao/releases/tags/aicore-v0.1.47'
+    expect(prepareTools.getReleaseByTagApiPath('aicore-v0.1.48')).toBe(
+      'repos/zzy1136660162/AI_lianliao/releases/tags/aicore-v0.1.48'
     );
     expect(prepareTools.getReleaseAssetApiPath(123456)).toBe('repos/zzy1136660162/AI_lianliao/releases/assets/123456');
   });

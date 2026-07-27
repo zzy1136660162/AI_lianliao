@@ -1,14 +1,15 @@
-name: Release LianLiaoAIPC Windows
+name: Release LianLiaoAIPC
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: Desktop version without v, for example 2.1.27
+        description: Desktop version without v, for example 2.1.28
         required: true
         type: string
 
 permissions:
+  actions: write
   contents: write
 
 concurrency:
@@ -16,62 +17,147 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release-windows:
-    name: Build and publish Windows x64
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: LianLiaoAIPC
-    env:
-      GH_TOKEN: ${{ github.token }}
-      LIANLIAO_RELEASE_BUILD: "1"
-      # Electron 渲染进程包含 Ant Design、ECharts 等大型依赖，Windows
-      # Runner 使用 Node 默认约 2 GB 堆会在 Vite 输出阶段耗尽内存。
-      NODE_OPTIONS: --max-old-space-size=6144
+  validate:
+    name: Validate release input
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
 
-      - name: Validate release input
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Validate version, branch, Release tag, and Core lock
         id: release
-        shell: pwsh
+        working-directory: LianLiaoAIPC
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $version = '${{ inputs.version }}'.Trim()
-          if ($version -notmatch '^\d+\.\d+\.\d+$') {
-            throw "Version must use x.y.z format without v. Received: $version"
-          }
-          if ('${{ github.ref_name }}' -ne 'master') {
-            throw 'Formal desktop releases must run from master.'
-          }
+          set -euo pipefail
+          version="$(printf '%s' "${INPUT_VERSION}" | xargs)"
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must use x.y.z format without v. Received: ${version}" >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_REF_NAME}" != "master" ]]; then
+            echo "Formal desktop releases must run from master." >&2
+            exit 1
+          fi
 
-          $package = Get-Content -LiteralPath package.json -Raw | ConvertFrom-Json
-          if ($package.version -ne $version) {
-            throw "Input version $version does not match package.json version $($package.version)."
-          }
+          package_version="$(node -p "require('./package.json').version")"
+          if [[ "${package_version}" != "${version}" ]]; then
+            echo "Input version ${version} does not match package.json version ${package_version}." >&2
+            exit 1
+          fi
 
-          $tag = "desktop-v$version"
-          # 未发布过同名 Release 是正常状态。临时放宽原生命令错误处理，
-          # 让脚本读取 gh 的退出码 1，而不是被 PowerShell 提前终止。
-          $strictErrorActionPreference = $ErrorActionPreference
-          $ErrorActionPreference = 'SilentlyContinue'
-          gh release view $tag --repo '${{ github.repository }}' *> $null
-          $releaseLookupExitCode = $LASTEXITCODE
-          $ErrorActionPreference = $strictErrorActionPreference
-          if ($releaseLookupExitCode -eq 0) {
-            throw "Release $tag already exists and will not be overwritten."
-          }
-          if ($releaseLookupExitCode -ne 1) {
-            throw "Unable to check whether Release $tag exists (exit code $releaseLookupExitCode)."
-          }
-          # pwsh 会保留上一个原生命令的退出码；确认“未找到”符合预期后必须清零，
-          # 否则步骤末尾仍会被 Actions 判定为失败。
-          $global:LASTEXITCODE = 0
+          tag="desktop-v${version}"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "Release ${tag} already exists and will not be overwritten." >&2
+            exit 1
+          fi
 
-          "version=$version" >> $env:GITHUB_OUTPUT
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-          "installer=LianLiaoAIPC-$version-win-x64.exe" >> $env:GITHUB_OUTPUT
-          "artifact=LianLiaoAIPC-$version-windows-x64" >> $env:GITHUB_OUTPUT
+          node scripts/verifyAioncoreReleaseLock.js
+          for runtime in win32-x64 win32-arm64 darwin-x64 darwin-arm64 linux-x64; do
+            node scripts/verifyAioncoreReleaseLock.js "${runtime}" >/dev/null
+          done
+
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+  create-draft-release:
+    name: Create draft GitHub Release
+    needs: validate
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Create release notes
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          cat > release-notes.md <<EOF
+          ## 链上辽宁·产业云城 AI桌面平台 v${VERSION}
+
+          - Windows：x64、ARM64 安装程序
+          - macOS：Intel x64、Apple Silicon ARM64 的 DMG 和 ZIP
+          - Ubuntu：x64 DEB
+          - LianLiaoAICore：由 \`LianLiaoAIPC/aioncore-release-lock.json\` 固定版本和 SHA256
+          - 完整性校验：下载后请使用同页 \`SHA256SUMS.txt\`
+          - Windows 签名：当前未配置代码签名证书，SmartScreen 可能显示安全提示
+          - macOS 签名：当前使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示
+          EOF
+
+      - name: Create draft Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          gh release create "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "链上辽宁·产业云城 AI桌面平台 v${VERSION}" \
+            --notes-file release-notes.md \
+            --draft
+
+  build-platform:
+    name: Build ${{ matrix.key }}
+    needs:
+      - validate
+      - create-draft-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - key: windows-x64
+            runner: windows-latest
+            runtime: win32-x64
+            command: bun run build-win:x64
+            source_suffixes: win-x64.exe
+            asset_suffixes: win-x64.exe
+          - key: windows-arm64
+            runner: windows-11-arm
+            runtime: win32-arm64
+            command: bun run build-win:arm64
+            source_suffixes: win-arm64.exe
+            asset_suffixes: win-arm64.exe
+          - key: macos-x64
+            runner: macos-15-intel
+            runtime: darwin-x64
+            command: bun run build-mac:x64
+            source_suffixes: mac-x64.dmg mac-x64.zip
+            asset_suffixes: mac-x64.dmg mac-x64.zip
+          - key: macos-arm64
+            runner: macos-15
+            runtime: darwin-arm64
+            command: bun run build-mac:arm64
+            source_suffixes: mac-arm64.dmg mac-arm64.zip
+            asset_suffixes: mac-arm64.dmg mac-arm64.zip
+          - key: linux-x64
+            runner: ubuntu-22.04
+            runtime: linux-x64
+            command: bun run build-deb
+            # electron-builder follows Debian's amd64 architecture spelling.
+            # The public Release keeps the cross-platform x64 naming contract.
+            source_suffixes: linux-amd64.deb
+            asset_suffixes: linux-x64.deb
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: LianLiaoAIPC
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      GH_TOKEN: ${{ github.token }}
+      LIANLIAO_RELEASE_BUILD: "1"
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -83,173 +169,248 @@ jobs:
         with:
           bun-version: 1.3.14
 
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fakeroot dpkg
+
       - name: Install dependencies
-        shell: pwsh
+        shell: bash
         run: bun install --frozen-lockfile
 
-      - name: Verify Core release lock
-        shell: pwsh
-        run: node scripts/verifyAioncoreReleaseLock.js
+      - name: Verify target Core release lock
+        shell: bash
+        run: node scripts/verifyAioncoreReleaseLock.js "${{ matrix.runtime }}"
 
-      - name: Build Windows x64 installer
-        shell: pwsh
-        run: bun run build-win:x64
+      - name: Build platform installers
+        shell: bash
+        run: ${{ matrix.command }}
 
-      - name: Verify installer and generate SHA256
-        id: package
-        shell: pwsh
+      - name: Stage exact platform assets
+        shell: bash
         env:
-          VERSION: ${{ steps.release.outputs.version }}
-          INSTALLER_NAME: ${{ steps.release.outputs.installer }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          SOURCE_SUFFIXES: ${{ matrix.source_suffixes }}
+          ASSET_SUFFIXES: ${{ matrix.asset_suffixes }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $source = Join-Path 'out' $env:INSTALLER_NAME
-          if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-            throw "Expected installer was not generated: $source"
-          }
+          set -euo pipefail
+          rm -rf release-assets
+          mkdir -p release-assets
 
-          $assets = Join-Path $PWD 'release-assets'
-          New-Item -ItemType Directory -Force -Path $assets | Out-Null
-          Get-ChildItem -LiteralPath $assets -Force | Remove-Item -Force
+          read -r -a source_suffixes <<< "${SOURCE_SUFFIXES}"
+          read -r -a asset_suffixes <<< "${ASSET_SUFFIXES}"
+          if [[ "${#source_suffixes[@]}" -ne "${#asset_suffixes[@]}" ]]; then
+            echo "Source and public asset name counts differ." >&2
+            exit 1
+          fi
 
-          $installer = Join-Path $assets $env:INSTALLER_NAME
-          Copy-Item -LiteralPath $source -Destination $installer
+          for ((index = 0; index < ${#source_suffixes[@]}; index++)); do
+            source_name="LianLiaoAIPC-${VERSION}-${source_suffixes[index]}"
+            asset_name="LianLiaoAIPC-${VERSION}-${asset_suffixes[index]}"
+            source="out/${source_name}"
+            if [[ ! -s "${source}" ]]; then
+              echo "Expected non-empty installer was not generated: ${source}" >&2
+              exit 1
+            fi
+            cp "${source}" "release-assets/${asset_name}"
+          done
 
-          $sha256 = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$sha256  $env:INSTALLER_NAME" |
-            Set-Content -LiteralPath (Join-Path $assets 'SHA256SUMS') -Encoding ascii
+          staged_count="$(find release-assets -maxdepth 1 -type f | wc -l | tr -d ' ')"
+          expected_count="$(wc -w <<< "${ASSET_SUFFIXES}" | tr -d ' ')"
+          if [[ "${staged_count}" != "${expected_count}" ]]; then
+            echo "Expected ${expected_count} staged files, found ${staged_count}." >&2
+            exit 1
+          fi
 
-          $files = @(Get-ChildItem -LiteralPath $assets -File)
-          if ($files.Count -ne 2) {
-            throw "Expected exactly two staged release files, found $($files.Count)."
-          }
-          foreach ($expected in @($env:INSTALLER_NAME, 'SHA256SUMS')) {
-            if ($expected -notin $files.Name) {
-              throw "Missing staged release file: $expected"
-            }
-          }
-
-          $size = (Get-Item -LiteralPath $installer).Length
-          "sha256=$sha256" >> $env:GITHUB_OUTPUT
-          "size=$size" >> $env:GITHUB_OUTPUT
-
-          @"
-          ## LianLiaoAIPC Windows build
-
-          - Version: ``$env:VERSION``
-          - Commit: ``${{ github.sha }}``
-          - Installer: ``$env:INSTALLER_NAME``
-          - Size: ``$size`` bytes
-          - SHA256: ``$sha256``
-          - Artifact: ``${{ steps.release.outputs.artifact }}``
-          - Release tag: ``${{ steps.release.outputs.tag }}``
-          "@ >> $env:GITHUB_STEP_SUMMARY
-
-      - name: Create draft GitHub Release
-        id: draft
-        shell: pwsh
+      - name: Upload platform assets to draft Release
+        shell: bash
         env:
-          VERSION: ${{ steps.release.outputs.version }}
-          TAG: ${{ steps.release.outputs.tag }}
-          INSTALLER_NAME: ${{ steps.release.outputs.installer }}
+          TAG: ${{ needs.validate.outputs.tag }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          @"
-          ## 链上辽宁·产业云城 AI桌面平台 v$env:VERSION
+          set -euo pipefail
+          assets=()
+          while IFS= read -r asset; do
+            assets+=("${asset}")
+          done < <(find release-assets -maxdepth 1 -type f -print | sort)
+          if [[ "${#assets[@]}" -eq 0 ]]; then
+            echo "No staged release assets found." >&2
+            exit 1
+          fi
+          gh release upload "${TAG}" "${assets[@]}" --repo "${GITHUB_REPOSITORY}"
 
-          - 支持平台：Windows x64
-          - 安装包：``$env:INSTALLER_NAME``
-          - LianLiaoAICore：由 ``LianLiaoAIPC/aioncore-release-lock.json`` 固定版本和 SHA256
-          - 完整性校验：下载后请使用同页 ``SHA256SUMS`` 校验
-          - 签名说明：当前安装包尚未配置 Windows 代码签名证书，Windows SmartScreen 可能显示安全提示
-          "@ | Set-Content -LiteralPath release-notes.md -Encoding utf8
-
-          gh release create $env:TAG `
-            --repo '${{ github.repository }}' `
-            --target '${{ github.sha }}' `
-            --title "链上辽宁·产业云城 AI桌面平台 v$env:VERSION" `
-            --notes-file release-notes.md `
-            --draft
-          "created=true" >> $env:GITHUB_OUTPUT
-
-      - name: Upload and verify Release assets
-        shell: pwsh
+      - name: Report platform build
+        shell: bash
         env:
-          TAG: ${{ steps.release.outputs.tag }}
-          INSTALLER_NAME: ${{ steps.release.outputs.installer }}
+          PLATFORM_KEY: ${{ matrix.key }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          gh release upload $env:TAG `
-            (Join-Path 'release-assets' $env:INSTALLER_NAME) `
-            (Join-Path 'release-assets' 'SHA256SUMS') `
-            --repo '${{ github.repository }}'
+          {
+            echo "## ${PLATFORM_KEY}"
+            echo
+            find release-assets -maxdepth 1 -type f -printf -- '- %f (%s bytes)\n' 2>/dev/null || \
+              find release-assets -maxdepth 1 -type f -exec sh -c 'printf -- "- %s (%s bytes)\n" "$(basename "$1")" "$(wc -c < "$1")"' _ {} \;
+          } >> "${GITHUB_STEP_SUMMARY}"
 
-          $actual = @(gh release view $env:TAG --repo '${{ github.repository }}' --json assets --jq '.assets[].name')
-          $expected = @($env:INSTALLER_NAME, 'SHA256SUMS')
-          if ($actual.Count -ne 2) {
-            throw "Expected two Release assets, found $($actual.Count): $($actual -join ', ')"
-          }
-          foreach ($name in $expected) {
-            if ($name -notin $actual) {
-              throw "Release asset verification failed; missing $name."
-            }
-          }
-
-      - name: Publish GitHub Release
-        shell: pwsh
+  verify-and-publish:
+    name: Verify assets and publish Release
+    needs:
+      - validate
+      - create-draft-release
+      - build-platform
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download installers from draft Release
         env:
-          TAG: ${{ steps.release.outputs.tag }}
-        run: gh release edit $env:TAG --repo '${{ github.repository }}' --draft=false
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          gh release download "${TAG}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "LianLiaoAIPC-${VERSION}-*" \
+            --dir release-assets
+
+      - name: Verify complete asset set and generate SHA256SUMS.txt
+        env:
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          expected=(
+            "LianLiaoAIPC-${VERSION}-win-x64.exe"
+            "LianLiaoAIPC-${VERSION}-win-arm64.exe"
+            "LianLiaoAIPC-${VERSION}-mac-x64.dmg"
+            "LianLiaoAIPC-${VERSION}-mac-x64.zip"
+            "LianLiaoAIPC-${VERSION}-mac-arm64.dmg"
+            "LianLiaoAIPC-${VERSION}-mac-arm64.zip"
+            "LianLiaoAIPC-${VERSION}-linux-x64.deb"
+          )
+          mapfile -t actual < <(find release-assets -maxdepth 1 -type f -printf '%f\n' | sort)
+          mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u <(printf '%s\n' "${wanted[@]}") <(printf '%s\n' "${actual[@]}")
+          (cd release-assets && sha256sum "${wanted[@]}" > SHA256SUMS.txt)
+
+      - name: Upload checksum file
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          gh release upload "${TAG}" release-assets/SHA256SUMS.txt \
+            --repo "${GITHUB_REPOSITORY}"
+
+      - name: Verify final draft Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          expected=(
+            "LianLiaoAIPC-${VERSION}-win-x64.exe"
+            "LianLiaoAIPC-${VERSION}-win-arm64.exe"
+            "LianLiaoAIPC-${VERSION}-mac-x64.dmg"
+            "LianLiaoAIPC-${VERSION}-mac-x64.zip"
+            "LianLiaoAIPC-${VERSION}-mac-arm64.dmg"
+            "LianLiaoAIPC-${VERSION}-mac-arm64.zip"
+            "LianLiaoAIPC-${VERSION}-linux-x64.deb"
+            "SHA256SUMS.txt"
+          )
+          mapfile -t actual < <(
+            gh release view "${TAG}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --json assets \
+              --jq '.assets[].name' |
+              sort
+          )
+          mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u <(printf '%s\n' "${wanted[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Create lightweight release report
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-report
+          cp release-assets/SHA256SUMS.txt release-report/SHA256SUMS.txt
+          {
+            echo "version=${VERSION}"
+            echo "tag=${TAG}"
+            echo "commit=${GITHUB_SHA}"
+            echo "generated_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo
+            echo "[assets]"
+            while IFS= read -r file; do
+              echo "$(basename "${file}")=$(stat -c '%s' "${file}")"
+            done < <(find release-assets -maxdepth 1 -type f ! -name SHA256SUMS.txt | sort)
+          } > release-report/manifest.txt
 
       - name: Remove previous desktop artifacts
-        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $artifactIds = @(
-            gh api --paginate 'repos/${{ github.repository }}/actions/artifacts?per_page=100' `
+          set -euo pipefail
+          mapfile -t artifact_ids < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
               --jq '.artifacts[] | select(.name | startswith("LianLiaoAIPC-")) | .id'
           )
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Unable to list existing LianLiaoAIPC Actions artifacts.'
-          }
-          foreach ($artifactId in $artifactIds) {
-            gh api --method DELETE "repos/${{ github.repository }}/actions/artifacts/$artifactId"
-            if ($LASTEXITCODE -ne 0) {
-              throw "Unable to delete previous LianLiaoAIPC artifact $artifactId."
-            }
-          }
+          for artifact_id in "${artifact_ids[@]}"; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+          done
 
       - name: Upload Actions artifact
-        id: artifact
+        id: report_artifact
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.release.outputs.artifact }}
-          path: LianLiaoAIPC/release-assets/*
+          name: LianLiaoAIPC-${{ needs.validate.outputs.version }}-release-report
+          path: release-report
           if-no-files-found: error
           retention-days: 30
-          compression-level: 0
 
-      - name: Report Actions artifact quota delay
-        if: steps.artifact.outcome == 'failure'
-        shell: pwsh
-        run: |
-          Write-Warning 'GitHub Release is published, but the Actions artifact upload failed. GitHub may need 6-12 hours to recalculate storage after old artifacts are deleted.'
-          @"
-          > [!WARNING]
-          > GitHub Release 已发布，但 Actions Artifact 因存储额度或服务状态上传失败。
-          > GitHub 删除旧 Artifact 后可能需要 6-12 小时重新计算额度；安装包仍可从 Release 下载。
-          "@ >> $env:GITHUB_STEP_SUMMARY
-
-      - name: Remove incomplete draft after failure
-        if: failure() && steps.draft.outputs.created == 'true'
-        shell: pwsh
+      - name: Publish GitHub Release
         env:
-          TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: gh release edit "${TAG}" --repo "${GITHUB_REPOSITORY}" --draft=false
+
+      - name: Write release summary
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          $isDraft = gh release view $env:TAG --repo '${{ github.repository }}' --json isDraft --jq '.isDraft'
-          if ($isDraft -eq 'true') {
-            gh release delete $env:TAG --repo '${{ github.repository }}' --cleanup-tag --yes
-          } else {
-            Write-Host "Release $env:TAG is not a draft; cleanup will not delete it."
-          }
+          {
+            echo "## LianLiaoAIPC v${VERSION}"
+            echo
+            echo "- Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Platforms: Windows x64/ARM64, macOS x64/ARM64, Ubuntu x64"
+            if [[ "${{ steps.report_artifact.outcome }}" != "success" ]]; then
+              echo "- Actions Artifact: upload failed; formal Release assets are unaffected"
+            else
+              echo "- Actions Artifact: one lightweight release report"
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  report-failure:
+    name: Report incomplete draft
+    if: failure()
+    needs:
+      - validate
+      - create-draft-release
+      - build-platform
+      - verify-and-publish
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Keep failed release private
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          {
+            echo "## Desktop release failed"
+            echo
+            echo "The incomplete Release remains a draft and was not exposed to users."
+            echo "Draft tag: \`${TAG}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"

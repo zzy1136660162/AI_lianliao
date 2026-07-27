@@ -43,4 +43,33 @@
 - Windows 发布前必须验证旧版本覆盖升级后不会产生第二个卸载项。
 - Windows 通知必须显示完整桌面产品名称，不能显示 `electron.app.Electron`。
 - 发布桌面安装包前核对本地和远端 SHA256；默认上传位置是 `10.2.202.23:/mnt/web/beiruan_ai/desktop_lianliao`。
+- 正式桌面 Release 必须同时包含 Windows x64/ARM64、macOS x64/ARM64、Ubuntu x64 的七个安装包和 `SHA256SUMS.txt`。
+- Windows ARM64 使用 `windows-11-arm` 原生 Runner 和锁定的 `win32-arm64` Core；不得用 x64 Core 冒充或回退。
+- macOS Intel 使用 `macos-15-intel`，macOS ARM64 使用 `macos-15`；未配置 Apple 凭据时仅允许按 Release 说明发布 ad-hoc 签名测试包。
+- 多平台安装包通过草稿 GitHub Release 中转；任一必需平台失败时不得公开 Release。
+- Actions Artifact 只保留一个轻量发布报告，不重复保存正式安装包。
 - 未经用户明确要求，不提交、不推送、不创建 GitHub Release，也不修改外部数据库。
+
+## Cloud Service 服务部署
+
+- Cloud Service 源码目录固定为 `E:\ZZY_PROJECT\lianshang_liaoning\cloud-service`。
+- 服务器 `10.2.202.23` 的部署目录为 `/mnt/web`，包含：
+  - `cloud-admin-1.0-SNAPSHOT.jar`
+  - `cloud-api-1.0-SNAPSHOT.jar`
+  - `cloud-common-api-1.0-SNAPSHOT.jar`
+  - `cloud-gateway-1.0-SNAPSHOT.jar`
+  - `cloud-graph-1.0-SNAPSHOT.jar`
+  - `cloud-log-service-1.0-SNAPSHOT.jar`
+  - `cloud-lsln-cjrh-admin-1.0-SNAPSHOT.jar`
+  - `cloud-oss-1.0-SNAPSHOT.jar`
+  - `cloud-resource-1.0-SNAPSHOT.jar`
+  - `cloud-solr-1.0-SNAPSHOT.jar`
+- 服务器 `10.2.24.13` 的部署目录为 `/mnt/web/spring-cloud-jars`，包含：
+  - `cloud-admin-1.0-SNAPSHOT.jar`
+  - `cloud-api-1.0-SNAPSHOT.jar`
+  - `cloud-gateway-1.0-SNAPSHOT.jar`
+  - `cloud-log-service-1.0-SNAPSHOT.jar`
+  - `cloud-lsln-cjrh-admin-1.0-SNAPSHOT.jar`
+  - `cloud-oss-1.0-SNAPSHOT.jar`
+- 两个目录均使用各自目录中的 `bootstrap.sh` 启动和停止服务。重启单个 API 服务使用 `./bootstrap.sh restart cloud-api`；不带服务名的 `./bootstrap.sh restart` 会重启目录内全部 JAR，部署单服务时不得误用。
+- 部署前后必须核对本地与远端 JAR 的文件大小和 SHA256。替换 JAR 或脚本前保留带时间戳的备份，启动失败时恢复备份，不得删除其他服务或修改它们的启动参数。

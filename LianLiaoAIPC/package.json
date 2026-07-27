@@ -1,9 +1,10 @@
 {
   "name": "lianliao-ai-pc",
-  "version": "2.1.27",
+  "version": "2.1.28",
   "description": "链上辽宁·产业云城 AI桌面平台",
   "keywords": [],
   "license": "Apache-2.0",
+  "homepage": "https://github.com/zzy1136660162/AI_lianliao",
   "author": {
     "name": "链上辽宁·产业云城"
   },
@@ -253,7 +254,7 @@
   "engines": {
     "node": ">=22 <25"
   },
-  "aioncoreVersion": "v0.1.47",
+  "aioncoreVersion": "v0.1.48",
   "desktopName": "com.lianliao.app.desktop",
   "electronRebuild": {
     "electronVersion": "^37.3.1"

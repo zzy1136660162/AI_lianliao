@@ -65,11 +65,15 @@ jobs:
             target: x86_64-pc-windows-msvc
             binary: aioncore.exe
             archive: zip
-          - os: macos-latest
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            binary: aioncore.exe
+            archive: zip
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             binary: aioncore
             archive: tar.gz
-          - os: macos-latest
+          - os: macos-15
             target: aarch64-apple-darwin
             binary: aioncore
             archive: tar.gz
@@ -164,6 +168,7 @@ jobs:
 
           expected_assets=(
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip"
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-pc-windows-msvc.zip"
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz"
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz"
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz"
@@ -180,6 +185,7 @@ jobs:
         run: |
           sha256sum \
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip" \
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-pc-windows-msvc.zip" \
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz" \
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz" \
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz" \
