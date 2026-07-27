@@ -53,6 +53,30 @@
   flex-shrink: 0 !important;
 }
 
+.ai-brand-mark {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.ai-brand-mark--collapsed {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+}
+
+.ai-brand-title {
+  min-width: 0;
+  max-width: 100%;
+  flex: 1 1 auto;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .layout-sider-content {
   flex: 1 !important;
   min-height: 0 !important;

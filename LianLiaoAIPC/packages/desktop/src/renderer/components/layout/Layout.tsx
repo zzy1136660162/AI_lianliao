@@ -5,9 +5,10 @@
  */
 
 import { ipcBridge } from '@/common';
-import { AI_PRODUCT_NAME, TEAM_MODE_ENABLED } from '@/common/config/constants';
+import { AI_WORKSPACE_TITLE, TEAM_MODE_ENABLED } from '@/common/config/constants';
 import PwaPullToRefresh from '@/renderer/components/layout/PwaPullToRefresh';
 import Titlebar from '@/renderer/components/layout/Titlebar';
+import appMark from '@renderer/assets/logos/brand/app-mark.png';
 import { Layout as ArcoLayout, Tooltip } from '@arco-design/web-react';
 import classNames from 'classnames';
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
@@ -123,7 +124,7 @@ const Layout: React.FC<{
   }, [navigate]);
   const location = useLocation();
   const { t } = useTranslation();
-  // The "AionUi" wordmark acts as Home / Back-to-Chat, but only from settings routes.
+  // The AI assistant title acts as Home / Back-to-Chat, but only from settings routes.
   // In non-settings routes the user is already "home", so it is a no-op (and not actionable).
   const isSettingsRoute = location.pathname.startsWith('/settings');
   // Only wired to the wordmark in the isSettingsRoute branch below, so the
@@ -349,39 +350,18 @@ const Layout: React.FC<{
                   }
                 )}
               >
-                <div
-                  className={classNames('bg-black shrink-0 size-32px relative rd-0.5rem', {
-                    '!size-24px': collapsed,
+                <img
+                  src={appMark}
+                  alt=''
+                  className={classNames('ai-brand-mark', {
+                    'ai-brand-mark--collapsed': collapsed,
                   })}
                   onClick={onClick}
-                >
-                  <svg
-                    className={classNames('w-5.5 h-5.5 absolute inset-0 m-auto', {
-                      'scale-140': !collapsed,
-                    })}
-                    viewBox='0 0 80 80'
-                    fill='none'
-                  >
-                    <path
-                      key='logo-path-1'
-                      d='M40 20 Q38 22 25 40 Q23 42 26 42 L30 42 Q32 40 40 30 Q48 40 50 42 L54 42 Q57 42 55 40 Q42 22 40 20'
-                      fill='white'
-                    ></path>
-                    <circle key='logo-circle' cx='40' cy='46' r='3' fill='white'></circle>
-                    <path
-                      key='logo-path-2'
-                      d='M18 50 Q40 70 62 50'
-                      stroke='white'
-                      strokeWidth='3.5'
-                      fill='none'
-                      strokeLinecap='round'
-                    ></path>
-                  </svg>
-                </div>
+                />
                 {isSettingsRoute ? (
                   <Tooltip content={t('common.back', { defaultValue: 'Back to Chat' })} position='bottom'>
                     <div
-                      className='text-16px text-t-primary collapsed-hidden font-semibold cursor-pointer'
+                      className='ai-brand-title text-16px text-t-primary collapsed-hidden font-semibold cursor-pointer'
                       role='button'
                       tabIndex={0}
                       aria-label={t('common.back', { defaultValue: 'Back to Chat' })}
@@ -393,11 +373,13 @@ const Layout: React.FC<{
                         }
                       }}
                     >
-                      {AI_PRODUCT_NAME}
+                      {AI_WORKSPACE_TITLE}
                     </div>
                   </Tooltip>
                 ) : (
-                  <div className='text-16px text-t-primary collapsed-hidden font-semibold'>{AI_PRODUCT_NAME}</div>
+                  <div className='ai-brand-title text-16px text-t-primary collapsed-hidden font-semibold'>
+                    {AI_WORKSPACE_TITLE}
+                  </div>
                 )}
                 {isMobile && !collapsed && (
                   <button

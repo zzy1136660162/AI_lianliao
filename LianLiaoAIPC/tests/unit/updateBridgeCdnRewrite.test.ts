@@ -6,6 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const electronFetchMock = vi.hoisted(() => vi.fn());
+const nodeFetchMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@office-ai/platform', () => ({
   bridge: {
     buildProvider: vi.fn(() => {
@@ -40,6 +43,9 @@ vi.mock('electron', () => ({
     getPath: vi.fn(() => '/test/path'),
     exit: vi.fn(),
     isPackaged: true,
+  },
+  net: {
+    fetch: electronFetchMock,
   },
   autoUpdater: {
     on: vi.fn(),
@@ -145,14 +151,17 @@ const makeDeferred = () => {
 describe('updateBridge CDN URL rewriting', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    electronFetchMock.mockReset();
+    nodeFetchMock.mockReset();
+    nodeFetchMock.mockRejectedValue(new Error('Node fetch must not be used by Electron update requests'));
+    vi.stubGlobal('fetch', nodeFetchMock);
   });
 
   it('rewrites asset.url to the CDN path and keeps GitHub URL in fallbackUrl', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
+    electronFetchMock.mockResolvedValue({
       ok: true,
       json: async () => makeGitHubReleaseResponse(),
     });
-    vi.stubGlobal('fetch', fetchMock);
 
     try {
       const handler = await getCheckHandler();
@@ -169,6 +178,13 @@ describe('updateBridge CDN URL rewriting', () => {
       expect(macAsset?.fallbackUrl).toBe(
         'https://github.com/iOfficeAI/AionUi/releases/download/v1.9.22/AionUi-1.9.22-mac-arm64.dmg'
       );
+      expect(electronFetchMock).toHaveBeenCalledWith(
+        'https://api.github.com/repos/iOfficeAI/AionUi/releases',
+        expect.objectContaining({
+          headers: expect.objectContaining({ Accept: 'application/vnd.github+json' }),
+        })
+      );
+      expect(nodeFetchMock).not.toHaveBeenCalled();
 
       const linuxAsset = assets.find((a: { name: string }) => a.name === 'AionUi-1.9.22-linux-amd64.deb');
       expect(linuxAsset?.url).toBe('https://static.aionui.com/releases/1.9.22/AionUi-1.9.22-linux-amd64.deb');
@@ -178,11 +194,10 @@ describe('updateBridge CDN URL rewriting', () => {
   });
 
   it('uses the normalized version (no v prefix) in the CDN path', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
+    electronFetchMock.mockResolvedValue({
       ok: true,
       json: async () => makeGitHubReleaseResponse(),
     });
-    vi.stubGlobal('fetch', fetchMock);
 
     try {
       const handler = await getCheckHandler();
@@ -201,7 +216,7 @@ describe('updateBridge allowlist includes CDN host', () => {
     vi.resetModules();
     vi.clearAllMocks();
 
-    const fetchMock = vi.fn().mockResolvedValue({
+    electronFetchMock.mockResolvedValue({
       ok: true,
       headers: new Headers({ 'content-length': '0' }),
       body: {
@@ -210,7 +225,6 @@ describe('updateBridge allowlist includes CDN host', () => {
         }),
       },
     });
-    vi.stubGlobal('fetch', fetchMock);
 
     try {
       const { initUpdateBridge } = await import('@process/bridge/updateBridge');

@@ -28,13 +28,16 @@ const clientBusinessSettingsMocks = vi.hoisted(() => ({
   getClientBusinessSetting: vi.fn(),
   setClientBusinessSetting: vi.fn(() => Promise.resolve()),
 }));
+const platformMocks = vi.hoisted(() => ({
+  isElectronDesktop: vi.fn(() => true),
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
 vi.mock('@/renderer/utils/platform', () => ({
-  isElectronDesktop: () => true,
+  isElectronDesktop: platformMocks.isElectronDesktop,
 }));
 
 vi.mock('@/renderer/components/base/AionScrollArea', () => ({
@@ -69,6 +72,8 @@ vi.mock('@/common', () => ({
       systemInfo: { invoke: systemInfoMock },
       updateSystemInfo: { invoke: updateSystemInfoMock },
       restart: { invoke: restartMock },
+      getManualHttpProxy: { invoke: vi.fn(() => Promise.resolve({ enabled: false, url: '' })) },
+      saveManualHttpProxy: { invoke: vi.fn() },
       getStartOnBootStatus: { invoke: vi.fn(() => Promise.resolve({ success: false })) },
       getGpuStatus: { invoke: vi.fn(() => Promise.resolve({ success: false })) },
     },
@@ -130,6 +135,7 @@ describe('SystemModalContent directory settings', () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
+    platformMocks.isElectronDesktop.mockReturnValue(true);
     configServiceMock.get.mockImplementation(() => undefined);
     configServiceMock.set.mockResolvedValue(undefined);
     clientBusinessSettingsMocks.getClientBusinessSetting.mockImplementation(async (key: string) => {
@@ -155,6 +161,20 @@ describe('SystemModalContent directory settings', () => {
     updateSystemInfoMock.mockResolvedValue(undefined);
     restartMock.mockResolvedValue({ restarted: true, manualRestartRequired: false });
     showOpenMock.mockResolvedValue(['/new-logs']);
+  });
+
+  it('mounts network proxy settings on Electron desktop', async () => {
+    renderContent();
+
+    expect(await screen.findByText('settings.networkProxy')).toBeInTheDocument();
+  });
+
+  it('hides network proxy settings outside Electron desktop', async () => {
+    platformMocks.isElectronDesktop.mockReturnValue(false);
+    renderContent();
+
+    await screen.findByText('/logs');
+    expect(screen.queryByText('settings.networkProxy')).not.toBeInTheDocument();
   });
 
   it('persists a selected log directory and restarts with the updated directory config', async () => {

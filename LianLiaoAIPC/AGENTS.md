@@ -2,7 +2,7 @@
 
 ## 链辽品牌与兼容规则
 
-- 用户可见桌面名称固定为“链上辽宁·产业云城 AI桌面平台”；AI 功能区简称仍为“链辽AI”。
+- 用户可见桌面名称固定为“链上辽宁·产业云城 AI桌面平台”；AI 功能区名称固定为“链上辽宁·产业云城AI助手”。
 - Electron `appId` 和 Windows AUMID 固定为 `com.lianliao.app`。
 - NSIS 必须保留 GUID `f3bfde38-8429-545c-a4e9-a078d87dee6c`，确保旧 `com.aionui.app` 安装可以覆盖升级。
 - 正式、开发和第二开发实例数据目录分别为 `LianLiaoAIPC`、`LianLiaoAIPC-Dev`、`LianLiaoAIPC-Dev-2`。
@@ -74,6 +74,17 @@ Two process types — never mix their APIs:
 
 Cross-process communication must go through the IPC bridge (`packages/desktop/src/preload/`).
 See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
+
+### 手动 HTTP 代理维护约束
+
+- 配置键固定为 `system.httpProxy`，只能由主进程通过 `ProcessConfig` 和 IPC 读写；渲染进程或业务模块不得直接访问存储。
+- 业务 HTTP/WS 调用不得复制代理 URL 的解析、校验或 Agent 创建逻辑，必须复用 `manualHttpProxy`、`manualHttpProxyRuntime` 和相应 factory。
+- 主进程中的版本查询、安装包下载等 Electron 网络请求必须使用 `electron.net.fetch`，不得使用不会继承 `defaultSession` 代理的 Node 全局 `fetch`。
+- `localhost`、整个 `127.0.0.0/8` IPv4 环回网段、`::1` 等环回目标必须绕过手动代理并保持直连。
+- 日志和错误上报禁止输出完整 proxy URL、ticket、openid；需要诊断时只记录不含敏感值的状态和原因码。
+- 新增 `ManualHttpProxyFailureReason` reason 时，必须同步更新 UI i18n 的穷尽映射、全部 10 个 locale 和对应测试，禁止依赖默认分支吞掉新原因。
+- 保存操作只持久化配置，不得局部热应用；所有网络入口在用户确认重启后统一应用新配置。
+- provider 的所有执行路径都必须以 fulfilled 状态返回纯数据，失败也要转换为可序列化结果；禁止 reject 或遗留未决 Promise 导致调用挂起。
 
 ## Testing
 

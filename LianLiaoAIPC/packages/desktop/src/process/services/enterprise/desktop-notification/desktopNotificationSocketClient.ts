@@ -1,5 +1,3 @@
-import WebSocket from 'ws';
-
 import {
   DESKTOP_NOTIFICATION_API_BASE_URLS,
   DESKTOP_NOTIFICATION_RECONNECT_DELAYS_MS,
@@ -16,6 +14,7 @@ import {
   desktopNotificationServerEnvelopeSchema,
   desktopNotificationWebSocketTicketSchema,
 } from '@/common/enterprise/desktop-notification/schemas';
+import { createEnterpriseWebSocket } from '@process/services/enterprise/enterpriseWebSocketFactory';
 
 import { DesktopNotificationApiError } from './desktopNotificationApiClient';
 
@@ -45,7 +44,7 @@ export type DesktopNotificationSocketEventListener = (event: DesktopNotification
 export type DesktopNotificationSocketStateListener = (snapshot: DesktopNotificationConnectionSnapshot) => void;
 
 const defaultSocketFactory = (url: string): DesktopNotificationSocketAdapter =>
-  new WebSocket(url) as unknown as DesktopNotificationSocketAdapter;
+  createEnterpriseWebSocket(url) as unknown as DesktopNotificationSocketAdapter;
 
 const normalizeSocketBaseUrl = (baseUrl: string): string => {
   let parsed: URL;
