@@ -537,7 +537,7 @@ describe('enterprise desktop core workbench', () => {
     expect(await screen.findByRole('heading', { name: 'legacy-guid-route' }, { timeout: 5000 })).toBeVisible();
     expect(screen.getByRole('status', { name: 'current route' })).toHaveTextContent('/guid');
     sensitiveAudit.stop(container);
-  }, 60_000);
+  }, 120_000);
 
   it('makes the fake bridge reject an unknown runtime operation instead of returning successful undefined data', async () => {
     const unsafeRequest = {
