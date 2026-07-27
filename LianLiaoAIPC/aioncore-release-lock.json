@@ -6,23 +6,23 @@
   "assets": {
     "win32-x64": {
       "name": "lianliao-aicore-v0.1.48-x86_64-pc-windows-msvc.zip",
-      "sha256": "a403c609e78b8160e69a35eb60472f1e2fea69d2d751553da20bf95b47518efc"
+      "sha256": "99426d0c5b551da7adc1ffcacfbbd6a280c46b723a33b5f52f906eb72a94eb91"
     },
     "win32-arm64": {
       "name": "lianliao-aicore-v0.1.48-aarch64-pc-windows-msvc.zip",
-      "sha256": "60a99fd8888d90a743cc92a526d41bb1fa65fd971cd513d3f06481e9e3866f31"
+      "sha256": "c65e134391eb71c60a03b280a6dfe051728e12ef3be343da002174f3f0702887"
     },
     "darwin-x64": {
       "name": "lianliao-aicore-v0.1.48-x86_64-apple-darwin.tar.gz",
-      "sha256": "07fe16ccf2d5a35cbf503c7b45c8730defc8cd63f9bb3552f7d8da0c6909f56e"
+      "sha256": "42bfdfcac4cdd8514dedb67124364d26cf6669865583e02961e54b4f3854e5cf"
     },
     "darwin-arm64": {
       "name": "lianliao-aicore-v0.1.48-aarch64-apple-darwin.tar.gz",
-      "sha256": "11be1d9efddfcda62ac555039cea9e239ec3ae2d06ac746a68359c818adf642d"
+      "sha256": "66615c0705dcf5a71ade2a6a0fa8dce34f447244226255a552e73d53786bf631"
     },
     "linux-x64": {
       "name": "lianliao-aicore-v0.1.48-x86_64-unknown-linux-gnu.tar.gz",
-      "sha256": "eca6a6bcaf2189b343bd97ba11e966469dbadf7eb5abf4d3762d8819196abedb"
+      "sha256": "cfd9b2e65eb550492bf201320593e1e89ea40c0cd36aadaede3f5c253b77f473"
     }
   }
 }
