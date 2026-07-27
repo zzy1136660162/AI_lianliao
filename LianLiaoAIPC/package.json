@@ -1,10 +1,10 @@
 {
   "name": "lianliao-ai-pc",
-  "version": "2.1.28",
+  "version": "2.1.29",
   "description": "链上辽宁·产业云城 AI桌面平台",
   "keywords": [],
-  "license": "Apache-2.0",
   "homepage": "https://github.com/zzy1136660162/AI_lianliao",
+  "license": "Apache-2.0",
   "author": {
     "name": "链上辽宁·产业云城"
   },
