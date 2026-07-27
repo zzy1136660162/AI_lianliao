@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, open, rename, rm, stat } from 'node:fs/promises';
 import * as path from 'node:path';
+import { net } from 'electron';
 
 import type { DesktopVersionRemoteRelease } from './desktopVersionApiClient';
 
@@ -33,8 +34,9 @@ const fetchInstaller = async (rawUrl: string): Promise<Response> => {
     let response: Response;
     try {
       // Redirect validation is sequential because every URL comes from the previous response.
+      // Electron's network stack inherits the proxy configured on defaultSession.
       // eslint-disable-next-line no-await-in-loop
-      response = await fetch(current, { redirect: 'manual' });
+      response = await net.fetch(current, { redirect: 'manual' });
     } catch {
       throw new DesktopVersionDownloadError('DOWNLOAD_FAILED');
     }

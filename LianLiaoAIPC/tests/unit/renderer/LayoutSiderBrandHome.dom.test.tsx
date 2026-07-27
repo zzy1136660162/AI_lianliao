@@ -82,7 +82,10 @@ vi.mock('@/common', () => ({
 }));
 
 // Trim Layout's collaborators to keep this a focused brand-behaviour test.
-vi.mock('@/common/config/constants', () => ({ AI_PRODUCT_NAME: '链辽AI', TEAM_MODE_ENABLED: false }));
+vi.mock('@/common/config/constants', () => ({
+  AI_WORKSPACE_TITLE: '链上辽宁·产业云城AI助手',
+  TEAM_MODE_ENABLED: false,
+}));
 vi.mock('@/renderer/components/layout/PwaPullToRefresh', () => ({ default: () => null }));
 vi.mock('@/renderer/components/layout/Titlebar', () => ({ default: () => null }));
 vi.mock('@/renderer/components/settings/UpdateModal', () => ({ default: () => null }));
@@ -221,7 +224,7 @@ describe('Layout sider brand Home button', () => {
 
     // No actionable role/label in chat routes.
     expect(screen.queryByLabelText(BACK_KEY)).toBeNull();
-    const wordmark = screen.getByText('链辽AI');
+    const wordmark = screen.getByText('链上辽宁·产业云城AI助手');
     fireEvent.click(wordmark);
     expect(navigate).not.toHaveBeenCalled();
   });
@@ -230,7 +233,7 @@ describe('Layout sider brand Home button', () => {
     currentPathname = '/conversation/xyz';
     renderLayout();
 
-    fireEvent.click(screen.getByText('链辽AI'));
+    fireEvent.click(screen.getByText('链上辽宁·产业云城AI助手'));
     expect(navigate).not.toHaveBeenCalled();
   });
 
@@ -239,15 +242,15 @@ describe('Layout sider brand Home button', () => {
     sessionStorage.setItem('aion:last-non-settings-path', '/conversation/abc');
     const { container } = renderLayout();
 
-    // The icon is the SVG-wrapping div (bg-black), separate from the wordmark.
-    const icon = container.querySelector('.bg-black') as HTMLElement;
+    // The workbench brand image remains the clickable devtools easter-egg target.
+    const icon = container.querySelector('.ai-brand-mark') as HTMLElement;
     expect(icon).toBeTruthy();
     for (let i = 0; i < 4; i++) fireEvent.click(icon);
     expect(openDevTools).toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it('opens the update notification directly for tray update checks', () => {
+  it('opens the database version page for tray update checks', () => {
     platformMocks.isElectronDesktopMock.mockReturnValue(true);
     const openListener = vi.fn();
     window.addEventListener('aionui-open-update-modal', openListener);
@@ -257,10 +260,8 @@ describe('Layout sider brand Home button', () => {
 
       window.dispatchEvent(new Event('tray:check-update'));
 
-      expect(navigate).not.toHaveBeenCalled();
-      expect(openListener).toHaveBeenCalledTimes(1);
-      const event = openListener.mock.calls[0][0] as CustomEvent;
-      expect(event.detail).toEqual({ source: 'tray' });
+      expect(navigate).toHaveBeenCalledWith('/enterprise/version-update');
+      expect(openListener).not.toHaveBeenCalled();
     } finally {
       window.removeEventListener('aionui-open-update-modal', openListener);
     }

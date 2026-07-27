@@ -7,6 +7,8 @@
 import fs from 'fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const electronFetchMock = vi.hoisted(() => vi.fn());
+
 vi.mock('@office-ai/platform', () => ({
   bridge: {
     buildProvider: vi.fn(() => {
@@ -41,6 +43,9 @@ vi.mock('electron', () => ({
     getPath: vi.fn(() => '/tmp/aionui-update-dedupe-test'),
     exit: vi.fn(),
     isPackaged: true,
+  },
+  net: {
+    fetch: electronFetchMock,
   },
 }));
 
@@ -107,10 +112,8 @@ const getDownloadHandlers = async () => {
 describe('updateBridge manual download dedupe', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => new Promise<Response>(() => {}))
-    );
+    electronFetchMock.mockReset();
+    electronFetchMock.mockImplementation(() => new Promise<Response>(() => {}));
   });
 
   afterEach(() => {
@@ -142,18 +145,15 @@ describe('updateBridge manual download dedupe', () => {
 
   it('creates a new manual download after the prior matching task reaches a terminal state', async () => {
     fs.mkdirSync('/tmp/aionui-update-dedupe-test', { recursive: true });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ 'content-length': '0' }),
-        body: {
-          getReader: () => ({
-            read: async () => ({ done: true, value: undefined }),
-          }),
-        },
-      })
-    );
+    electronFetchMock.mockResolvedValue({
+      ok: true,
+      headers: new Headers({ 'content-length': '0' }),
+      body: {
+        getReader: () => ({
+          read: async () => ({ done: true, value: undefined }),
+        }),
+      },
+    });
 
     const handler = await getDownloadHandler();
     const request = {
@@ -187,17 +187,14 @@ describe('updateBridge manual download dedupe', () => {
 
   it('cancels an active manual download by download id and clears its dedupe slot', async () => {
     fs.mkdirSync('/tmp/aionui-update-dedupe-test', { recursive: true });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((_url: string, init?: RequestInit) => {
-        const signal = init?.signal;
-        return new Promise<Response>((_resolve, reject) => {
-          signal?.addEventListener('abort', () => {
-            reject(new DOMException('aborted', 'AbortError'));
-          });
+    electronFetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+      const signal = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(new DOMException('aborted', 'AbortError'));
         });
-      })
-    );
+      });
+    });
 
     const { download, cancel, ipcBridge } = await getDownloadHandlers();
     const request = {

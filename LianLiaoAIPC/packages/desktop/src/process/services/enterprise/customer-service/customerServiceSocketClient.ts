@@ -1,7 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import WebSocket from 'ws';
-
 import {
   CUSTOMER_SERVICE_API_BASE_URLS,
   CUSTOMER_SERVICE_RECONNECT_DELAYS_MS,
@@ -20,6 +18,7 @@ import {
   customerServiceServerEnvelopeSchema,
   customerServiceWebSocketTicketSchema,
 } from '@/common/enterprise/customer-service/schemas';
+import { createEnterpriseWebSocket } from '@process/services/enterprise/enterpriseWebSocketFactory';
 
 import { CustomerServiceApiError } from './customerServiceApiClient';
 
@@ -49,7 +48,7 @@ export type CustomerServiceSocketEventListener = (event: CustomerServiceServerEn
 export type CustomerServiceSocketStateListener = (snapshot: CustomerServiceConnectionSnapshot) => void;
 
 const defaultSocketFactory = (url: string): CustomerServiceSocketAdapter => {
-  return new WebSocket(url) as unknown as CustomerServiceSocketAdapter;
+  return createEnterpriseWebSocket(url) as unknown as CustomerServiceSocketAdapter;
 };
 
 const normalizeSocketBaseUrl = (baseUrl: string): string => {

@@ -21,6 +21,7 @@ import { useSettingsViewMode } from '../../settingsViewContext';
 import BrowserNotificationGrant from './BrowserNotificationGrant';
 import DevSettings from './DevSettings';
 import DirInputItem from './DirInputItem';
+import ManualHttpProxySection from './ManualHttpProxySection';
 import PreferenceRow from './PreferenceRow';
 import VoiceInputSection from './VoiceInputSection';
 
@@ -473,6 +474,8 @@ const SystemModalContent: React.FC = () => {
               )}
             </Form>
           </div>
+
+          {isDesktop && <ManualHttpProxySection />}
 
           {/* Voice input (speech-to-text) settings */}
           <VoiceInputSection />

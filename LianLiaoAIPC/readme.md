@@ -1,6 +1,6 @@
 # 链上辽宁·产业云城 AI桌面平台
 
-本目录是链辽桌面端 `LianLiaoAIPC`。操作系统、安装器和系统通知使用完整名称“链上辽宁·产业云城 AI桌面平台”，客户端内的通用 AI 工作区继续称为“链辽AI”。
+本目录是链辽桌面端 `LianLiaoAIPC`。操作系统、安装器和系统通知使用完整名称“链上辽宁·产业云城 AI桌面平台”，客户端内的 AI 功能区名称为“链上辽宁·产业云城AI助手”。
 
 Core 固定从 [zzy1136660162/AI_lianliao Releases](https://github.com/zzy1136660162/AI_lianliao/releases) 获取，并由 [`aioncore-release-lock.json`](./aioncore-release-lock.json) 锁定版本和 SHA256。禁止在正式构建中回退到上游 Release 或 `latest`。
 
@@ -9,6 +9,14 @@ Core 固定从 [zzy1136660162/AI_lianliao Releases](https://github.com/zzy113666
 需要使用当前开发代理时，请在同一个 PowerShell 会话设置 `$env:HTTPS_PROXY='http://127.0.0.1:7897'` 和 `$env:HTTP_PROXY='http://127.0.0.1:7897'`。
 
 Windows x64 正式安装包由根目录 `.github/workflows/lianliao-aipc-release.yml` 构建。手动输入版本必须与本目录 `package.json` 一致；工作流优先发布 `desktop-v<version>` GitHub Release，再删除旧 AIPC Artifact 并尝试上传保留 30 天的当前 Artifact。若 GitHub Artifact 存储额度尚未回收，Release 仍会正常发布，Artifact 步骤只记录警告。当前安装包尚未配置 Windows 代码签名证书，测试安装时可能出现 SmartScreen 提示。
+
+## 手动 HTTP 代理
+
+在桌面端打开“设置 → 系统 → 网络代理”，启用手动 HTTP 代理并填写包含显式端口的完整地址，例如 `http://127.0.0.1:7897`。该配置覆盖 Electron 桌面端发起的 HTTP 请求与下载、生产环境实时 WebSocket，以及 AICore 和其 Agent、MCP、模型请求；`localhost`、整个 `127.0.0.0/8` IPv4 环回网段和 `::1` 始终直连。
+
+保存只会持久化配置，应用会询问是否立即重启；确认并完成重启后新配置才统一生效。关闭手动代理并重启后，应用恢复到本次启动时捕获的系统代理与环境变量基线。
+
+第一版仅支持 `http://` 和 `https://` 代理地址，且必须显式填写端口；不支持代理认证、PAC、SOCKS，也不允许地址包含路径、query 或 hash。代理配置仅保存在本地，不会上传到账号。
 
 > 本项目基于开源 AionUi/AionCore 持续开发。内部 `@aionui/*` 包名、`aioncore.exe` 和协议兼容标识会按迁移策略保留，不代表系统品牌仍使用 AionUi。
 

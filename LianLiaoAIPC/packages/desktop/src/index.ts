@@ -13,7 +13,7 @@ import { captureBackendStartupFailure, initSentry, scheduleStartupLogReport, set
 initSentry();
 
 import './process/utils/configureConsoleLog';
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, session } from 'electron';
 import fixPath from 'fix-path';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -34,6 +34,7 @@ import './process/bridge/feedbackBridge';
 import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
 import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@process/services/i18n';
+import { initializeManualHttpProxyForStartup } from '@process/services/network-proxy/manualHttpProxyRuntime';
 import { setupApplicationMenu } from './process/utils/appMenu';
 import { attachDevToolsShortcutToWindow, isDevToolsEnabled } from './process/utils/devToolsPolicy';
 import { startWebHost } from '@aionui/web-host';
@@ -91,9 +92,7 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', (_event, argv, _workingDirectory, additionalData) => {
     // Prefer additionalData (reliable on all platforms), fallback to argv scan
-    const deepLinkUrl =
-      (additionalData as { deepLinkUrl?: string })?.deepLinkUrl ||
-      argv.find(isSupportedDeepLinkUrl);
+    const deepLinkUrl = (additionalData as { deepLinkUrl?: string })?.deepLinkUrl || argv.find(isSupportedDeepLinkUrl);
     if (deepLinkUrl) {
       handleDeepLinkUrl(deepLinkUrl);
     }
@@ -584,6 +583,17 @@ const handleAppReady = async (): Promise<void> => {
     app.exit(1);
     return;
   }
+
+  let storedProxyConfig: unknown;
+  try {
+    storedProxyConfig = await ProcessConfig.get('system.httpProxy');
+  } catch {
+    console.warn('[AionUi] Failed to read manual HTTP proxy configuration; proxy disabled.');
+    storedProxyConfig = { enabled: false, url: '' };
+  }
+  await initializeManualHttpProxyForStartup(storedProxyConfig, session.defaultSession, (message) =>
+    console.warn(message)
+  );
 
   const debugBackendStartupFailure = resolveDebugBackendStartupFailure();
   if (debugBackendStartupFailure) {

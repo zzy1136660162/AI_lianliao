@@ -7,11 +7,20 @@
 import type { BrowserWindow } from 'electron';
 import { app } from 'electron';
 import { ipcBridge } from '@/common';
+import type {
+  ManualHttpProxyConfig,
+  ManualHttpProxyResult,
+  SaveManualHttpProxyRequest,
+} from '@/common/networkProxy/contracts';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { getZoomFactor, setZoomFactor } from '@process/utils/zoom';
 import { getCdpStatus, updateCdpConfig } from '@process/utils/configureChromium';
 import { isDevToolsEnabled } from '@process/utils/devToolsPolicy';
 import { getGpuStatus, setGpuUserOverride } from '@process/utils/gpuRecovery';
+import {
+  ManualHttpProxyValidationError,
+  normalizeManualHttpProxyConfig,
+} from '@process/services/network-proxy/manualHttpProxy';
 import { initApplicationBridgeCore } from './applicationBridgeCore';
 import type { IOpenClawPrepareStatus, IStartOnBootStatus } from '@/common/adapter/ipcBridge';
 import { restartApplication } from './restartApplication';
@@ -20,7 +29,88 @@ import { getOpenClawFirstRunPrepareStatus, prepareOpenClawFirstRun } from '@proc
 let mainWindowRef: BrowserWindow | null = null;
 
 const START_ON_BOOT_UNSUPPORTED_MESSAGE = 'Start on boot is only available in packaged macOS and Windows apps.';
+const INVALID_STORED_PROXY_WARNING = '[ApplicationBridge] Ignored invalid stored manual HTTP proxy configuration.';
+const PROXY_PERSISTENCE_FAILURE_MESSAGE = 'Failed to persist manual HTTP proxy configuration.';
 export const START_ON_BOOT_WINDOWS_ARG = '--start-on-boot';
+
+export type ManualHttpProxyStorage = {
+  get: (key: 'system.httpProxy') => Promise<unknown>;
+  set: (key: 'system.httpProxy', value: ManualHttpProxyConfig) => Promise<unknown>;
+};
+
+export type ManualHttpProxyApplicationBridge = {
+  getManualHttpProxy: Pick<typeof ipcBridge.application.getManualHttpProxy, 'provider'>;
+  saveManualHttpProxy: Pick<typeof ipcBridge.application.saveManualHttpProxy, 'provider'>;
+};
+
+const disabledManualHttpProxyConfig = (): ManualHttpProxyConfig => ({
+  enabled: false,
+  url: '',
+});
+
+/** Loads and validates the persisted manual proxy without exposing corrupt values. */
+export async function loadManualHttpProxyConfig(
+  storage: ManualHttpProxyStorage,
+  warn: (message: string) => void = (message) => console.warn(message)
+): Promise<ManualHttpProxyConfig> {
+  try {
+    const storedConfig = await storage.get('system.httpProxy');
+    if (storedConfig === undefined) {
+      return disabledManualHttpProxyConfig();
+    }
+    return normalizeManualHttpProxyConfig(storedConfig);
+  } catch {
+    warn(INVALID_STORED_PROXY_WARNING);
+    return disabledManualHttpProxyConfig();
+  }
+}
+
+/** Validates and persists a manual proxy for activation after application restart. */
+export async function saveManualHttpProxyConfig(
+  storage: ManualHttpProxyStorage,
+  request: SaveManualHttpProxyRequest
+): Promise<ManualHttpProxyResult> {
+  let config: ManualHttpProxyConfig;
+  try {
+    config = normalizeManualHttpProxyConfig(request);
+  } catch (error) {
+    if (error instanceof ManualHttpProxyValidationError) {
+      return {
+        success: false,
+        code: 'INVALID_PROXY_URL',
+        reason: error.reason,
+        message: error.message,
+      };
+    }
+    throw error;
+  }
+
+  try {
+    await storage.set('system.httpProxy', config);
+  } catch {
+    return {
+      success: false,
+      code: 'PERSISTENCE_FAILED',
+      reason: 'PERSISTENCE_FAILED',
+      message: PROXY_PERSISTENCE_FAILURE_MESSAGE,
+    };
+  }
+
+  return {
+    success: true,
+    config,
+    restartRequired: true,
+  };
+}
+
+/** Registers the manual proxy providers against an injectable bridge boundary. */
+export function registerManualHttpProxyProviders(
+  applicationBridge: ManualHttpProxyApplicationBridge,
+  storage: ManualHttpProxyStorage
+): void {
+  applicationBridge.getManualHttpProxy.provider(() => loadManualHttpProxyConfig(storage));
+  applicationBridge.saveManualHttpProxy.provider((request) => saveManualHttpProxyConfig(storage, request));
+}
 
 const isStartOnBootSupported = (): boolean => {
   return app.isPackaged && (process.platform === 'darwin' || process.platform === 'win32');
@@ -104,6 +194,8 @@ const emitOpenClawPrepareStatus = (status: IOpenClawPrepareStatus) => {
 export function initApplicationBridge(): void {
   // Platform-agnostic handlers: systemInfo, updateSystemInfo, getPath
   initApplicationBridgeCore();
+
+  registerManualHttpProxyProviders(ipcBridge.application, ProcessConfig);
 
   ipcBridge.application.restart.provider(async () => {
     // Backend subprocess shutdown is handled by backendManager.stop() in the

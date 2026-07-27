@@ -116,6 +116,11 @@ Every domain crate must follow:
 
 New subprocess spawn sites must use `aionui_runtime::Builder::agent(program)` or `aionui_runtime::Builder::clean_cli(program)`. Do NOT use raw `tokio::process::Command`. See [ARCHITECTURE.md § Runtime Infrastructure](./ARCHITECTURE.md#runtime-infrastructure) for details.
 
+When merging a login-shell environment for an Agent or MCP subprocess, proxy
+families inherited by the current Core process (`HTTP_PROXY`, `HTTPS_PROXY`,
+`ALL_PROXY`, `NO_PROXY`, including lowercase variants) must remain authoritative.
+Do not let stale shell values override the desktop user's selected manual proxy.
+
 ### Pushing Code
 
 Always use `just push` instead of `git push`.

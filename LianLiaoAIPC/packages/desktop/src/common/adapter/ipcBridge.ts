@@ -14,6 +14,11 @@
 
 import type { IConfirmation } from '@/common/chat/chatLib';
 import type { AcpSlashCommandApiItem } from '@/common/chat/slash/types';
+import type {
+  ManualHttpProxyConfig,
+  ManualHttpProxyResult,
+  SaveManualHttpProxyRequest,
+} from '@/common/networkProxy/contracts';
 import { bridge } from '@office-ai/platform';
 import type { OpenDialogOptions } from 'electron';
 import type {
@@ -490,6 +495,10 @@ export const application = {
     })
   ),
   getPath: bridge.buildProvider<string, { name: 'desktop' | 'home' | 'downloads' }>('app.get-path'),
+  getManualHttpProxy: bridge.buildProvider<ManualHttpProxyConfig, void>('app.get-manual-http-proxy'),
+  saveManualHttpProxy: bridge.buildProvider<ManualHttpProxyResult, SaveManualHttpProxyRequest>(
+    'app.save-manual-http-proxy'
+  ),
   // Electron-local: copies cache dir + persists to ProcessEnv, paired with restart.
   // The backend reads AIONUI_*_DIR env vars on boot, so it does not own this config.
   updateSystemInfo: bridge.buildProvider<void, { cacheDir: string; workDir: string; logDir?: string }>(

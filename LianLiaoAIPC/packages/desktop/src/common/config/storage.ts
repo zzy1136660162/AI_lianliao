@@ -6,6 +6,7 @@
 
 import type { SpeechToTextConfig } from '@/common/types/provider/speech';
 import type { Theme } from '@/common/theme/types';
+import type { ManualHttpProxyConfig } from '@/common/networkProxy/contracts';
 import { storage } from '@office-ai/platform';
 
 // 系统配置存储
@@ -53,6 +54,8 @@ export interface IConfigStorageRefer {
   'system.keepAwake'?: boolean;
   // Automatically preview newly created Office files in the current workspace
   'system.autoPreviewOfficeFiles'?: boolean;
+  /** Electron-local proxy configuration that must be read before AICore starts. */
+  'system.httpProxy'?: ManualHttpProxyConfig;
   /** First-run OpenClaw CLI/gateway bootstrap state. */
   'openclaw.firstRunPrepare_v1'?: {
     version: 1;

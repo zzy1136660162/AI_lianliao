@@ -16,7 +16,7 @@ import type {
   GitHubReleaseAsset,
 } from '@/common/update/updateTypes';
 import { uuid } from '@/common/utils';
-import { app } from 'electron';
+import { app, net } from 'electron';
 import log from 'electron-log';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -223,7 +223,8 @@ const fetchWithAllowlistedRedirects = async (rawUrl: string, signal: AbortSignal
   for (let i = 0; i <= MAX_REDIRECTS; i++) {
     await assertAllowedUrl(current);
 
-    const res = await fetch(current, {
+    // net.fetch uses Electron's default session, including the user-configured manual proxy.
+    const res = await net.fetch(current, {
       signal,
       redirect: 'manual',
       headers: {
@@ -254,7 +255,7 @@ const fetchGitHubReleases = async (repo: string): Promise<GitHubReleaseApi[]> =>
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 秒超时 / 30 second timeout
 
   try {
-    const res = await fetch(url, {
+    const res = await net.fetch(url, {
       headers: {
         Accept: 'application/vnd.github+json',
         'User-Agent': DEFAULT_USER_AGENT,

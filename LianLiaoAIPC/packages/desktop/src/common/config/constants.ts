@@ -10,8 +10,16 @@
 
 // ===== 文件处理相关常量 =====
 
-/** User-visible AI desktop product name. Do not use it for protocols, storage keys, or package scopes. */
+/** Short AI product name used by notifications, login branding, and existing feature copy. */
 export const AI_PRODUCT_NAME = '链辽AI';
+
+/**
+ * AI workspace title shown in the desktop sidebar and mobile title bar.
+ *
+ * Keep this separate from AI_PRODUCT_NAME: changing the workspace heading must not
+ * silently rename browser notifications, login pages, or protocol client identity.
+ */
+export const AI_WORKSPACE_TITLE = '链上辽宁·产业云城AI助手';
 
 /** 临时文件时间戳分隔符 */
 export const AIONUI_TIMESTAMP_SEPARATOR = '_aionui_';
