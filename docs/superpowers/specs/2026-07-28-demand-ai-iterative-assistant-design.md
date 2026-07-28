@@ -211,6 +211,7 @@ cloud-api 在线上有双实例，会话状态不能只存在 JVM 内存。新�
 - `REQUEST_ID` 唯一，重复请求返回原结果。
 - `VERSION_NO` 使用乐观锁，防止双机或重复点击覆盖会话。
 - 默认会话有效期为七天；过期会话只读，不再调用模型。
+- 默认最多处理二十个 AI 轮次；达到上限后保留表单并转为手工填写，不能继续消耗模型。
 - API Key 不进入会话表、轮次表或日志。
 
 ## 12. API 设计
@@ -277,11 +278,17 @@ cloud-api 在线上有双实例，会话状态不能只存在 JVM 内存。新�
 
 ### POST `/resume`
 
-按 `sessionId` 恢复相同 openId 创建且未过期的会话；响应使用统一会话快照。
+按可选 `sessionId` 恢复相同 openId 创建且未过期的会话；未传时恢复该账号最近一个非终态会话，响应使用统一会话快照。
 
 ### POST `/cancel`
 
 按 `sessionId + version` 将会话改为 `CANCELLED`，不删除审计记录。
+
+### POST `/complete`
+
+现有供需发布接口返回成功后，由 Electron 使用 `sessionId + version + demandId` 将会话幂等标记为
+`SUBMITTED`。如果本次状态同步失败，不回滚已经成功提交审核的供需数据；Electron 在后台重试一次，
+服务端也允许以后根据相同 `demandId` 补记完成状态。
 
 统一响应：
 
