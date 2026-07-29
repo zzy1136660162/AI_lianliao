@@ -202,7 +202,8 @@
     },
     "status": {
       "open": "进行中",
-      "closed": "已结束"
+      "closed": "已结束",
+      "expired": "已过期"
     },
     "columns": {
       "title": "需求名称",
@@ -211,10 +212,19 @@
       "region": "所在地区",
       "address": "详细地址",
       "budget": "预算",
+      "progress": "抢单进度",
+      "remainingDays": "剩余天数",
       "publishedAt": "发布时间",
       "endTime": "截止时间",
       "status": "状态",
       "actions": "操作"
+    },
+    "stats": {
+      "grabbed": "已抢 {{count}} 人",
+      "applied": "已投递 {{count}} 人",
+      "remaining": "剩余 {{count}} 个",
+      "capacity": "需求人数 {{value}}",
+      "daysRemaining": "{{count}} 天"
     },
     "actions": {
       "search": "查询供需",
@@ -222,7 +232,8 @@
       "preview": "快速预览",
       "detail": "查看详情",
       "closePreview": "关闭预览",
-      "back": "返回供需大厅"
+      "back": "返回供需大厅",
+      "publish": "发布供需"
     },
     "preview": {
       "title": "供需快速预览"
@@ -245,6 +256,71 @@
     "errors": {
       "invalidRoute": "供需详情地址无效",
       "invalidRouteDescription": "请返回供需大厅并选择有效记录。"
+    },
+    "publish": {
+      "eyebrow": "辽宁产业供需大厅",
+      "title": "发布供需信息",
+      "description": "选择业务线并完善结构化信息，提交后由平台审核发布。",
+      "typeTitle": "01 / 选择业务线",
+      "typePlaceholder": "请选择供需业务类型",
+      "variantPlaceholder": "请选择子业务类型",
+      "otherGroup": "其他信息",
+      "formTitle": "02 / 完善需求信息",
+      "loadingSchema": "正在加载发布表单",
+      "selectType": "请选择业务类型以生成表单",
+      "actions": {
+        "clear": "清空表单",
+        "submit": "提交审核"
+      },
+      "image": {
+        "action": "上传图片",
+        "hint": "支持 JPG、PNG、WebP、GIF，最多 {{count}} 张",
+        "error": "图片上传失败，请重试。",
+        "uploadedName": "已上传图片"
+      },
+      "ai": {
+        "title": "AI 一键解析",
+        "description": "用自然语言描述需求，AI 会把识别结果填入对应字段，发布前仍可修改。",
+        "placeholder": "例如：需要采购200件不锈钢机加工零件，下月底前交付到沈阳，预算10~20万元……",
+        "action": "一键解析并回填",
+        "parsing": "AI 正在整理需求信息",
+        "applied": "AI 建议已回填",
+        "review": "AI 回填内容仅作为建议，请核对并完善后再提交。"
+      },
+      "aiConversation": {
+        "title": "AI 多轮发布助手",
+        "startTitle": "先描述您要发布的供需信息",
+        "startHint": "AI 会先判断业务类型，不明确时会向您确认，再逐步补齐右侧表单。",
+        "startPlaceholder": "例如：需要采购200件304不锈钢机加工零件，一个月内交付到沈阳……",
+        "startAction": "让 AI 帮我填写",
+        "continueAction": "发送并继续",
+        "currentLine": "当前业务：{{name}}",
+        "discoveringLine": "正在识别业务类型",
+        "completion": "完成度 {{value}}%",
+        "candidateTitle": "请选择最符合的业务类型",
+        "switchTitle": "AI 建议切换业务类型",
+        "rejectSwitch": "保留当前类型",
+        "warningTitle": "需要您留意",
+        "aiFilled": "AI 填写",
+        "manualFilled": "已手动修改",
+        "retry": "重试",
+        "reviewTitle": "主要信息已整理",
+        "reviewHint": "请检查右侧表单，确认无误后手动提交审核；AI 不会自动发布。",
+        "cancel": "取消本次 AI 填写",
+        "unavailable": "AI 助手暂时不可用，已填写内容不会丢失。"
+      },
+      "success": "提交成功，正在等待平台审核",
+      "validation": {
+        "required": "请填写{{label}}",
+        "minLength": "{{label}}至少填写{{count}}个字"
+      },
+      "errors": {
+        "types": "暂时无法加载可发布的业务类型，请稍后重试。",
+        "schema": "暂时无法加载发布表单，请稍后重试。",
+        "description": "请先输入至少5个字的需求描述。",
+        "ai": "AI解析暂时不可用，您仍可手动填写。",
+        "publish": "发布失败，请检查表单后重试。"
+      }
     }
   },
   "dashboard": {
@@ -553,7 +629,7 @@
     "contactPermissionNote": "仅在接口确认项目已购买后展示联系方式；本页面不提供拨号或解锁操作。",
     "sections": {
       "profile": "项目基本信息",
-      "contact": "已授权主体与联系方式",
+      "contact": "项目主体与联系方式",
       "composition": "建设内容",
       "equipment": "设备购置需求",
       "materials": "原材料采购需求"
@@ -569,8 +645,8 @@
       "address": "联系地址"
     },
     "locked": {
-      "title": "项目主体信息受限",
-      "description": "接口尚未确认查看权限，建设单位、联系人、电话与地址已隐藏；本页面不会自动解锁。",
+      "title": "尚未解锁联系方式",
+      "description": "解锁后可查看项目主体与联系方式。",
       "enterpriseInvestor": "某企业投资",
       "governmentInvestor": "政府投资",
       "defaultNature": "新建"
@@ -582,6 +658,11 @@
     "error": {
       "title": "暂时无法加载项目详情",
       "description": "企业服务未返回有效的项目档案，请重试。"
+    },
+    "unlock": {
+      "action": "立即解锁",
+      "membershipRequired": "当前查看权益已用完，请升级会员后继续。",
+      "failed": "暂时无法解锁联系方式，请重试。"
     }
   },
   "consultation": {

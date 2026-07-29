@@ -96,55 +96,71 @@ const drillResponse = (): EnterpriseResponse => ({
   ],
 });
 
-const companyResponse = (name: string): EnterpriseResponse => ({
-  operation: 'company.list',
-  data: { list: [{ companyId: '11', name, industry: 'Equipment' }], pageNum: 1, pageSize: 5, pages: 1, total: 1 },
-});
+type UnifiedResponseOptions = {
+  companyName?: string;
+  productName?: string;
+  projectName?: string;
+  projectId?: string;
+  includeCompany?: boolean;
+  includeProduct?: boolean;
+  includeProject?: boolean;
+};
 
-const productResponse = (name: string): EnterpriseResponse => ({
-  operation: 'product.list',
-  data: {
-    list: [
-      {
-        productId: '22',
-        companyId: '11',
-        name,
-        companyName: 'Liaoning Precision Equipment',
-        phone: '138****0000',
-      },
-    ],
-    pageNum: 1,
-    pageSize: 5,
-    pages: 1,
-    total: 1,
-  },
-});
-
-const projectResponse = (projectName: string, hpInfoId = '33'): EnterpriseResponse => ({
-  operation: 'project.list',
-  data: {
-    list: [
-      {
-        hpInfoId,
-        projectName,
-        constructionUnit: 'Confidential Group',
-        province: 'Liaoning',
-        constructionNature: 'New build',
-      },
-    ],
-    pageNum: 1,
-    pageSize: 5,
-    pages: 1,
-    total: 1,
-  },
-});
+/** Mirrors the single Solr-backed response now shared with the H5 global search. */
+const unifiedResponse = ({
+  companyName = 'Search company',
+  productName = 'Search product',
+  projectName = 'enterprise.projectDetail.lockedProjectTitle',
+  projectId = '33',
+  includeCompany = true,
+  includeProduct = true,
+  includeProject = true,
+}: UnifiedResponseOptions = {}): EnterpriseResponse => {
+  const items = [
+    ...(includeCompany
+      ? [
+          {
+            resourceType: 'COMPANY' as const,
+            businessId: '11',
+            title: companyName,
+            industry: 'Equipment',
+            tags: [],
+          },
+        ]
+      : []),
+    ...(includeProduct
+      ? [
+          {
+            resourceType: 'PRODUCT' as const,
+            businessId: '22',
+            title: productName,
+            subtitle: 'Liaoning Precision Equipment',
+            tags: [],
+          },
+        ]
+      : []),
+    ...(includeProject
+      ? [
+          {
+            resourceType: 'PROJECT' as const,
+            businessId: projectId,
+            title: projectName,
+            subtitle: 'Liaoning',
+            tags: [],
+          },
+        ]
+      : []),
+  ];
+  return {
+    operation: 'unified.search',
+    data: { items, pageNum: 1, pageSize: 15, total: items.length },
+  };
+};
 
 const defaultRequest = vi.fn<EnterpriseClient['request']>((request: EnterpriseRequest) => {
   if (request.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
   if (request.operation === 'project.drill') return Promise.resolve(drillResponse());
-  if (request.operation === 'company.list') return Promise.resolve(companyResponse('Search company'));
-  if (request.operation === 'product.list') return Promise.resolve(productResponse('Search product'));
-  if (request.operation === 'project.list') return Promise.resolve(projectResponse('RAW confidential project'));
+  if (request.operation === 'unified.search') return Promise.resolve(unifiedResponse());
   return Promise.reject(new Error('unexpected operation'));
 });
 
@@ -244,16 +260,8 @@ describe('enterprise dashboard', () => {
     await act(async () => vi.advanceTimersByTime(1));
 
     expect(defaultRequest).toHaveBeenCalledWith({
-      operation: 'company.list',
-      payload: { keyword: 'ab', pageNum: 1, pageSize: 5 },
-    });
-    expect(defaultRequest).toHaveBeenCalledWith({
-      operation: 'product.list',
-      payload: { keyword: 'ab', pageNum: 1, pageSize: 5 },
-    });
-    expect(defaultRequest).toHaveBeenCalledWith({
-      operation: 'project.list',
-      payload: { keyword: 'ab', pageNum: 1, pageSize: 5 },
+      operation: 'unified.search',
+      payload: { keyword: 'ab', pageNum: 1, pageSize: 15, enableGroupTop: true, groupTopN: 5 },
     });
   });
 
@@ -274,13 +282,19 @@ describe('enterprise dashboard', () => {
     expect(input).toHaveAttribute('aria-controls', listbox.id);
   });
 
-  it('keeps partial results, reports the failed group and routes clicks to real details', async () => {
+  it('keeps empty resource groups and routes unified results to real details', async () => {
     const request = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
       if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
-      if (operation.operation === 'company.list') return Promise.resolve(companyResponse('Clickable company'));
-      if (operation.operation === 'product.list') return Promise.reject(new Error('raw-product-failure'));
-      if (operation.operation === 'project.list') return Promise.resolve(projectResponse('RAW secret project'));
+      if (operation.operation === 'unified.search') {
+        return Promise.resolve(
+          unifiedResponse({
+            companyName: 'Clickable company',
+            includeProduct: false,
+            projectName: 'enterprise.projectDetail.lockedProjectTitle',
+          })
+        );
+      }
       return Promise.reject(new Error('unexpected operation'));
     });
     renderDashboard(createClient(request));
@@ -290,8 +304,7 @@ describe('enterprise dashboard', () => {
     const companyResult = await screen.findByRole('option', { name: /Clickable company/ }, SEARCH_WAIT_OPTIONS);
     const listbox = companyResult.closest('[role="listbox"]') as HTMLElement;
     expect(companyResult).toBeInTheDocument();
-    expect(within(listbox).getByText('enterprise.dashboard.search.groupError')).toBeInTheDocument();
-    expect(within(listbox).queryByText('RAW secret project')).toBeNull();
+    expect(within(listbox).getByText('enterprise.dashboard.search.groupEmpty')).toBeInTheDocument();
 
     await userEvent.click(companyResult);
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/11');
@@ -353,19 +366,14 @@ describe('enterprise dashboard', () => {
     const nextRequest = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
       if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
-      if (operation.operation === 'company.list') return Promise.resolve(companyResponse('Only company'));
-      if (operation.operation === 'product.list') {
-        return Promise.resolve({
-          operation: 'product.list',
-          data: { list: [], pageNum: 1, pageSize: 5, pages: 0, total: 0 },
-        });
-      }
-      if (operation.operation === 'project.list') {
-        return Promise.resolve({
-          operation: 'project.list',
-          data: { list: [], pageNum: 1, pageSize: 5, pages: 0, total: 0 },
-        });
-      }
+      if (operation.operation === 'unified.search')
+        return Promise.resolve(
+          unifiedResponse({
+            companyName: 'Only company',
+            includeProduct: false,
+            includeProject: false,
+          })
+        );
       return Promise.reject(new Error('unexpected operation'));
     });
     const view = renderDashboard(initialClient);
@@ -397,14 +405,20 @@ describe('enterprise dashboard', () => {
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/projects/33');
   });
 
-  it('shows an empty state when all three successful groups contain no records', async () => {
+  it('shows an empty state when unified search contains no records', async () => {
     const request = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
       if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
-      return Promise.resolve({
-        operation: operation.operation,
-        data: { list: [], pageNum: 1, pageSize: 5, pages: 0, total: 0 },
-      } as EnterpriseResponse);
+      if (operation.operation === 'unified.search') {
+        return Promise.resolve(
+          unifiedResponse({
+            includeCompany: false,
+            includeProduct: false,
+            includeProject: false,
+          })
+        );
+      }
+      return Promise.reject(new Error('unexpected operation'));
     });
     renderDashboard(createClient(request));
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
@@ -419,16 +433,19 @@ describe('enterprise dashboard', () => {
   });
 
   it('discards stale search results when the query changes during a request', async () => {
-    const firstCompany = deferred<EnterpriseResponse>();
+    const firstSearch = deferred<EnterpriseResponse>();
     const request = vi.fn<EnterpriseClient['request']>((operation) => {
       if (operation.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
       if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
-      if (operation.operation === 'company.list' && operation.payload.keyword === 'ab') return firstCompany.promise;
-      if (operation.operation === 'company.list') return Promise.resolve(companyResponse('Latest company'));
-      if (operation.operation === 'product.list')
-        return Promise.resolve(productResponse(`Product ${operation.payload.keyword}`));
-      if (operation.operation === 'project.list')
-        return Promise.resolve(projectResponse(`Project ${operation.payload.keyword}`));
+      if (operation.operation === 'unified.search' && operation.payload.keyword === 'ab') return firstSearch.promise;
+      if (operation.operation === 'unified.search') {
+        return Promise.resolve(
+          unifiedResponse({
+            companyName: 'Latest company',
+            productName: `Product ${operation.payload.keyword}`,
+          })
+        );
+      }
       return Promise.reject(new Error('unexpected operation'));
     });
     renderDashboard(createClient(request));
@@ -436,12 +453,12 @@ describe('enterprise dashboard', () => {
 
     setSearchValue(input, 'ab');
     await waitFor(
-      () => expect(request).toHaveBeenCalledWith(expect.objectContaining({ operation: 'company.list' })),
+      () => expect(request).toHaveBeenCalledWith(expect.objectContaining({ operation: 'unified.search' })),
       SEARCH_WAIT_OPTIONS
     );
     setSearchValue(input, 'cd');
     expect(await screen.findByRole('option', { name: /Latest company/ }, SEARCH_WAIT_OPTIONS)).toBeInTheDocument();
-    firstCompany.resolve(companyResponse('Stale company'));
+    firstSearch.resolve(unifiedResponse({ companyName: 'Stale company' }));
     await act(async () => undefined);
 
     expect(screen.queryByText('Stale company')).toBeNull();

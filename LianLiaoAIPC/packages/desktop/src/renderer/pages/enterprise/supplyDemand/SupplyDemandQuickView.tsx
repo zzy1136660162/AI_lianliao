@@ -28,10 +28,6 @@ const SupplyDemandQuickView: React.FC<SupplyDemandQuickViewProps> = ({ demand, o
       </div>
       <dl className={styles.factList}>
         <div>
-          <dt>{t('enterprise.supplyDemand.columns.company')}</dt>
-          <dd>{demand.companyName || t('enterprise.supplyDemand.notProvided')}</dd>
-        </div>
-        <div>
           <dt>{t('enterprise.supplyDemand.columns.region')}</dt>
           <dd>
             {[demand.city, demand.district].filter(Boolean).join(' / ') || t('enterprise.supplyDemand.notProvided')}

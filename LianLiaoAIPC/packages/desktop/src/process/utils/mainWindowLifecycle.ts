@@ -9,8 +9,8 @@ import { setApplicationMainWindow } from '../bridge/applicationBridge';
 import { setDeepLinkMainWindow } from './deepLink';
 import { setTrayMainWindow } from './tray';
 
-export const bindMainWindowReferences = (window: BrowserWindow): void => {
-  setTrayMainWindow(window);
+export const bindMainWindowReferences = (window: BrowserWindow, createWindow?: () => void): void => {
+  setTrayMainWindow(window, createWindow);
   setDeepLinkMainWindow(window);
   setApplicationMainWindow(window);
 };

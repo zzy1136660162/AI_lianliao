@@ -36,6 +36,7 @@ export type EnterpriseUserContext = {
   companyId?: string;
   companyName?: string;
   companyLevel?: number;
+  remainingDemandQuota?: number;
   roleId?: string;
 };
 
@@ -103,6 +104,8 @@ export type EnterpriseProductSummary = {
   address?: string;
   contactName?: string;
   phone?: string;
+  companyLevel?: number;
+  vip?: boolean;
   collected?: boolean;
 };
 
@@ -185,7 +188,6 @@ export type EnterpriseDemandSummary = {
   typeId: number;
   typeName: string;
   title: string;
-  companyName?: string;
   city?: string;
   district?: string;
   budget?: string;
@@ -195,6 +197,9 @@ export type EnterpriseDemandSummary = {
   status?: number;
   grabCount?: number;
   remainingGrabCount?: number;
+  remainingDays?: number;
+  capacityLabel?: string;
+  statMode?: 'GRAB' | 'APPLICATION';
   primaryTags: string[];
 };
 
@@ -207,7 +212,6 @@ export type EnterpriseDemandDetailField = {
 };
 
 export type EnterpriseDemandDetail = EnterpriseDemandSummary & {
-  address?: string;
   fields: EnterpriseDemandDetailField[];
 };
 
@@ -215,6 +219,143 @@ export type EnterpriseDemandDetail = EnterpriseDemandSummary & {
 export type EnterpriseDemandTypeOption = {
   typeId: number;
   typeName: string;
+  groupCode?: string;
+  groupName?: string;
+  displayOrder?: number;
+  variantEnabled?: boolean;
+  statMode?: 'GRAB' | 'APPLICATION';
+};
+
+export type EnterpriseDemandPublishInputType =
+  | 'TEXT'
+  | 'TEXTAREA'
+  | 'NUMBER'
+  | 'DATE'
+  | 'SELECT'
+  | 'MULTISELECT'
+  | 'IMAGE';
+
+export type EnterpriseDemandPublishField = {
+  sourceColumn?: string;
+  fieldKey: string;
+  fieldLabel: string;
+  targetKind?: 'BASE' | 'DYNAMIC';
+  groupCode?: string;
+  groupName?: string;
+  groupOrder?: number;
+  displayOrder?: number;
+  inputType: EnterpriseDemandPublishInputType;
+  required: boolean;
+  placeholder?: string;
+  maxLength: number;
+  options: string[];
+  visibleWhenJson?: string;
+  validationJson?: string;
+  defaultValue?: string;
+  controlPropsJson?: string;
+  valueSeparator?: string;
+  aiHint?: string;
+};
+
+export type EnterpriseDemandPublishVariant = {
+  variantCode: string;
+  variantName: string;
+};
+
+export type EnterpriseDemandPublishSchema = {
+  typeId: number;
+  typeName: string;
+  variantCode: string;
+  variants: EnterpriseDemandPublishVariant[];
+  fields: EnterpriseDemandPublishField[];
+};
+
+export type EnterpriseDemandPublishPayload = {
+  typeId: number;
+  variantCode?: string;
+  title: string;
+  summary?: string;
+  province?: string;
+  city?: string;
+  district?: string;
+  address?: string;
+  budget?: string;
+  endTime?: string;
+  fields: Record<string, string>;
+};
+
+export type EnterpriseDemandAiParseResult = {
+  suggestedFields: Record<string, string>;
+  warnings: string[];
+};
+
+export type DemandAiSessionState =
+  | 'DISCOVERING_LINE'
+  | 'CONFIRMING_LINE'
+  | 'COLLECTING_FIELDS'
+  | 'CONFIRMING_SWITCH'
+  | 'REVIEW_READY'
+  | 'SUBMITTED'
+  | 'CANCELLED';
+
+export type DemandAiConversationAction =
+  | 'ASK'
+  | 'CONFIRM_LINE'
+  | 'APPLY_PATCH'
+  | 'CONFIRM_SWITCH'
+  | 'REVIEW_READY'
+  | 'RETRY_AVAILABLE';
+
+export type DemandAiFieldSnapshot = {
+  value: string;
+  source: 'AI' | 'MANUAL' | 'SYSTEM';
+  confidence?: number;
+  updatedTurn: number;
+  locked: boolean;
+};
+
+export type DemandAiLineCandidate = {
+  typeId: number;
+  typeName: string;
+  variantCode?: string;
+  variantName?: string;
+  confidence: number;
+  reason?: string;
+};
+
+export type DemandAiConversationSnapshot = {
+  sessionId: string;
+  version: number;
+  state: DemandAiSessionState;
+  action: DemandAiConversationAction;
+  message: string;
+  lineDecision: {
+    typeId?: number;
+    typeName?: string;
+    variantCode?: string;
+    confidence?: number;
+    candidates: DemandAiLineCandidate[];
+  };
+  fieldPatch: Record<string, string>;
+  formValues: Record<string, DemandAiFieldSnapshot>;
+  missingRequiredFields: string[];
+  warnings: string[];
+  completion: number;
+  submittedDemandId?: string;
+};
+
+export type EnterpriseDemandPublishResult = {
+  demandId: string;
+  typeId: number;
+  reviewStatus: 'PENDING';
+};
+
+export type EnterpriseDemandImage = {
+  url: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 };
 
 export type CompanyListQuery = {
@@ -294,9 +435,80 @@ export type EnterpriseRequest =
   | { operation: 'project.drill'; payload: ProjectDrillQuery }
   | { operation: 'project.list'; payload: ProjectListQuery }
   | { operation: 'project.detail'; payload: { hpInfoId: string } }
+  | {
+      operation: 'contact.acquire';
+      payload: {
+        resourceType: EnterpriseContactResourceType;
+        resourceId: string;
+        /** False performs the H5 project entitlement preflight without consuming phone quota. */
+        consumeQuota?: boolean;
+      };
+    }
+  | { operation: 'project.contactUnlock'; payload: { hpInfoId: string } }
   | { operation: 'demand.types'; payload: Record<string, never> }
   | { operation: 'demand.list'; payload: DemandListQuery }
-  | { operation: 'demand.detail'; payload: { demandId: string; typeId: number } };
+  | { operation: 'demand.detail'; payload: { demandId: string; typeId: number } }
+  | { operation: 'demand.contactStatus'; payload: { demandId: string; typeId: number } }
+  | { operation: 'demand.contactAcquire'; payload: { demandId: string; typeId: number } }
+  | { operation: 'demand.publishTypes'; payload: Record<string, never> }
+  | { operation: 'demand.publishSchema'; payload: { typeId: number; variantCode?: string } }
+  | { operation: 'demand.aiParse'; payload: { typeId: number; variantCode?: string; description: string } }
+  | {
+      operation: 'demand.aiConversation.start';
+      payload: { requestId: string; initialMessage: string };
+    }
+  | {
+      operation: 'demand.aiConversation.turn';
+      payload: { sessionId: string; requestId: string; version: number; message: string };
+    }
+  | {
+      operation: 'demand.aiConversation.confirmLine';
+      payload: {
+        sessionId: string;
+        requestId: string;
+        version: number;
+        typeId: number;
+        variantCode?: string;
+        confirmSwitch?: boolean;
+      };
+    }
+  | {
+      operation: 'demand.aiConversation.patch';
+      payload: {
+        sessionId: string;
+        requestId: string;
+        version: number;
+        fields: Record<string, string>;
+      };
+    }
+  | {
+      operation: 'demand.aiConversation.resume';
+      payload: { sessionId?: string };
+    }
+  | {
+      operation: 'demand.aiConversation.cancel';
+      payload: { sessionId: string; requestId: string; version: number };
+    }
+  | {
+      operation: 'demand.aiConversation.complete';
+      payload: {
+        sessionId: string;
+        requestId: string;
+        version: number;
+        demandId: string;
+      };
+    }
+  | { operation: 'demand.publish'; payload: EnterpriseDemandPublishPayload }
+  | {
+      operation: 'demand.uploadImage';
+      payload: {
+        fileName: string;
+        mimeType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+        bytes: number[];
+      };
+    }
+  | { operation: 'unified.suggest'; payload: { keyword: string } }
+  | { operation: 'unified.search'; payload: UnifiedSearchQuery };
 
 export type EnterpriseResponse =
   | { operation: 'company.list'; data: EnterprisePage<EnterpriseCompanySummary> }
@@ -307,8 +519,33 @@ export type EnterpriseResponse =
   | { operation: 'project.drill'; data: EnterpriseProjectDrillItem[] }
   | { operation: 'project.list'; data: EnterprisePage<EnterpriseProjectSummary> }
   | { operation: 'project.detail'; data: EnterpriseProjectDetail }
+  | { operation: 'contact.acquire'; data: EnterpriseContactAccess }
+  | { operation: 'project.contactUnlock'; data: EnterpriseProjectContactUnlock }
   | { operation: 'demand.types'; data: EnterpriseDemandTypeOption[] }
   | { operation: 'demand.list'; data: EnterprisePage<EnterpriseDemandSummary> }
-  | { operation: 'demand.detail'; data: EnterpriseDemandDetail };
+  | { operation: 'demand.detail'; data: EnterpriseDemandDetail }
+  | { operation: 'demand.contactStatus'; data: DemandContactAccess }
+  | { operation: 'demand.contactAcquire'; data: DemandContactAccess }
+  | { operation: 'demand.publishTypes'; data: EnterpriseDemandTypeOption[] }
+  | { operation: 'demand.publishSchema'; data: EnterpriseDemandPublishSchema }
+  | { operation: 'demand.aiParse'; data: EnterpriseDemandAiParseResult }
+  | { operation: 'demand.aiConversation.start'; data: DemandAiConversationSnapshot }
+  | { operation: 'demand.aiConversation.turn'; data: DemandAiConversationSnapshot }
+  | { operation: 'demand.aiConversation.confirmLine'; data: DemandAiConversationSnapshot }
+  | { operation: 'demand.aiConversation.patch'; data: DemandAiConversationSnapshot }
+  | { operation: 'demand.aiConversation.resume'; data: DemandAiConversationSnapshot }
+  | { operation: 'demand.aiConversation.cancel'; data: DemandAiConversationSnapshot }
+  | { operation: 'demand.aiConversation.complete'; data: DemandAiConversationSnapshot }
+  | { operation: 'demand.publish'; data: EnterpriseDemandPublishResult }
+  | { operation: 'demand.uploadImage'; data: EnterpriseDemandImage }
+  | { operation: 'unified.suggest'; data: string[] }
+  | { operation: 'unified.search'; data: UnifiedSearchResult };
 
 export type EnterpriseOperation = EnterpriseRequest['operation'];
+import type { DemandContactAccess } from './demand-contact/contracts';
+import type {
+  EnterpriseContactAccess,
+  EnterpriseContactResourceType,
+  EnterpriseProjectContactUnlock,
+} from './contact-access/contracts';
+import type { UnifiedSearchQuery, UnifiedSearchResult } from './unified-search/contracts';

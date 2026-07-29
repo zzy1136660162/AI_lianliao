@@ -1,10 +1,12 @@
-import { ArrowRight, BuildingFour, CloseSmall } from '@icon-park/react';
+import { ArrowRight, BuildingFour } from '@icon-park/react';
 import { Button, Tag } from 'antd';
 import React, { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { EnterpriseProductSummary } from '@/common/enterprise/contracts';
+import { CatalogQuickViewPanel } from '@/renderer/pages/enterprise/layout/catalog/CatalogLayout';
+import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 
 import styles from './product-catalog.module.css';
 
@@ -34,27 +36,34 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
   }, [product.productId]);
 
   return (
-    <aside
-      ref={quickViewRef}
-      className={styles.quickView}
-      role='complementary'
+    <CatalogQuickViewPanel
+      panelRef={quickViewRef}
       tabIndex={-1}
-      aria-label={t('enterprise.products.quickView.label')}
+      ariaLabel={t('enterprise.products.quickView.label')}
+      closeAriaLabel={t('enterprise.products.actions.closeQuickView')}
+      eyebrow={t('enterprise.products.quickView.title')}
+      title={product.name}
+      badge={
+        product.companyLevel !== undefined ? (
+          <CompanyMembershipBadge level={product.companyLevel} compact />
+        ) : displayIndustry ? (
+          <Tag>{displayIndustry}</Tag>
+        ) : undefined
+      }
+      onClose={onClose}
+      footer={
+        <div className={styles.quickViewActions}>
+          <p className={styles.quickViewHint}>{t('enterprise.products.quickView.hint')}</p>
+          <Button type='primary' block icon={<ArrowRight />} onClick={() => onViewDetails(product)}>
+            {t('enterprise.products.quickView.action')}
+          </Button>
+          <Link className={styles.companyLink} to={`/enterprise/companies/${encodeURIComponent(product.companyId)}`}>
+            <BuildingFour aria-hidden='true' />
+            {t('enterprise.products.actions.viewCompany')}
+          </Link>
+        </div>
+      }
     >
-      <Button
-        className={styles.quickViewClose}
-        type='text'
-        size='small'
-        icon={<CloseSmall />}
-        aria-label={t('enterprise.products.actions.closeQuickView')}
-        onClick={onClose}
-      />
-      <div className={styles.quickViewHeading}>
-        <span>{t('enterprise.products.quickView.title')}</span>
-        <h2>{product.name}</h2>
-        {displayIndustry ? <Tag>{displayIndustry}</Tag> : null}
-      </div>
-
       <dl className={styles.quickViewFacts}>
         <div>
           <dt>{t('enterprise.products.fields.company')}</dt>
@@ -75,18 +84,7 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
           <dd>{product.summary || missing}</dd>
         </div>
       </dl>
-
-      <p className={styles.quickViewHint}>{t('enterprise.products.quickView.hint')}</p>
-      <div className={styles.quickViewActions}>
-        <Button type='primary' block icon={<ArrowRight />} onClick={() => onViewDetails(product)}>
-          {t('enterprise.products.quickView.action')}
-        </Button>
-        <Link className={styles.companyLink} to={`/enterprise/companies/${encodeURIComponent(product.companyId)}`}>
-          <BuildingFour aria-hidden='true' />
-          {t('enterprise.products.actions.viewCompany')}
-        </Link>
-      </div>
-    </aside>
+    </CatalogQuickViewPanel>
   );
 };
 

@@ -36,9 +36,11 @@ const ProductDetailPage = React.lazy(() => import('@renderer/pages/enterprise/pr
 const ProjectPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectPage'));
 const ProjectDetailPage = React.lazy(() => import('@renderer/pages/enterprise/projects/ProjectDetailPage'));
 const SupplyDemandListPage = React.lazy(() => import('@renderer/pages/enterprise/supplyDemand/SupplyDemandListPage'));
+const PublishDemandPage = React.lazy(() => import('@renderer/pages/enterprise/supplyDemand/Publish'));
 const SupplyDemandDetailPage = React.lazy(
   () => import('@renderer/pages/enterprise/supplyDemand/SupplyDemandDetailPage')
 );
+const UnifiedSearchPage = React.lazy(() => import('@renderer/pages/enterprise/search/UnifiedSearchPage'));
 const DashboardPage = React.lazy(() => import('@renderer/pages/enterprise/dashboard/DashboardPage'));
 const CustomerServiceWorkbench = React.lazy(() => import('@renderer/pages/enterprise/customerService'));
 const CustomerConsultationPage = React.lazy(() => import('@renderer/pages/enterprise/customerConsultation'));
@@ -203,7 +205,9 @@ export const PanelRoutes: React.FC<{ layout: React.ReactElement }> = ({ layout }
           <Route path='projects' element={withRouteFallback(ProjectPage)} />
           <Route path='projects/:hpInfoId' element={withRouteFallback(ProjectDetailPage)} />
           <Route path='supply-demand' element={withRouteFallback(SupplyDemandListPage)} />
+          <Route path='supply-demand/publish' element={withRouteFallback(PublishDemandPage)} />
           <Route path='supply-demand/:typeId/:demandId' element={withRouteFallback(SupplyDemandDetailPage)} />
+          <Route path='search' element={withRouteFallback(UnifiedSearchPage)} />
           <Route path='notifications' element={withRouteFallback(DesktopNotificationCenterPage)} />
           <Route path='version-update' element={withRouteFallback(VersionUpdatePage)} />
           <Route

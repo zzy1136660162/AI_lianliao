@@ -63,7 +63,8 @@ const page = <T,>(list: T[], pageNum: number, pageSize: number) => ({
   total: list.length,
 });
 
-const assertNeverRequest = (_request: never): never => {
+// This workbench fake intentionally supports only routes exercised by the integration flow.
+const throwUnsupportedRequest = (_request: EnterpriseRequest): never => {
   throw new Error('Unsupported enterprise fake operation');
 };
 
@@ -124,7 +125,6 @@ const demandSummary = {
   typeId: 6,
   typeName: 'Packaging service',
   title: 'Integration packaging requirement',
-  companyName: COMPANY_NAME,
   city: 'Shenyang',
   district: 'Hunnan',
   budget: 'Negotiable',
@@ -228,6 +228,18 @@ const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
           purchased: false,
         },
       };
+    case 'project.contactUnlock':
+      return { operation: request.operation, data: { purchased: true, inserted: true } };
+    case 'contact.acquire':
+      return {
+        operation: request.operation,
+        data: {
+          allowed: false,
+          errType: 6,
+          message: 'Integration quota exhausted',
+          actionUrl: '',
+        },
+      };
     case 'demand.types':
       return {
         operation: request.operation,
@@ -243,12 +255,62 @@ const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
         operation: request.operation,
         data: {
           ...demandSummary,
-          address: 'Public industrial park address',
           fields: [{ key: 'packingType', label: 'Packaging type', value: 'Carton', valueType: 'TEXT' }],
         },
       };
+    case 'demand.contactStatus':
+      return {
+        operation: request.operation,
+        data: {
+          state: 'PAYMENT_REQUIRED',
+          canAcquire: false,
+          canUpgrade: true,
+          contact: null,
+        },
+      };
+    case 'demand.contactAcquire':
+      return {
+        operation: request.operation,
+        data: {
+          state: 'UNLOCKED',
+          canAcquire: false,
+          canUpgrade: false,
+          contact: { contactPhone: PRIVATE_PROJECT_PHONE },
+        },
+      };
+    case 'unified.suggest':
+      return { operation: request.operation, data: ['Integration'] };
+    case 'unified.search':
+      return {
+        operation: request.operation,
+        data: {
+          total: 2,
+          pageNum: request.payload.pageNum,
+          pageSize: request.payload.pageSize,
+          items: [
+            {
+              resourceType: 'COMPANY',
+              businessId: companySummary.companyId,
+              title: companySummary.name,
+              summary: companySummary.businessSummary,
+              city: companySummary.city,
+              district: companySummary.district,
+              tags: [companySummary.industry],
+            },
+            {
+              resourceType: 'PRODUCT',
+              businessId: productSummary.productId,
+              title: productSummary.name,
+              summary: productSummary.summary,
+              city: productSummary.city,
+              district: productSummary.district,
+              tags: [productSummary.industry],
+            },
+          ],
+        },
+      };
   }
-  return assertNeverRequest(request);
+  return throwUnsupportedRequest(request);
 };
 
 const rawBridge: EnterpriseRawBridge = {

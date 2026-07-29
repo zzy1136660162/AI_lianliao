@@ -56,6 +56,8 @@ const PRODUCT_FIELD_RULES = [
   ['address', 'string'],
   ['contactName', 'string'],
   ['phone', 'string'],
+  ['companyLevel', 'finiteNumber'],
+  ['vip', 'boolean'],
   ['collected', 'boolean'],
 ] as const satisfies readonly EnterpriseDataFieldRule[];
 
@@ -199,10 +201,20 @@ export const loadProductDetail = async (
 
 export const useProductCatalog = (
   client: Pick<EnterpriseClient, 'request'>,
-  initialPageSize = 20
+  initial: number | ProductListQuery = 20
 ): ProductCatalogState => {
-  const [filters, setFilters] = useState<ProductFilters>({});
-  const [pagination, setPagination] = useState<ProductPagination>({ pageNum: 1, pageSize: initialPageSize });
+  const initialQuery = typeof initial === 'number' ? undefined : initial;
+  const [filters, setFilters] = useState<ProductFilters>(() => ({
+    keyword: initialQuery?.keyword,
+    industry: initialQuery?.industry,
+    province: initialQuery?.province,
+    city: initialQuery?.city,
+    district: initialQuery?.district,
+  }));
+  const [pagination, setPagination] = useState<ProductPagination>({
+    pageNum: initialQuery?.pageNum ?? 1,
+    pageSize: initialQuery?.pageSize ?? (typeof initial === 'number' ? initial : 20),
+  });
   const [data, setData] = useState<EnterprisePage<EnterpriseProductSummary> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRetainingData, setIsRetainingData] = useState(false);

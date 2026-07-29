@@ -1,14 +1,21 @@
 import { Left, Lock } from '@icon-park/react';
 import { Alert, Button, Card, Tag } from 'antd';
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
+import EnterpriseContactAccessPanel from '@/renderer/pages/enterprise/contact/EnterpriseContactAccessPanel';
+import MembershipUpgradeModal from '@/renderer/pages/enterprise/contact/MembershipUpgradeModal';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
-import { displayProjectName, useProjectDetail } from './projectData';
+import {
+  displayProjectName,
+  ProjectContactPermissionError,
+  unlockProjectContact,
+  useProjectDetail,
+} from './projectData';
 import styles from './project-workspace.module.css';
 
 export type ProjectDetailPageProps = { client?: EnterpriseClient };
@@ -19,6 +26,28 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
   const navigate = useNavigate();
   const detail = useProjectDetail(client, hpInfoId);
   const missing = t('enterprise.projects.missing');
+  const [unlocking, setUnlocking] = useState(false);
+  const [unlockError, setUnlockError] = useState('');
+  const [membershipOpen, setMembershipOpen] = useState(false);
+
+  const unlock = async () => {
+    if (!hpInfoId || unlocking) return;
+    setUnlocking(true);
+    setUnlockError('');
+    try {
+      await unlockProjectContact(client, hpInfoId);
+      detail.retry();
+    } catch (error) {
+      if (error instanceof ProjectContactPermissionError && error.membershipRequired) {
+        setUnlockError(error.detail || t('enterprise.projectDetail.unlock.membershipRequired'));
+        setMembershipOpen(true);
+      } else {
+        setUnlockError(t('enterprise.projectDetail.unlock.failed'));
+      }
+    } finally {
+      setUnlocking(false);
+    }
+  };
 
   const renderContent = () => {
     if (detail.isInvalidId) {
@@ -74,13 +103,18 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
 
         {!purchased ? (
           <Alert
-            type='warning'
+            type='info'
             showIcon
             icon={<Lock />}
             title={t('enterprise.projectDetail.locked.title')}
-            description={t('enterprise.projectDetail.locked.description')}
+            action={
+              <Button type='primary' loading={unlocking} onClick={() => void unlock()}>
+                {t('enterprise.projectDetail.unlock.action')}
+              </Button>
+            }
           />
         ) : null}
+        {unlockError && !membershipOpen ? <Alert type='error' showIcon title={unlockError} /> : null}
 
         <div className={styles.detailColumns}>
           <Card title={t('enterprise.projectDetail.sections.profile')} variant='outlined'>
@@ -93,24 +127,40 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
               ))}
             </dl>
           </Card>
-          {purchased ? (
-            <Card title={t('enterprise.projectDetail.sections.contact')} variant='outlined'>
-              <dl className={styles.detailFacts}>
-                {[
-                  ['constructionUnit', project.constructionUnit],
-                  ['contactName', project.contactName],
-                  ['phone', project.phone],
-                  ['address', project.address],
-                ].map(([key, value]) => (
-                  <div key={key}>
-                    <dt>{t(`enterprise.projectDetail.fields.${key}`)}</dt>
-                    <dd>{value || missing}</dd>
-                  </div>
-                ))}
-              </dl>
-              <p className={styles.permissionNote}>{t('enterprise.projectDetail.contactPermissionNote')}</p>
-            </Card>
-          ) : null}
+          <Card title={t('enterprise.projectDetail.sections.contact')} variant='outlined'>
+            <dl className={styles.detailFacts}>
+              {[
+                ['constructionUnit', project.constructionUnit],
+                ['contactName', project.contactName],
+                ['phone', project.phone],
+                ['address', project.address],
+              ].map(([key, value]) => (
+                <div key={key}>
+                  <dt>{t(`enterprise.projectDetail.fields.${key}`)}</dt>
+                  <dd aria-label={!purchased ? t('enterprise.projectDetail.locked.title') : undefined}>
+                    <span
+                      className={!purchased ? styles.protectedContactValue : undefined}
+                      aria-hidden={!purchased || undefined}
+                      data-protected={!purchased ? 'true' : undefined}
+                    >
+                      {value || missing}
+                    </span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {purchased ? (
+              <>
+                <EnterpriseContactAccessPanel
+                  client={client}
+                  resourceType='PROJECT'
+                  resourceId={project.hpInfoId}
+                  maskedPhone={project.phone}
+                />
+                <p className={styles.permissionNote}>{t('enterprise.projectDetail.contactPermissionNote')}</p>
+              </>
+            ) : null}
+          </Card>
         </div>
 
         <div className={styles.detailContentGrid}>
@@ -140,6 +190,15 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
         </div>
       </header>
       <div className={styles.detailContent}>{renderContent()}</div>
+      <MembershipUpgradeModal
+        open={membershipOpen}
+        message={unlockError}
+        onClose={() => setMembershipOpen(false)}
+        onRefreshed={async () => {
+          setMembershipOpen(false);
+          await unlock();
+        }}
+      />
     </section>
   );
 };

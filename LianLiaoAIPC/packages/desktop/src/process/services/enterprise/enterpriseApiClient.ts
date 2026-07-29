@@ -92,7 +92,21 @@ export class EnterpriseApiError extends Error {
   }
 }
 
-type EnterpriseRequestBody = Record<string, string | number | boolean>;
+type EnterpriseRequestBodyValue =
+  | string
+  | number
+  | boolean
+  | readonly string[]
+  | Readonly<Record<string, string>>;
+type EnterpriseRequestBody = Record<string, EnterpriseRequestBodyValue>;
+type ContactCacheEntry = {
+  openId: string;
+  phone: string;
+  targetCompanyId: string;
+  expiresAt: number;
+};
+
+const CONTACT_CACHE_TTL_MS = 10 * 60 * 1000;
 
 const errorMessages: Record<EnterpriseApiErrorCode, string> = {
   INVALID_BASE_URL: 'Enterprise API base URL is not allowed.',
@@ -143,7 +157,11 @@ const defaultTransport: EnterpriseApiTransport = async (url, init) => {
   return net.fetch(url, init);
 };
 
-const setDefined = (target: EnterpriseRequestBody, key: string, value: string | number | boolean | undefined): void => {
+const setDefined = (
+  target: EnterpriseRequestBody,
+  key: string,
+  value: EnterpriseRequestBodyValue | undefined
+): void => {
   if (value !== undefined) target[key] = value;
 };
 
@@ -294,6 +312,10 @@ const serializeProjectRequest = (
     case 'project.detail':
       setDefined(body, 'hpInfoId', request.payload.hpInfoId);
       return body;
+    case 'project.contactUnlock':
+      setDefined(body, 'hpInfoId', request.payload.hpInfoId);
+      setDefined(body, 'companyLevel', context.companyLevel);
+      return body;
   }
 };
 
@@ -303,19 +325,75 @@ const serializeDemandRequest = (
 ): EnterpriseRequestBody => {
   requireRegisteredIdentity(context);
   const body: EnterpriseRequestBody = {};
-  if (request.operation === 'demand.types') return body;
-  if (request.operation === 'demand.detail') {
-    setDefined(body, 'demandId', request.payload.demandId);
-    setDefined(body, 'typeId', request.payload.typeId);
-    return body;
+  switch (request.operation) {
+    case 'demand.types':
+      return body;
+    case 'demand.detail':
+      setDefined(body, 'demandId', request.payload.demandId);
+      setDefined(body, 'typeId', request.payload.typeId);
+      return body;
+    case 'demand.contactStatus':
+    case 'demand.contactAcquire':
+      setDefined(body, 'demandId', request.payload.demandId);
+      setDefined(body, 'typeId', request.payload.typeId);
+      setDefined(body, 'openId', context.openId);
+      return body;
+    case 'demand.publishTypes':
+      return body;
+    case 'demand.publishSchema':
+      setDefined(body, 'typeId', request.payload.typeId);
+      setDefined(body, 'variantCode', request.payload.variantCode);
+      return body;
+    case 'demand.aiParse':
+      setDefined(body, 'typeId', request.payload.typeId);
+      setDefined(body, 'variantCode', request.payload.variantCode);
+      setDefined(body, 'description', request.payload.description);
+      setDefined(body, 'openId', context.openId);
+      return body;
+    case 'demand.aiConversation.start':
+    case 'demand.aiConversation.turn':
+    case 'demand.aiConversation.confirmLine':
+    case 'demand.aiConversation.patch':
+    case 'demand.aiConversation.resume':
+    case 'demand.aiConversation.cancel':
+    case 'demand.aiConversation.complete':
+      Object.assign(body, request.payload);
+      setDefined(body, 'openId', context.openId);
+      return body;
+    case 'demand.publish':
+      Object.assign(body, request.payload);
+      setDefined(body, 'openId', context.openId);
+      return body;
+    case 'demand.uploadImage':
+      return body;
+    case 'demand.list':
+      setDefined(body, 'keyword', request.payload.keyword);
+      setDefined(body, 'typeId', request.payload.typeId);
+      setDefined(body, 'city', request.payload.city);
+      setDefined(body, 'district', request.payload.district);
+      setDefined(body, 'status', request.payload.status);
+      setDefined(body, 'pageNum', request.payload.pageNum);
+      setDefined(body, 'pageSize', request.payload.pageSize);
+      return body;
   }
-  setDefined(body, 'keyword', request.payload.keyword);
-  setDefined(body, 'typeId', request.payload.typeId);
-  setDefined(body, 'city', request.payload.city);
-  setDefined(body, 'district', request.payload.district);
-  setDefined(body, 'status', request.payload.status);
-  setDefined(body, 'pageNum', request.payload.pageNum);
-  setDefined(body, 'pageSize', request.payload.pageSize);
+};
+
+const serializeUnifiedRequest = (
+  request: Extract<EnterpriseRequest, { operation: `unified.${string}` }>,
+  context: EnterpriseUserContext
+): EnterpriseRequestBody => {
+  requireRegisteredIdentity(context);
+  if (request.operation === 'unified.suggest') {
+    return { keyword: request.payload.keyword };
+  }
+  const body: EnterpriseRequestBody = {
+    keyword: request.payload.keyword,
+    pageNum: request.payload.pageNum,
+    pageSize: request.payload.pageSize,
+    enableGroupTop: request.payload.enableGroupTop,
+    groupTopN: request.payload.groupTopN,
+  };
+  setDefined(body, 'resourceTypes', request.payload.resourceTypes);
   return body;
 };
 
@@ -333,11 +411,32 @@ const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserCon
     case 'project.drill':
     case 'project.list':
     case 'project.detail':
+    case 'project.contactUnlock':
       return serializeProjectRequest(request, context);
+    case 'contact.acquire':
+      requireRegisteredIdentity(context);
+      return {};
     case 'demand.types':
     case 'demand.list':
     case 'demand.detail':
+    case 'demand.contactStatus':
+    case 'demand.contactAcquire':
+    case 'demand.publishTypes':
+    case 'demand.publishSchema':
+    case 'demand.aiParse':
+    case 'demand.aiConversation.start':
+    case 'demand.aiConversation.turn':
+    case 'demand.aiConversation.confirmLine':
+    case 'demand.aiConversation.patch':
+    case 'demand.aiConversation.resume':
+    case 'demand.aiConversation.cancel':
+    case 'demand.aiConversation.complete':
+    case 'demand.publish':
+    case 'demand.uploadImage':
       return serializeDemandRequest(request, context);
+    case 'unified.suggest':
+    case 'unified.search':
+      return serializeUnifiedRequest(request, context);
   }
 };
 
@@ -371,6 +470,44 @@ const sanitizeEnvelope = (input: unknown): Record<string, unknown> | undefined =
     return undefined;
   }
 };
+
+const ownRecord = (input: unknown): Record<string, unknown> | undefined => {
+  const record = sanitizeEnvelope(input);
+  return record;
+};
+
+const firstOwnText = (record: Record<string, unknown> | undefined, ...keys: string[]): string | undefined => {
+  if (!record) return undefined;
+  for (const key of keys) {
+    if (!Object.hasOwn(record, key)) continue;
+    const value = record[key];
+    if (typeof value !== 'string') continue;
+    const normalized = value.trim();
+    if (normalized && normalized.length <= 256 && !/\p{C}/u.test(normalized)) return normalized;
+  }
+  return undefined;
+};
+
+const extractContactPhone = (operation: EnterpriseRequest['operation'], responseData: unknown): string | undefined => {
+  const root = ownRecord(responseData);
+  if (!root) return undefined;
+  if (operation === 'company.detail') {
+    return firstOwnText(ownRecord(root.company) ?? root, 'phone', 'PHONE', 'compPhone', 'COMP_PHONE');
+  }
+  if (operation === 'product.detail') {
+    return firstOwnText(root, 'compPhone', 'COMP_PHONE', 'phone', 'PHONE');
+  }
+  if (operation === 'project.detail') {
+    return firstOwnText(root, 'phone', 'PHONE');
+  }
+  return undefined;
+};
+
+const contactCacheKey = (resourceType: string, resourceId: string): string => `${resourceType}:${resourceId}`;
+
+/** Mirrors the bounded legacy boolean values accepted by the response schema. */
+const isAffirmativeBackendValue = (value: unknown): boolean =>
+  value === true || value === 1 || value === '1' || value === 'true' || value === 'Y';
 
 const sanitizeAuthObject = (
   input: unknown,
@@ -570,6 +707,7 @@ export class EnterpriseApiClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly transport: EnterpriseApiTransport;
+  private readonly contactCache = new Map<string, ContactCacheEntry>();
 
   constructor(options: EnterpriseApiClientOptions = {}) {
     const environment = options.environment ?? 'production';
@@ -587,10 +725,32 @@ export class EnterpriseApiClient {
     const parsedRequest = enterpriseRequestSchema.safeParse(request);
     if (!parsedRequest.success) throw apiError('INVALID_REQUEST');
     const validRequest = parsedRequest.data as EnterpriseRequest;
+    if (validRequest.operation === 'contact.acquire') {
+      return this.acquireContact(validRequest, context);
+    }
+    if (validRequest.operation === 'demand.uploadImage') {
+      requireRegisteredIdentity(context);
+      const form = new FormData();
+      form.append('openId', context.openId);
+      const isolatedBytes = Uint8Array.from(validRequest.payload.bytes);
+      form.append(
+        'file',
+        new Blob([isolatedBytes.buffer], { type: validRequest.payload.mimeType }),
+        validRequest.payload.fileName
+      );
+      const responseData = await this.postMultipart(validRequest.operation, form);
+      try {
+        return parseEnterpriseResponse(validRequest.operation, responseData);
+      } catch {
+        throw apiError('INVALID_RESPONSE');
+      }
+    }
     const responseData = await this.post(validRequest.operation, serializeRequest(validRequest, context));
 
     try {
-      return parseEnterpriseResponse(validRequest.operation, responseData);
+      const response = parseEnterpriseResponse(validRequest.operation, responseData);
+      this.rememberContact(validRequest, context, responseData, response);
+      return response;
     } catch {
       throw apiError('INVALID_RESPONSE');
     }
@@ -697,6 +857,148 @@ export class EnterpriseApiClient {
       }
       return unwrapCommonResult(json);
     });
+  }
+
+  private async postForm(routeKey: EnterpriseApiRouteKey, body: URLSearchParams): Promise<unknown> {
+    const url = new URL(ENTERPRISE_API_ROUTES[routeKey], this.baseUrl).toString();
+    return this.withDeadline(async (signal) => {
+      const response = await this.transport(url, {
+        method: 'POST',
+        redirect: 'error',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        },
+        body: body.toString(),
+        signal,
+      });
+      if (!response.ok) throw apiError('HTTP');
+
+      let json: unknown;
+      try {
+        json = await response.json();
+      } catch {
+        if (signal.aborted) throw apiError('TIMEOUT');
+        throw apiError('INVALID_JSON');
+      }
+      return unwrapCommonResult(json);
+    });
+  }
+
+  private async postMultipart(routeKey: EnterpriseApiRouteKey, body: FormData): Promise<unknown> {
+    const url = new URL(ENTERPRISE_API_ROUTES[routeKey], this.baseUrl).toString();
+    return this.withDeadline(async (signal) => {
+      const response = await this.transport(url, {
+        method: 'POST',
+        redirect: 'error',
+        headers: { Accept: 'application/json' },
+        body,
+        signal,
+      });
+      if (!response.ok) throw apiError('HTTP');
+
+      let json: unknown;
+      try {
+        json = await response.json();
+      } catch {
+        if (signal.aborted) throw apiError('TIMEOUT');
+        throw apiError('INVALID_JSON');
+      }
+      return unwrapCommonResult(json);
+    });
+  }
+
+  /**
+   * Stores the unmasked telephone only inside the main-process client and binds it
+   * to the authenticated openId. Renderer responses remain masked until access succeeds.
+   */
+  private rememberContact(
+    request: EnterpriseRequest,
+    context: EnterpriseUserContext,
+    responseData: unknown,
+    response: EnterpriseResponse
+  ): void {
+    const phone = extractContactPhone(request.operation, responseData);
+    if (!phone) return;
+
+    let resourceType: 'COMPANY' | 'PRODUCT' | 'PROJECT';
+    let resourceId: string;
+    let targetCompanyId: string;
+    if (request.operation === 'company.detail' && response.operation === 'company.detail') {
+      resourceType = 'COMPANY';
+      resourceId = response.data.companyId;
+      targetCompanyId = response.data.companyId;
+    } else if (request.operation === 'product.detail' && response.operation === 'product.detail') {
+      resourceType = 'PRODUCT';
+      resourceId = response.data.productId;
+      targetCompanyId = response.data.companyId;
+    } else if (request.operation === 'project.detail' && response.operation === 'project.detail') {
+      resourceType = 'PROJECT';
+      resourceId = response.data.hpInfoId;
+      targetCompanyId = response.data.hpInfoId;
+    } else {
+      return;
+    }
+
+    this.contactCache.set(contactCacheKey(resourceType, resourceId), {
+      openId: context.openId,
+      phone,
+      targetCompanyId,
+      expiresAt: Date.now() + CONTACT_CACHE_TTL_MS,
+    });
+  }
+
+  private async acquireContact(
+    request: Extract<EnterpriseRequest, { operation: 'contact.acquire' }>,
+    context: EnterpriseUserContext
+  ): Promise<EnterpriseResponse> {
+    requireRegisteredIdentity(context);
+    const cacheKey = contactCacheKey(request.payload.resourceType, request.payload.resourceId);
+    let cached = this.contactCache.get(cacheKey);
+    if (!cached || cached.openId !== context.openId || cached.expiresAt <= Date.now()) {
+      this.contactCache.delete(cacheKey);
+      if (request.payload.resourceType === 'PROJECT') {
+        // Project pages can remain open longer than the short-lived raw-contact cache.
+        // Re-fetching the protected detail repopulates the main-process-only phone
+        // without exposing it to the renderer or consuming any contact quota.
+        await this.request(
+          {
+            operation: 'project.detail',
+            payload: { hpInfoId: request.payload.resourceId },
+          },
+          context
+        );
+        cached = this.contactCache.get(cacheKey);
+      }
+      if (!cached || cached.openId !== context.openId || cached.expiresAt <= Date.now()) {
+        this.contactCache.delete(cacheKey);
+        throw apiError('INVALID_REQUEST');
+      }
+    }
+
+    const project = request.payload.resourceType === 'PROJECT';
+    const consumeQuota = request.payload.consumeQuota !== false;
+    const responseData = await this.postForm(
+      'contact.acquire',
+      new URLSearchParams({
+        openId: context.openId,
+        toCompanyId: cached.targetCompanyId,
+        toPhone: cached.phone,
+        aiMaterialProject: project ? '1' : '0',
+        consumeQuota: consumeQuota ? '1' : '0',
+      })
+    );
+    const raw = ownRecord(responseData);
+    if (!raw) throw apiError('INVALID_RESPONSE');
+    const enriched = {
+      ...raw,
+      ...(consumeQuota && isAffirmativeBackendValue(raw.type) ? { phone: cached.phone } : {}),
+    };
+    try {
+      return parseEnterpriseResponse('contact.acquire', enriched);
+    } catch {
+      throw apiError('INVALID_RESPONSE');
+    }
   }
 
   private async downloadQr(url: string): Promise<Uint8Array> {

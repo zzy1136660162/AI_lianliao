@@ -22,6 +22,7 @@ const routeTitleKey = (pathname: string): string => {
   if (pathname.startsWith('/enterprise/products')) return 'enterprise.routes.products.title';
   if (pathname.startsWith('/enterprise/projects/')) return 'enterprise.routes.projectDetail.title';
   if (pathname.startsWith('/enterprise/projects')) return 'enterprise.routes.projects.title';
+  if (pathname === '/enterprise/supply-demand/publish') return 'enterprise.supplyDemand.publish.title';
   if (pathname.startsWith('/enterprise/supply-demand/')) return 'enterprise.routes.supplyDemandDetail.title';
   if (pathname.startsWith('/enterprise/supply-demand')) return 'enterprise.routes.supplyDemand.title';
   if (pathname.startsWith('/enterprise/favorites')) return 'enterprise.routes.favorites.title';

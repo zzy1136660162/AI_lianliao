@@ -1,12 +1,24 @@
 import { ArrowRight, Refresh, Search } from '@icon-park/react';
-import { Button, Form, Input, Pagination, Tag } from 'antd';
-import React, { useState } from 'react';
+import { Button, Form, Input, Tag } from 'antd';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-import type { EnterpriseProductSummary } from '@/common/enterprise/contracts';
+import type { EnterpriseProductSummary, ProductListQuery } from '@/common/enterprise/contracts';
+import {
+  CatalogFilterCard,
+  CatalogPagination,
+  EnterpriseCatalogShell,
+} from '@/renderer/pages/enterprise/layout/catalog/CatalogLayout';
+import {
+  createCatalogReturnState,
+  getEnterpriseCatalogScrollTop,
+  readCatalogReturnState,
+  restoreEnterpriseCatalogScroll,
+} from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
+import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
@@ -15,6 +27,14 @@ import ProductQuickView from './ProductQuickView';
 import styles from './product-catalog.module.css';
 
 export type ProductListPageProps = { client?: EnterpriseClient };
+
+const productFiltersFromQuery = (query: ProductListQuery): ProductFilters => ({
+  keyword: query.keyword,
+  industry: query.industry,
+  province: query.province,
+  city: query.city,
+  district: query.district,
+});
 
 const ProductImage: React.FC<{ product: EnterpriseProductSummary }> = ({ product }) => {
   const { t } = useTranslation();
@@ -31,28 +51,34 @@ const ProductImage: React.FC<{ product: EnterpriseProductSummary }> = ({ product
       ) : (
         <span>{t('enterprise.products.imageUnavailable')}</span>
       )}
-      <span className={styles.cardIndex} aria-hidden='true'>
-        {product.productId.slice(-3).padStart(3, '0')}
-      </span>
     </div>
   );
 };
 
 const ProductCard: React.FC<{
   product: EnterpriseProductSummary;
+  selected: boolean;
   onSelect: (product: EnterpriseProductSummary) => void;
   onViewDetails: (product: EnterpriseProductSummary) => void;
-}> = ({ product, onSelect, onViewDetails }) => {
+}> = ({ product, selected, onSelect, onViewDetails }) => {
   const { t } = useTranslation();
   const missing = t('enterprise.products.missing');
   const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
   const displayIndustry = product.industry || product.companyIndustry;
   return (
-    <article className={styles.productCard} aria-label={t('enterprise.products.cardLabel', { name: product.name })}>
+    <article
+      className={[styles.productCard, selected ? styles.selectedCard : ''].filter(Boolean).join(' ')}
+      aria-label={t('enterprise.products.cardLabel', { name: product.name })}
+    >
       <ProductImage product={product} />
       <div className={styles.cardBody}>
         <div className={styles.cardHeading}>
-          <span>{product.companyName || missing}</span>
+          <div className={styles.cardCompanyLine}>
+            <span>{product.companyName || missing}</span>
+            {product.companyLevel !== undefined ? (
+              <CompanyMembershipBadge level={product.companyLevel} compact />
+            ) : null}
+          </div>
           <h2>{product.name}</h2>
         </div>
         <div className={styles.cardTags}>
@@ -75,24 +101,50 @@ const ProductCard: React.FC<{
 
 const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseClient }) => {
   const { t } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
-  const catalog = useProductCatalog(client);
-  const [draftFilters, setDraftFilters] = useState<ProductFilters>({});
+  const restoredReturn = useMemo(() => readCatalogReturnState(location.state, 'products'), [location.state]);
+  const initialQueryRef = useRef<ProductListQuery>(restoredReturn?.query ?? { pageNum: 1, pageSize: 20 });
+  const catalog = useProductCatalog(client, initialQueryRef.current);
+  const [draftFilters, setDraftFilters] = useState<ProductFilters>(() =>
+    productFiltersFromQuery(initialQueryRef.current)
+  );
   const [selectedProduct, setSelectedProduct] = useState<EnterpriseProductSummary | null>(null);
+  const restoredRef = useRef(false);
   const { targetRef, scrollToTarget } = useEnterprisePaginationScroll<HTMLDivElement>();
 
+  useEffect(() => {
+    if (!catalog.data || restoredRef.current) return;
+    restoredRef.current = true;
+    if (restoredReturn?.selectedId) {
+      setSelectedProduct(catalog.data.list.find((product) => product.productId === restoredReturn.selectedId) ?? null);
+    }
+    restoreEnterpriseCatalogScroll(restoredReturn?.scrollTop ?? 0);
+  }, [catalog.data, restoredReturn]);
+
   const viewDetails = (product: EnterpriseProductSummary) => {
-    navigate(`/enterprise/products/${encodeURIComponent(product.productId)}`);
+    navigate(`/enterprise/products/${encodeURIComponent(product.productId)}`, {
+      state: createCatalogReturnState({
+        kind: 'products',
+        path: '/enterprise/products',
+        query: catalog.query,
+        selectedId: product.productId,
+        scrollTop: getEnterpriseCatalogScrollTop(),
+      }),
+    });
   };
+
   const submitFilters = () => {
     setSelectedProduct(null);
     catalog.applyFilters(draftFilters);
   };
+
   const resetFilters = () => {
     setDraftFilters({});
     setSelectedProduct(null);
     catalog.applyFilters({});
   };
+
   const changePage = (pageNum: number, pageSize: number) => {
     setSelectedProduct(null);
     catalog.changePage(pageNum, pageSize);
@@ -130,24 +182,19 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
               <ProductCard
                 key={product.productId}
                 product={product}
+                selected={selectedProduct?.productId === product.productId}
                 onSelect={setSelectedProduct}
                 onViewDetails={viewDetails}
               />
             ))}
           </div>
-          <div className={styles.paginationBar}>
-            <span>{t('enterprise.products.resultCount', { count: catalog.data.total })}</span>
-            <Pagination
-              current={catalog.query.pageNum}
-              pageSize={catalog.query.pageSize}
-              total={catalog.data.total}
-              size='small'
-              showQuickJumper
-              showSizeChanger
-              pageSizeOptions={[10, 20, 50]}
-              onChange={changePage}
-            />
-          </div>
+          <CatalogPagination
+            current={catalog.query.pageNum}
+            pageSize={catalog.query.pageSize}
+            total={catalog.data.total}
+            resultLabel={t('enterprise.products.resultCount', { count: catalog.data.total })}
+            onChange={changePage}
+          />
         </div>
         {selectedProduct ? (
           <ProductQuickView
@@ -160,17 +207,8 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
     );
   };
 
-  return (
-    <section className={`enterprise-product-list ${styles.page}`} aria-labelledby='product-catalog-title'>
-      <header className={styles.pageHeader}>
-        <div>
-          <span className={styles.eyebrow}>{t('enterprise.products.eyebrow')}</span>
-          <h1 id='product-catalog-title'>{t('enterprise.routes.products.title')}</h1>
-          <p>{t('enterprise.products.description')}</p>
-        </div>
-        <div className={styles.headerRule} aria-hidden='true' />
-      </header>
-
+  const filters = (
+    <CatalogFilterCard>
       <Form className={styles.filterForm} layout='vertical' onFinish={submitFilters}>
         {(['keyword', 'industry', 'province', 'city', 'district'] as const).map((field) => (
           <Form.Item key={field} label={t(`enterprise.products.filters.${field}Label`)}>
@@ -191,9 +229,20 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
           </Button>
         </div>
       </Form>
+    </CatalogFilterCard>
+  );
 
-      <div className={styles.content}>{renderContent()}</div>
-    </section>
+  return (
+    <EnterpriseCatalogShell
+      className='enterprise-product-list'
+      titleId='product-catalog-title'
+      eyebrow={t('enterprise.products.eyebrow')}
+      title={t('enterprise.routes.products.title')}
+      description={t('enterprise.products.description')}
+      filters={filters}
+    >
+      {renderContent()}
+    </EnterpriseCatalogShell>
   );
 };
 

@@ -38,6 +38,12 @@ vi.mock('@/renderer/hooks/context/AuthContext', () => ({
 }));
 
 vi.mock('@/renderer/hooks/context/EnterpriseAuthContext', () => ({
+  useOptionalEnterpriseAuth: () => ({
+    refreshUserContext: vi.fn(async () => ({
+      registered: true,
+      openId: 'openid-must-not-be-rendered',
+    })),
+  }),
   useEnterpriseAuth: (): EnterpriseAuthContextValue => ({
     status: routerMocks.enterpriseStatus,
     user: {

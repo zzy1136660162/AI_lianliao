@@ -55,6 +55,12 @@
   opacity: 0.62;
 }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .filterForm {
   display: grid;
   grid-template-columns: minmax(200px, 1.5fr) repeat(4, minmax(120px, 1fr));
@@ -125,13 +131,38 @@
   font-size: 11px;
 }
 
+.progressCell {
+  display: grid;
+  gap: 3px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.progressCell span:first-child {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .rowActions {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 4px;
+  white-space: nowrap;
 }
 
-.rowActions a {
+.rowAction {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+button.rowAction {
+  height: auto;
+  padding-inline: 0;
+}
+
+a.rowAction {
   color: var(--primary);
   font-size: 12px;
 }
@@ -222,26 +253,88 @@
 
 .detailGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
-.detailSummary,
-.detailFields {
+.detailSummary {
   border-color: var(--enterprise-border);
   border-radius: var(--enterprise-radius-card);
   box-shadow: var(--enterprise-shadow-card);
 }
 
-.detailSummary > p,
-.detailFields > p {
+.contactCard {
+  border-color: var(--enterprise-border);
+  border-radius: var(--enterprise-radius-card);
+  box-shadow: var(--enterprise-shadow-card);
+}
+
+.contactState {
+  display: flex;
+  min-height: 180px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-secondary);
+}
+
+.lockedContact {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--enterprise-radius-control);
+  background: color-mix(in srgb, var(--bg-2) 88%, #fff);
+  user-select: none;
+}
+
+.lockedContact > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.lockedContact span {
+  color: var(--text-secondary);
+}
+
+.lockedContact strong {
+  filter: blur(6px);
+  opacity: 0.55;
+}
+
+.contactActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  color: var(--text-secondary);
+}
+
+.quotaHint {
+  font-size: 12px;
+}
+
+.qrDialog {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 0 6px;
+  text-align: center;
+}
+
+.qrDialog p {
+  max-width: 360px;
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.detailSummary > p {
   color: var(--text-secondary);
   line-height: 1.8;
   white-space: pre-wrap;
-}
-
-.fieldGrid {
-  margin-top: 4px;
 }
 
 @media (max-width: 1120px) {

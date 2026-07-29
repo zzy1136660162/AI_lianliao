@@ -17,7 +17,7 @@ import { getPlatformServices } from '@/common/platform';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { changeLanguage } from '@process/services/i18n';
 import type { PetSize } from '@process/pet/petTypes';
-import { createOrUpdateTray, destroyTray, setCloseToTrayEnabled } from '@process/utils/tray';
+import { createOrUpdateTray, setCloseToTrayEnabled } from '@process/utils/tray';
 import { readCloseToTraySetting, writeCloseToTraySetting } from '@process/utils/closeToTraySetting';
 
 // Keep-awake power blocker state
@@ -25,6 +25,61 @@ let _keepAwakeBlockerId: number | null = null;
 
 type LanguageChangeListener = () => void;
 let _languageChangeListener: LanguageChangeListener | null = null;
+
+const CLOSE_TO_TRAY_DEFAULT_FLAG = 'system.closeToTrayDefaultV1Applied' as const;
+
+export type CloseToTrayStorage = {
+  get: (key: typeof CLOSE_TO_TRAY_DEFAULT_FLAG) => Promise<boolean | undefined>;
+  set: (key: typeof CLOSE_TO_TRAY_DEFAULT_FLAG, value: boolean) => Promise<unknown>;
+};
+
+export type CloseToTrayRuntime = {
+  read: () => Promise<boolean>;
+  persist: (enabled: boolean) => Promise<void>;
+  setEnabled: (enabled: boolean) => void;
+  ensureTray: () => void;
+};
+
+const closeToTrayRuntime: CloseToTrayRuntime = {
+  read: readCloseToTraySetting,
+  persist: writeCloseToTraySetting,
+  setEnabled: setCloseToTrayEnabled,
+  ensureTray: createOrUpdateTray,
+};
+
+/**
+ * Applies close-to-tray behavior without coupling tray availability to it.
+ * Disabling the behavior keeps the permanent tray entry alive.
+ */
+export async function updateCloseToTraySetting(
+  enabled: boolean,
+  storage: CloseToTrayStorage = ProcessConfig,
+  runtime: CloseToTrayRuntime = closeToTrayRuntime
+): Promise<void> {
+  await runtime.persist(enabled);
+  runtime.setEnabled(enabled);
+  runtime.ensureTray();
+  await storage.set(CLOSE_TO_TRAY_DEFAULT_FLAG, true);
+}
+
+/**
+ * Applies the versioned default once, then defers to the user's saved choice.
+ * The marker is recorded only after persistence and runtime application finish.
+ */
+export async function initializeCloseToTrayDefault(
+  storage: CloseToTrayStorage = ProcessConfig,
+  runtime: CloseToTrayRuntime = closeToTrayRuntime
+): Promise<boolean> {
+  if ((await storage.get(CLOSE_TO_TRAY_DEFAULT_FLAG)) !== true) {
+    await updateCloseToTraySetting(true, storage, runtime);
+    return true;
+  }
+
+  const enabled = await runtime.read();
+  runtime.setEnabled(enabled);
+  runtime.ensureTray();
+  return enabled;
+}
 
 /**
  * 注册语言变更监听器（供主进程 index.ts 使用）
@@ -38,13 +93,7 @@ export function initSystemSettingsBridge(): void {
   ipcBridge.systemSettings.getCloseToTray.provider(async () => readCloseToTraySetting());
 
   ipcBridge.systemSettings.setCloseToTray.provider(async ({ enabled }) => {
-    await writeCloseToTraySetting(enabled);
-    setCloseToTrayEnabled(enabled);
-    if (enabled) {
-      createOrUpdateTray();
-    } else {
-      destroyTray();
-    }
+    await updateCloseToTraySetting(enabled);
   });
 
   // Set "keep awake" — toggle prevent-display-sleep blocker.

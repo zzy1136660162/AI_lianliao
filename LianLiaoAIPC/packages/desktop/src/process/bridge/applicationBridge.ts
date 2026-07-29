@@ -32,6 +32,7 @@ const START_ON_BOOT_UNSUPPORTED_MESSAGE = 'Start on boot is only available in pa
 const INVALID_STORED_PROXY_WARNING = '[ApplicationBridge] Ignored invalid stored manual HTTP proxy configuration.';
 const PROXY_PERSISTENCE_FAILURE_MESSAGE = 'Failed to persist manual HTTP proxy configuration.';
 export const START_ON_BOOT_WINDOWS_ARG = '--start-on-boot';
+const START_ON_BOOT_DEFAULT_FLAG = 'system.startOnBootDefaultV1Applied' as const;
 
 export type ManualHttpProxyStorage = {
   get: (key: 'system.httpProxy') => Promise<unknown>;
@@ -41,6 +42,16 @@ export type ManualHttpProxyStorage = {
 export type ManualHttpProxyApplicationBridge = {
   getManualHttpProxy: Pick<typeof ipcBridge.application.getManualHttpProxy, 'provider'>;
   saveManualHttpProxy: Pick<typeof ipcBridge.application.saveManualHttpProxy, 'provider'>;
+};
+
+export type StartOnBootStorage = {
+  get: (key: typeof START_ON_BOOT_DEFAULT_FLAG) => Promise<boolean | undefined>;
+  set: (key: typeof START_ON_BOOT_DEFAULT_FLAG, value: boolean) => Promise<unknown>;
+};
+
+export type StartOnBootController = {
+  getStatus: () => IStartOnBootStatus;
+  setEnabled: (enabled: boolean) => IStartOnBootStatus;
 };
 
 const disabledManualHttpProxyConfig = (): ManualHttpProxyConfig => ({
@@ -183,6 +194,57 @@ export function setStartOnBootEnabled(enabled: boolean): IStartOnBootStatus {
   return getStartOnBootStatus();
 }
 
+const electronStartOnBootController: StartOnBootController = {
+  getStatus: getStartOnBootStatus,
+  setEnabled: setStartOnBootEnabled,
+};
+
+/**
+ * Enables start-on-boot once for a supported packaged desktop installation.
+ *
+ * The completion flag is written only after Electron confirms the login item
+ * is enabled. Later launches never overwrite a choice made in Settings or in
+ * the operating-system startup-apps panel.
+ */
+export async function ensureStartOnBootDefaultEnabled(
+  storage: StartOnBootStorage = ProcessConfig,
+  controller: StartOnBootController = electronStartOnBootController
+): Promise<IStartOnBootStatus> {
+  const status = controller.getStatus();
+  if (!status.supported) {
+    return status;
+  }
+
+  if ((await storage.get(START_ON_BOOT_DEFAULT_FLAG)) === true) {
+    return status;
+  }
+
+  const enabledStatus = status.enabled ? status : controller.setEnabled(true);
+  if (enabledStatus.enabled) {
+    await storage.set(START_ON_BOOT_DEFAULT_FLAG, true);
+  }
+  return enabledStatus;
+}
+
+/** Applies a user choice and prevents the first-run default from overriding it later. */
+export async function updateStartOnBootEnabled(
+  enabled: boolean,
+  storage: StartOnBootStorage = ProcessConfig,
+  controller: StartOnBootController = electronStartOnBootController
+): Promise<IStartOnBootStatus> {
+  const status = controller.setEnabled(enabled);
+  if (!status.supported) {
+    return status;
+  }
+
+  if (status.enabled !== enabled) {
+    return status;
+  }
+
+  await storage.set(START_ON_BOOT_DEFAULT_FLAG, true);
+  return status;
+}
+
 export function setApplicationMainWindow(win: BrowserWindow): void {
   mainWindowRef = win;
 }
@@ -301,9 +363,12 @@ export function initApplicationBridge(): void {
 
   ipcBridge.application.setStartOnBoot.provider(async ({ enabled }) => {
     try {
-      const status = setStartOnBootEnabled(enabled);
+      const status = await updateStartOnBootEnabled(enabled);
       if (!status.supported) {
         return { success: false, msg: START_ON_BOOT_UNSUPPORTED_MESSAGE, data: status };
+      }
+      if (status.enabled !== enabled) {
+        return { success: false, data: status };
       }
       return { success: true, data: status };
     } catch (e) {

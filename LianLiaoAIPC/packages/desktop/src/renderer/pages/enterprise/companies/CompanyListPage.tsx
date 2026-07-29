@@ -1,15 +1,26 @@
 import { Refresh, Search } from '@icon-park/react';
-import { Button, Form, Input, Pagination, Select, Table, type TableColumnsType } from 'antd';
-import React, { useMemo, useState } from 'react';
+import { Button, Form, Input, Select, Table, type TableColumnsType } from 'antd';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-import type { EnterpriseCompanySummary } from '@/common/enterprise/contracts';
-import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
-import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import type { CompanyListQuery, EnterpriseCompanySummary } from '@/common/enterprise/contracts';
+import {
+  CatalogFilterCard,
+  CatalogPagination,
+  EnterpriseCatalogShell,
+} from '@/renderer/pages/enterprise/layout/catalog/CatalogLayout';
+import {
+  createCatalogReturnState,
+  getEnterpriseCatalogScrollTop,
+  readCatalogReturnState,
+  restoreEnterpriseCatalogScroll,
+} from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
 import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
+import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 import CompanyQuickView from './CompanyQuickView';
 import { COMPANY_LEVEL_FILTERS, COMPANY_VIP_FILTER_VALUE, type CompanyFilters, useCompanyCatalog } from './companyData';
@@ -21,17 +32,50 @@ export type CompanyListPageProps = {
 
 const companyDetailPath = (companyId: string): string => `/enterprise/companies/${encodeURIComponent(companyId)}`;
 
+const companyFiltersFromQuery = (query: CompanyListQuery): CompanyFilters => ({
+  keyword: query.keyword,
+  industry: query.industry,
+  province: query.province,
+  city: query.city,
+  district: query.district,
+  companyLevel: query.companyLevel,
+  vip: query.vip,
+});
+
 const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseClient }) => {
   const { t } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
-  const catalog = useCompanyCatalog(client);
-  const [draftFilters, setDraftFilters] = useState<CompanyFilters>({});
+  const restoredReturn = useMemo(() => readCatalogReturnState(location.state, 'companies'), [location.state]);
+  const initialQueryRef = useRef<CompanyListQuery>(restoredReturn?.query ?? { pageNum: 1, pageSize: 20 });
+  const catalog = useCompanyCatalog(client, initialQueryRef.current);
+  const [draftFilters, setDraftFilters] = useState<CompanyFilters>(() =>
+    companyFiltersFromQuery(initialQueryRef.current)
+  );
   const [selectedCompany, setSelectedCompany] = useState<EnterpriseCompanySummary | null>(null);
+  const restoredRef = useRef(false);
   const { targetRef, scrollToTarget } = useEnterprisePaginationScroll<HTMLDivElement>();
   const missing = t('enterprise.companies.missing');
 
+  useEffect(() => {
+    if (!catalog.data || restoredRef.current) return;
+    restoredRef.current = true;
+    if (restoredReturn?.selectedId) {
+      setSelectedCompany(catalog.data.list.find((company) => company.companyId === restoredReturn.selectedId) ?? null);
+    }
+    restoreEnterpriseCatalogScroll(restoredReturn?.scrollTop ?? 0);
+  }, [catalog.data, restoredReturn]);
+
   const viewDetails = (company: EnterpriseCompanySummary) => {
-    navigate(companyDetailPath(company.companyId));
+    navigate(companyDetailPath(company.companyId), {
+      state: createCatalogReturnState({
+        kind: 'companies',
+        path: '/enterprise/companies',
+        query: catalog.query,
+        selectedId: company.companyId,
+        scrollTop: getEnterpriseCatalogScrollTop(),
+      }),
+    });
   };
 
   const columns = useMemo<TableColumnsType<EnterpriseCompanySummary>>(
@@ -147,31 +191,30 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             pagination={false}
             loading={catalog.isLoading && catalog.isRetainingData}
             scroll={{ x: 1016 }}
+            rowClassName={(company) => (company.companyId === selectedCompany?.companyId ? styles.selectedRow : '')}
             onRow={(company) => ({
               tabIndex: 0,
+              'aria-selected': company.companyId === selectedCompany?.companyId,
               onClick: () => setSelectedCompany(company),
               onDoubleClick: () => viewDetails(company),
               onKeyDown: (event: React.KeyboardEvent<HTMLTableRowElement>) => {
-                if (event.key === 'Enter' || event.key === ' ') {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  viewDetails(company);
+                } else if (event.key === ' ') {
                   event.preventDefault();
                   setSelectedCompany(company);
                 }
               },
             })}
           />
-          <div className={styles.paginationBar}>
-            <span>{t('enterprise.companies.resultCount', { count: catalog.data.total })}</span>
-            <Pagination
-              current={catalog.query.pageNum}
-              pageSize={catalog.query.pageSize}
-              total={catalog.data.total}
-              size='small'
-              showQuickJumper
-              showSizeChanger
-              pageSizeOptions={[10, 20, 50]}
-              onChange={changePage}
-            />
-          </div>
+          <CatalogPagination
+            current={catalog.query.pageNum}
+            pageSize={catalog.query.pageSize}
+            total={catalog.data.total}
+            resultLabel={t('enterprise.companies.resultCount', { count: catalog.data.total })}
+            onChange={changePage}
+          />
         </div>
         {selectedCompany ? (
           <CompanyQuickView
@@ -184,17 +227,8 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
     );
   };
 
-  return (
-    <section className={styles.page} aria-labelledby='company-catalog-title'>
-      <header className={styles.pageHeader}>
-        <div>
-          <span className={styles.eyebrow}>{t('enterprise.companies.eyebrow')}</span>
-          <h1 id='company-catalog-title'>{t('enterprise.routes.companies.title')}</h1>
-          <p>{t('enterprise.companies.description')}</p>
-        </div>
-        <div className={styles.headerRule} aria-hidden='true' />
-      </header>
-
+  const filters = (
+    <CatalogFilterCard>
       <Form className={styles.filterForm} layout='vertical' onFinish={submitFilters}>
         <Form.Item label={t('enterprise.companies.filters.keywordLabel')}>
           <Input
@@ -275,9 +309,19 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
           </Button>
         </div>
       </Form>
+    </CatalogFilterCard>
+  );
 
-      <div className={styles.content}>{renderContent()}</div>
-    </section>
+  return (
+    <EnterpriseCatalogShell
+      titleId='company-catalog-title'
+      eyebrow={t('enterprise.companies.eyebrow')}
+      title={t('enterprise.routes.companies.title')}
+      description={t('enterprise.companies.description')}
+      filters={filters}
+    >
+      {renderContent()}
+    </EnterpriseCatalogShell>
   );
 };
 

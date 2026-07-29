@@ -17,6 +17,11 @@
   --enterprise-shadow-card: 0 8px 24px rgba(36, 92, 145, 0.08);
   --enterprise-shadow-hover: 0 12px 30px rgba(36, 92, 145, 0.13);
   --enterprise-content-gap: 14px;
+  --enterprise-catalog-gap: 12px;
+  --enterprise-catalog-row-height: 54px;
+  --enterprise-catalog-image-ratio: 4 / 3;
+  --enterprise-detail-sidebar-width: 300px;
+  --enterprise-detail-section-gap: 12px;
   --ll-ant-font-family: var(--enterprise-font-ui);
 
   /*

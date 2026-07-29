@@ -31,8 +31,8 @@ import { registerWindowMaximizeListeners } from '@process/bridge';
 import { BackendLifecycleManager } from '@aionui/web-host';
 import { resolveBinaryPath } from '@process/backend';
 import './process/bridge/feedbackBridge';
-import { wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
-import { onLanguageChanged } from './process/bridge/systemSettingsBridge';
+import { ensureStartOnBootDefaultEnabled, wasLaunchedAtLogin } from '@process/bridge/applicationBridge';
+import { initializeCloseToTrayDefault, onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@process/services/i18n';
 import { initializeManualHttpProxyForStartup } from '@process/services/network-proxy/manualHttpProxyRuntime';
 import { setupApplicationMenu } from './process/utils/appMenu';
@@ -74,7 +74,6 @@ import {
   setCloseToTrayEnabled,
   setIsQuitting,
 } from './process/utils/tray';
-import { readCloseToTraySetting } from './process/utils/closeToTraySetting';
 // @ts-expect-error - electron-squirrel-startup doesn't have types
 import electronSquirrelStartup from 'electron-squirrel-startup';
 
@@ -447,7 +446,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   }
 
   initMainAdapterWithWindow(mainWindow);
-  bindMainWindowReferences(mainWindow);
+  bindMainWindowReferences(mainWindow, createWindow);
 
   setupApplicationMenu();
 
@@ -780,17 +779,26 @@ const handleAppReady = async (): Promise<void> => {
       destroyTray();
     } else {
       try {
-        const savedCloseToTray = await readCloseToTraySetting();
-        setCloseToTrayEnabled(savedCloseToTray);
-        if (getCloseToTrayEnabled()) {
-          createOrUpdateTray();
-        }
-      } catch {
-        // Ignore storage read errors, default to false
+        await initializeCloseToTrayDefault();
+      } catch (error) {
+        // A settings failure must not remove the permanent branded tray entry
+        // or block the desktop window.
+        console.warn('[LianLiaoAIPC] Failed to initialize close to tray:', error);
+        createOrUpdateTray();
+      }
+
+      try {
+        await ensureStartOnBootDefaultEnabled();
+      } catch (error) {
+        // Startup registration is best-effort and must never block the desktop
+        // window. The Settings page remains available for a manual retry.
+        console.warn('[LianLiaoAIPC] Failed to initialize start on boot:', error);
       }
     }
 
-    const showMainWindowOnReady = !(wasLaunchedAtLogin() && getCloseToTrayEnabled());
+    // Login-startup is intentionally silent and independent from the
+    // close-to-tray preference, which controls only the window close action.
+    const showMainWindowOnReady = !wasLaunchedAtLogin();
 
     createWindow({ showOnReady: showMainWindowOnReady });
     appReadyDone = true;

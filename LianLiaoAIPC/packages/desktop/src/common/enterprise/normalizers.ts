@@ -45,6 +45,14 @@ const optionalText = (...values: unknown[]): string | undefined => {
   return typeof value === 'string' ? value.trim() : undefined;
 };
 
+/** Accepts legacy textual dates and the finite integer timestamps returned by Oracle JSON serialization. */
+const optionalTemporalText = (...values: unknown[]): string | undefined => {
+  const value = firstScalar(...values);
+  if (typeof value === 'string') return value.trim() || undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isSafeInteger(value)) return undefined;
+  return String(value);
+};
+
 const optionalIdentifier = (...values: unknown[]): string | undefined => {
   const value = firstScalar(...values);
   if (typeof value === 'string') return value.trim() || undefined;
@@ -239,6 +247,14 @@ const normalizeUserContextRaw = (raw: z.infer<typeof userContextRawSchema>): Ent
   setIdentifier(result, 'companyId', operation, raw.companyId, raw.COMPANY_ID);
   setText(result, 'companyName', raw.companyName, raw.COMPANY_NAME);
   setNumber(result, 'companyLevel', raw.companyLevel, raw.COMPANY_LEVEL, raw.comLevel, raw.COM_LEVEL);
+  setNumber(
+    result,
+    'remainingDemandQuota',
+    raw.remainingDemandQuota,
+    raw.REMAINING_DEMAND_QUOTA,
+    raw.payResNum,
+    raw.PAY_RES_NUM
+  );
   setIdentifier(result, 'roleId', operation, raw.roleId, raw.ROLE_ID);
   return result;
 };
@@ -347,6 +363,8 @@ const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.d
   setText(result, 'contactName', raw.compContactPerson, raw.COMP_CONTACT_PERSON, raw.contactName, raw.CONTACT_NAME);
   const phone = optionalText(raw.compPhone, raw.COMP_PHONE, raw.phone, raw.PHONE);
   if (phone !== undefined) result.phone = maskEnterprisePhone(phone);
+  setNumber(result, 'companyLevel', raw.companyLevel, raw.COMPANY_LEVEL, raw.comLevel, raw.COM_LEVEL);
+  setBoolean(result, 'vip', raw.vip, raw.VIP, raw.payVip, raw.PAY_VIP);
   setBoolean(result, 'collected', raw.collected, raw.COLLECTED, raw.isCollect, raw.IS_COLLECT);
   return result;
 };
@@ -402,7 +420,9 @@ const normalizeProjectSummary = (
   setText(result, 'constructionNature', raw.constructionNature, raw.CONSTRUCTION_NATURE, raw.xingzhi, raw.XINGZHI);
   setText(result, 'investmentType', raw.investmentType, raw.INVESTMENT_TYPE);
   setText(result, 'projectNature', raw.projectNature, raw.PROJECT_NATURE, raw.xiangmuxingzhi, raw.XIANGMUXINGZHI);
-  setText(result, 'publishedAt', raw.publishDate, raw.PUBLISH_DATE, raw.inputTime, raw.INPUT_TIME);
+  const publishedAt =
+    optionalText(raw.publishDate, raw.PUBLISH_DATE) ?? optionalTemporalText(raw.inputTime, raw.INPUT_TIME);
+  if (publishedAt !== undefined) result.publishedAt = publishedAt;
   const constructionPeriod = optionalText(
     raw.constructionPeriod,
     raw.CONSTRUCTION_PERIOD,
@@ -431,7 +451,10 @@ const normalizeProjectDetail = (input: unknown): EnterpriseProjectDetail => {
   const purchased = optionalBoolean(raw.purchased, raw.PURCHASED, raw.isPurchased, raw.IS_PURCHASED);
   setText(result, 'contactName', raw.contactName, raw.CONTACT_NAME, raw.lianxiren, raw.LIANXIREN);
   const phone = optionalText(raw.phone, raw.PHONE);
-  if (phone !== undefined) result.phone = purchased === true ? phone : maskEnterprisePhone(phone);
+  // A purchased project may expose its profile, but dialing still follows the
+  // H5 membership/quota rule. Keep the renderer value masked until
+  // `contact.acquire` succeeds in the main process.
+  if (phone !== undefined) result.phone = maskEnterprisePhone(phone);
   setText(result, 'email', raw.email, raw.EMAIL);
   setText(result, 'address', raw.address, raw.ADDRESS, raw.buildLocation, raw.BUILD_LOCATION, raw.didian, raw.DIDIAN);
   setText(result, 'industry', raw.industry, raw.INDUSTRY, raw.hangye, raw.HANGYE);
@@ -472,7 +495,6 @@ const normalizeDemandSummary = (
     title: requiredText(operation, 'title', raw.title, raw.TITLE),
     primaryTags,
   };
-  setText(result, 'companyName', raw.companyName, raw.COMPANY_NAME);
   setText(result, 'city', raw.city, raw.CITY);
   setText(result, 'district', raw.district, raw.DISTRICT);
   setText(result, 'budget', raw.budget, raw.BUDGET);
@@ -490,6 +512,11 @@ const normalizeDemandSummary = (
     raw.REMAINING_GRAB_COUNT
   );
   if (remainingGrabCount !== undefined) result.remainingGrabCount = remainingGrabCount;
+  const remainingDays = optionalNonNegativeInteger(operation, 'remainingDays', raw.remainingDays, raw.REMAINING_DAYS);
+  if (remainingDays !== undefined) result.remainingDays = remainingDays;
+  setText(result, 'capacityLabel', raw.capacityLabel, raw.CAPACITY_LABEL);
+  const statMode = optionalText(raw.statMode, raw.STAT_MODE);
+  if (statMode === 'GRAB' || statMode === 'APPLICATION') result.statMode = statMode;
   return result;
 };
 
@@ -497,10 +524,19 @@ const normalizeDemandSummary = (
 const normalizeDemandTypeOption = (input: unknown): EnterpriseDemandTypeOption => {
   const operation = 'demand.types';
   const raw = enterpriseDemandTypeOptionRawSchema.parse(input);
-  return {
+  const result: EnterpriseDemandTypeOption = {
     typeId: requiredNonNegativeInteger(operation, 'typeId', raw.typeId),
     typeName: requiredText(operation, 'typeName', raw.typeName),
   };
+  setText(result, 'groupCode', raw.groupCode);
+  setText(result, 'groupName', raw.groupName);
+  const displayOrder = optionalNonNegativeInteger(operation, 'displayOrder', raw.displayOrder);
+  if (displayOrder !== undefined) result.displayOrder = displayOrder;
+  const variantEnabled = optionalBoolean(raw.variantEnabled);
+  if (variantEnabled !== undefined) result.variantEnabled = variantEnabled;
+  const statMode = optionalText(raw.statMode);
+  if (statMode === 'GRAB' || statMode === 'APPLICATION') result.statMode = statMode;
+  return result;
 };
 
 const normalizeDemandDetail = (input: unknown): EnterpriseDemandDetail => {
@@ -523,7 +559,6 @@ const normalizeDemandDetail = (input: unknown): EnterpriseDemandDetail => {
       return normalized;
     }),
   };
-  setText(result, 'address', raw.address, raw.ADDRESS);
   return result;
 };
 

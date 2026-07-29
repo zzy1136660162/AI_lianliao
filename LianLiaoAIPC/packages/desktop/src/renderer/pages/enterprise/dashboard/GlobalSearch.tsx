@@ -4,12 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import type {
-  EnterpriseCompanySummary,
-  EnterpriseProductSummary,
-  EnterpriseProjectSummary,
-} from '@/common/enterprise/contracts';
-import { displayProjectName } from '@/renderer/pages/enterprise/projects/projectData';
+import type { UnifiedSearchItem } from '@/common/enterprise/unified-search/contracts';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 import { isDashboardSearchQueryReady, useDashboardSearch } from './dashboardData';
@@ -37,20 +32,12 @@ export type GlobalSearchProps = {
   debounceMs?: number;
 };
 
-const companyOption = (company: EnterpriseCompanySummary): SearchOption => ({
-  id: `company-${company.companyId}`,
-  kind: 'companies',
-  label: company.name,
-  secondary: company.industry,
-  path: `/enterprise/companies/${encodeURIComponent(company.companyId)}`,
-});
-
-const productOption = (product: EnterpriseProductSummary): SearchOption => ({
-  id: `product-${product.productId}`,
-  kind: 'products',
-  label: product.name,
-  secondary: product.companyName,
-  path: `/enterprise/products/${encodeURIComponent(product.productId)}`,
+const itemOption = (item: UnifiedSearchItem, kind: SearchGroupKind): SearchOption => ({
+  id: `${item.resourceType}-${item.businessId}`,
+  kind,
+  label: item.title,
+  secondary: item.subtitle ?? ([item.city, item.district, item.industry].filter(Boolean).join(' / ') || undefined),
+  path: `/enterprise/${kind}/${encodeURIComponent(item.businessId)}`,
 });
 
 const groupIcon = {
@@ -78,25 +65,17 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
       {
         kind: 'companies' as const,
         errorCode: result.companies.errorCode,
-        options: result.companies.items.map(companyOption),
+        options: result.companies.items.map((item) => itemOption(item, 'companies')),
       },
       {
         kind: 'products' as const,
         errorCode: result.products.errorCode,
-        options: result.products.items.map(productOption),
+        options: result.products.items.map((item) => itemOption(item, 'products')),
       },
       {
         kind: 'projects' as const,
         errorCode: result.projects.errorCode,
-        options: result.projects.items.map(
-          (project: EnterpriseProjectSummary): SearchOption => ({
-            id: `project-${project.hpInfoId}`,
-            kind: 'projects',
-            label: displayProjectName(project, false, t),
-            secondary: [project.province, project.city].filter(Boolean).join(' / ') || undefined,
-            path: `/enterprise/projects/${encodeURIComponent(project.hpInfoId)}`,
-          })
-        ),
+        options: result.projects.items.map((item) => itemOption(item, 'projects')),
       },
     ];
   }, [search.result, t]);
@@ -315,6 +294,11 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
             }}
             onBlur={() => {
               inputFocusedRef.current = false;
+            }}
+            onSearch={(value) => {
+              if (!isDashboardSearchQueryReady(value)) return;
+              setOpen(false);
+              navigate(`/enterprise/search?q=${encodeURIComponent(value.trim())}`);
             }}
           />
         </AutoComplete>

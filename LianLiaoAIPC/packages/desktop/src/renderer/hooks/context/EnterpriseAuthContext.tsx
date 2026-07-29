@@ -34,6 +34,8 @@ export type EnterpriseAuthContextValue = {
   /** Returns true only after the persisted enterprise session has been cleared. */
   logout: () => Promise<boolean>;
   checkRegistration: () => Promise<void>;
+  /** Re-queries the current enterprise membership without changing the login flow. */
+  refreshUserContext: () => Promise<EnterpriseUserContext>;
   isExpired: boolean;
   remainingSeconds: number;
 };
@@ -381,6 +383,14 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
     await completeRegistration(generation);
   }, [completeRegistration, isCurrent]);
 
+  const refreshUserContext = useCallback(async (): Promise<EnterpriseUserContext> => {
+    const refreshed = await activeClient.restoreSession();
+    if (!refreshed?.registered) throw new EnterpriseRendererError('REGISTRATION_INCOMPLETE');
+    if (!mountedRef.current) throw new EnterpriseRendererError('SESSION_RESTORE_FAILED');
+    setUser(refreshed);
+    return refreshed;
+  }, [activeClient]);
+
   const retry = useCallback(async (): Promise<void> => {
     switch (failedActionRef.current) {
       case 'restore':
@@ -452,6 +462,7 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
       retry,
       logout,
       checkRegistration,
+      refreshUserContext,
       isExpired,
       remainingSeconds,
     }),
@@ -462,6 +473,7 @@ export const EnterpriseAuthProvider: React.FC<EnterpriseAuthProviderProps> = ({ 
       loginSession,
       logout,
       registrationOpenId,
+      refreshUserContext,
       remainingSeconds,
       retry,
       startLogin,
@@ -479,3 +491,10 @@ export const useEnterpriseAuth = (): EnterpriseAuthContextValue => {
   if (!context) throw new Error('useEnterpriseAuth must be used within EnterpriseAuthProvider');
   return context;
 };
+
+/**
+ * Optional variant for reusable leaf components and isolated DOM tests.
+ * Authenticated production routes still always provide the enterprise context.
+ */
+export const useOptionalEnterpriseAuth = (): EnterpriseAuthContextValue | undefined =>
+  useContext(EnterpriseAuthContext);

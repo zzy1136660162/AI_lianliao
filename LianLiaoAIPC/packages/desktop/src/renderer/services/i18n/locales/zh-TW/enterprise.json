@@ -200,7 +200,11 @@
       "district": "區縣",
       "status": "狀態"
     },
-    "status": { "open": "進行中", "closed": "已結束" },
+    "status": {
+      "open": "進行中",
+      "closed": "已結束",
+      "expired": "已過期"
+    },
     "columns": {
       "title": "需求名稱",
       "type": "類型",
@@ -208,10 +212,19 @@
       "region": "所在地區",
       "address": "詳細地址",
       "budget": "預算",
+      "progress": "搶單進度",
+      "remainingDays": "剩餘天數",
       "publishedAt": "發布時間",
       "endTime": "截止時間",
       "status": "狀態",
       "actions": "操作"
+    },
+    "stats": {
+      "grabbed": "已搶 {{count}} 人",
+      "applied": "已投遞 {{count}} 人",
+      "remaining": "剩餘 {{count}} 個",
+      "capacity": "需求人數 {{value}}",
+      "daysRemaining": "{{count}} 天"
     },
     "actions": {
       "search": "查詢供需",
@@ -219,9 +232,12 @@
       "preview": "快速預覽",
       "detail": "查看詳情",
       "closePreview": "關閉預覽",
-      "back": "返回供需大廳"
+      "back": "返回供需大廳",
+      "publish": "發布供需"
     },
-    "preview": { "title": "供需快速預覽" },
+    "preview": {
+      "title": "供需快速預覽"
+    },
     "detail": {
       "summaryTitle": "需求概況",
       "fieldsTitle": "業務欄位",
@@ -240,6 +256,71 @@
     "errors": {
       "invalidRoute": "供需詳情地址無效",
       "invalidRouteDescription": "請返回供需大廳並選擇有效記錄。"
+    },
+    "publish": {
+      "eyebrow": "遼寧產業供需大廳",
+      "title": "發布供需資訊",
+      "description": "選擇業務線並完善結構化資訊，提交後由平台審核發布。",
+      "typeTitle": "01 / 選擇業務線",
+      "typePlaceholder": "請選擇供需業務類型",
+      "variantPlaceholder": "請選擇子業務類型",
+      "otherGroup": "其他資訊",
+      "formTitle": "02 / 完善需求資訊",
+      "loadingSchema": "正在載入發布表單",
+      "selectType": "請選擇業務類型以產生表單",
+      "actions": {
+        "clear": "清空表單",
+        "submit": "提交審核"
+      },
+      "image": {
+        "action": "上傳圖片",
+        "hint": "支援 JPG、PNG、WebP、GIF，最多 {{count}} 張",
+        "error": "圖片上傳失敗，請重試。",
+        "uploadedName": "已上傳圖片"
+      },
+      "ai": {
+        "title": "AI 一鍵解析",
+        "description": "用自然語言描述需求，AI 會把識別結果填入對應欄位，發布前仍可修改。",
+        "placeholder": "例如：需要採購200件不鏽鋼機加工零件，下月底前交付到瀋陽，預算10~20萬元……",
+        "action": "一鍵解析並回填",
+        "parsing": "AI 正在整理需求資訊",
+        "applied": "AI 建議已回填",
+        "review": "AI 回填內容僅作為建議，請核對並完善後再提交。"
+      },
+      "aiConversation": {
+        "title": "AI 多輪發布助手",
+        "startTitle": "先描述您要發布的供需資訊",
+        "startHint": "AI 會先判斷業務類型，不明確時向您確認，再逐步補齊右側表單。",
+        "startPlaceholder": "例如：需要採購200件304不鏽鋼機加工零件，一個月內交付到瀋陽……",
+        "startAction": "讓 AI 幫我填寫",
+        "continueAction": "發送並繼續",
+        "currentLine": "目前業務：{{name}}",
+        "discoveringLine": "正在識別業務類型",
+        "completion": "完成度 {{value}}%",
+        "candidateTitle": "請選擇最符合的業務類型",
+        "switchTitle": "AI 建議切換業務類型",
+        "rejectSwitch": "保留目前類型",
+        "warningTitle": "需要您留意",
+        "aiFilled": "AI 填寫",
+        "manualFilled": "已手動修改",
+        "retry": "重試",
+        "reviewTitle": "主要資訊已整理",
+        "reviewHint": "請檢查右側表單，確認無誤後手動提交審核；AI 不會自動發布。",
+        "cancel": "取消本次 AI 填寫",
+        "unavailable": "AI 助手暫時不可用，已填寫內容不會遺失。"
+      },
+      "success": "提交成功，正在等待平台審核",
+      "validation": {
+        "required": "請填寫{{label}}",
+        "minLength": "{{label}}至少填寫{{count}}個字"
+      },
+      "errors": {
+        "types": "暫時無法載入可發布的業務類型，請稍後重試。",
+        "schema": "暫時無法載入發布表單，請稍後重試。",
+        "description": "請先輸入至少5個字的需求描述。",
+        "ai": "AI 解析暫時不可用，您仍可手動填寫。",
+        "publish": "發布失敗，請檢查表單後重試。"
+      }
     }
   },
   "dashboard": {
@@ -597,6 +678,11 @@
     "error": {
       "title": "The project profile could not be loaded",
       "description": "The enterprise service did not return a valid project record. Try again."
+    },
+    "unlock": {
+      "action": "立即解鎖",
+      "membershipRequired": "目前查看權益已用完，請升級會員後繼續。",
+      "failed": "暫時無法解鎖聯絡方式，請重試。"
     }
   },
   "consultation": {
@@ -608,7 +694,10 @@
       "title": "Chat with Lianliao support",
       "description": "Text and images are supported; history is restored automatically."
     },
-    "accessibility": { "timeline": "Consultation message history", "composer": "Consultation message composer" },
+    "accessibility": {
+      "timeline": "Consultation message history",
+      "composer": "Consultation message composer"
+    },
     "timeline": {
       "loading": "Connecting to a service agent",
       "unavailable": "The consultation is temporarily unavailable",
@@ -649,7 +738,11 @@
       "reconnecting": "Reconnecting automatically",
       "disconnected": "Disconnected"
     },
-    "delivery": { "sending": "Sending", "delivered": "Sent", "failed": "Failed" },
+    "delivery": {
+      "sending": "Sending",
+      "delivered": "Sent",
+      "failed": "Failed"
+    },
     "actions": {
       "retry": "Reconnect",
       "retryMessage": "Retry",
@@ -677,7 +770,9 @@
   },
   "customerService": {
     "title": "Customer service",
-    "queue": { "eyebrow": "Lianliao live support" },
+    "queue": {
+      "eyebrow": "Lianliao live support"
+    },
     "accessibility": {
       "workspace": "Customer service workspace",
       "queue": "Conversation queue",
@@ -686,7 +781,11 @@
       "profile": "Customer and company profile",
       "composer": "Reply composer"
     },
-    "queues": { "pending": "Awaiting reply", "active": "In progress", "closed": "Closed" },
+    "queues": {
+      "pending": "Awaiting reply",
+      "active": "In progress",
+      "closed": "Closed"
+    },
     "search": {
       "placeholder": "Search customer, phone, or company",
       "ariaLabel": "Search customer service conversations"
@@ -706,7 +805,11 @@
       "imageAlt": "Customer service image",
       "staffFallback": "Support agent"
     },
-    "delivery": { "sending": "Sending", "delivered": "Delivered", "failed": "Failed" },
+    "delivery": {
+      "sending": "Sending",
+      "delivered": "Delivered",
+      "failed": "Failed"
+    },
     "composer": {
       "placeholder": "Type a reply. Enter to send; Shift + Enter for a new line",
       "hint": "Enter to send · Shift + Enter for a new line",
@@ -732,7 +835,11 @@
       "online": "Online",
       "offline": "Offline"
     },
-    "status": { "waiting": "Waiting", "active": "In progress", "closed": "Closed" },
+    "status": {
+      "waiting": "Waiting",
+      "active": "In progress",
+      "closed": "Closed"
+    },
     "connection": {
       "idle": "Not connected",
       "connecting": "Connecting",

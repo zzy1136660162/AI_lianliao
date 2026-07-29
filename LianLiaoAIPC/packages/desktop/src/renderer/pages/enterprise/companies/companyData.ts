@@ -206,6 +206,8 @@ const PRODUCT_FIELD_RULES = [
   ['address', 'string'],
   ['contactName', 'string'],
   ['phone', 'string'],
+  ['companyLevel', 'finiteNumber'],
+  ['vip', 'boolean'],
   ['collected', 'boolean'],
 ] as const satisfies readonly EnterpriseDataFieldRule[];
 
@@ -286,12 +288,21 @@ export const loadCompanyDetailBundle = async (
 /** Controlled company-list loader with stale-response protection and pagination-only data retention. */
 export const useCompanyCatalog = (
   client: Pick<EnterpriseClient, 'request'>,
-  initialPageSize = 20
+  initial: number | CompanyListQuery = 20
 ): CompanyCatalogState => {
-  const [filters, setFilters] = useState<CompanyFilters>({});
+  const initialQuery = typeof initial === 'number' ? undefined : initial;
+  const [filters, setFilters] = useState<CompanyFilters>(() => ({
+    keyword: initialQuery?.keyword,
+    industry: initialQuery?.industry,
+    province: initialQuery?.province,
+    city: initialQuery?.city,
+    district: initialQuery?.district,
+    companyLevel: initialQuery?.companyLevel,
+    vip: initialQuery?.vip,
+  }));
   const [pagination, setPagination] = useState<CompanyPagination>({
-    pageNum: 1,
-    pageSize: initialPageSize,
+    pageNum: initialQuery?.pageNum ?? 1,
+    pageSize: initialQuery?.pageSize ?? (typeof initial === 'number' ? initial : 20),
   });
   const [data, setData] = useState<EnterprisePage<EnterpriseCompanySummary> | null>(null);
   const [isLoading, setIsLoading] = useState(true);

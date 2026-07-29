@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { EnterpriseRequest, EnterpriseResponse } from '@/common/enterprise/contracts';
+import type { EnterpriseResponse } from '@/common/enterprise/contracts';
 import {
   loadDashboardSearch,
   normalizeDashboardSearchQuery,
@@ -17,303 +17,73 @@ const deferred = <T>(): Deferred<T> => {
   return { promise, resolve };
 };
 
-const companyResponse = (name = 'Liaoning Precision'): EnterpriseResponse => ({
-  operation: 'company.list',
+const unifiedResponse = (): EnterpriseResponse => ({
+  operation: 'unified.search',
   data: {
-    list: [{ companyId: '11', name, industry: 'Equipment' }],
+    total: 3,
     pageNum: 1,
-    pageSize: 5,
-    pages: 1,
-    total: 1,
-  },
-});
-
-const productResponse = (name = 'Industrial pump'): EnterpriseResponse => ({
-  operation: 'product.list',
-  data: {
-    list: [{ productId: '22', companyId: '11', name, companyName: 'Liaoning Precision' }],
-    pageNum: 1,
-    pageSize: 5,
-    pages: 1,
-    total: 1,
-  },
-});
-
-const projectResponse = (projectName = 'RAW confidential project'): EnterpriseResponse => ({
-  operation: 'project.list',
-  data: {
-    list: [
-      {
-        hpInfoId: '33',
-        projectName,
-        constructionUnit: 'Confidential Group',
-        province: 'Liaoning',
-        constructionNature: 'New build',
-      },
+    pageSize: 15,
+    items: [
+      { resourceType: 'COMPANY', businessId: '11', title: '辽宁装备企业', tags: [] },
+      { resourceType: 'PRODUCT', businessId: '22', title: '工业泵', tags: [] },
+      { resourceType: 'PROJECT', businessId: '-33', title: '在建项目', tags: [] },
     ],
-    pageNum: 1,
-    pageSize: 5,
-    pages: 1,
-    total: 1,
   },
 });
 
 const createClient = (request: EnterpriseClient['request']): Pick<EnterpriseClient, 'request'> => ({ request });
 
 describe('dashboard unified search loader', () => {
-  it('trims queries and rejects fewer than two characters before IPC', async () => {
+  it('normalizes whitespace and rejects fewer than two characters before IPC', async () => {
     const request = vi.fn<EnterpriseClient['request']>();
-
-    expect(normalizeDashboardSearchQuery('  steel  ')).toBe('steel');
+    expect(normalizeDashboardSearchQuery('  steel   pump  ')).toBe('steel pump');
     await expect(loadDashboardSearch(createClient(request), ' a ', new AbortController().signal)).rejects.toMatchObject(
       { code: 'INVALID_REQUEST' }
     );
     expect(request).not.toHaveBeenCalled();
   });
 
-  it('starts all three five-result searches in parallel', async () => {
-    const pending = {
-      company: deferred<EnterpriseResponse>(),
-      product: deferred<EnterpriseResponse>(),
-      project: deferred<EnterpriseResponse>(),
-    };
-    const request = vi.fn<EnterpriseClient['request']>((operation: EnterpriseRequest) => {
-      if (operation.operation === 'company.list') return pending.company.promise;
-      if (operation.operation === 'product.list') return pending.product.promise;
-      if (operation.operation === 'project.list') return pending.project.promise;
-      return Promise.reject(new Error('unexpected operation'));
-    });
+  it('uses one grouped unified-search request and splits the safe items by type', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(unifiedResponse());
 
-    const loading = loadDashboardSearch(createClient(request), '  pump  ', new AbortController().signal);
+    const result = await loadDashboardSearch(createClient(request), ' pump ', new AbortController().signal);
 
-    expect(request).toHaveBeenCalledTimes(3);
+    expect(request).toHaveBeenCalledTimes(1);
     expect(request).toHaveBeenCalledWith({
-      operation: 'company.list',
-      payload: { keyword: 'pump', pageNum: 1, pageSize: 5 },
+      operation: 'unified.search',
+      payload: {
+        keyword: 'pump',
+        pageNum: 1,
+        pageSize: 15,
+        enableGroupTop: true,
+        groupTopN: 5,
+      },
     });
-    expect(request).toHaveBeenCalledWith({
-      operation: 'product.list',
-      payload: { keyword: 'pump', pageNum: 1, pageSize: 5 },
-    });
-    expect(request).toHaveBeenCalledWith({
-      operation: 'project.list',
-      payload: { keyword: 'pump', pageNum: 1, pageSize: 5 },
-    });
-
-    pending.company.resolve(companyResponse());
-    pending.product.resolve(productResponse());
-    pending.project.resolve(projectResponse());
-    const result = await loading;
-
-    expect(result.companies.items).toHaveLength(1);
-    expect(result.products.items).toHaveLength(1);
-    expect(result.projects.items).toHaveLength(1);
+    expect(result.companies.items.map((item) => item.businessId)).toEqual(['11']);
+    expect(result.products.items.map((item) => item.businessId)).toEqual(['22']);
+    expect(result.projects.items.map((item) => item.businessId)).toEqual(['-33']);
     expect(result.errorCode).toBeNull();
   });
 
-  it('caps every successful search group at five records when a response is overfull', async () => {
-    const request = vi.fn<EnterpriseClient['request']>((operation) => {
-      if (operation.operation === 'company.list') {
-        return Promise.resolve({
-          operation: 'company.list',
-          data: {
-            list: Array.from({ length: 6 }, (_, index) => ({
-              companyId: String(index + 1),
-              name: `Company ${index + 1}`,
-            })),
-            pageNum: 1,
-            pageSize: 5,
-            pages: 2,
-            total: 6,
-          },
-        });
-      }
-      if (operation.operation === 'product.list') {
-        return Promise.resolve({
-          operation: 'product.list',
-          data: {
-            list: Array.from({ length: 6 }, (_, index) => ({
-              productId: String(index + 1),
-              companyId: '1',
-              name: `Product ${index + 1}`,
-            })),
-            pageNum: 1,
-            pageSize: 5,
-            pages: 2,
-            total: 6,
-          },
-        });
-      }
-      if (operation.operation === 'project.list') {
-        return Promise.resolve({
-          operation: 'project.list',
-          data: {
-            list: Array.from({ length: 6 }, (_, index) => ({
-              hpInfoId: String(index + 1),
-              projectName: `Project ${index + 1}`,
-            })),
-            pageNum: 1,
-            pageSize: 5,
-            pages: 2,
-            total: 6,
-          },
-        });
-      }
-      return Promise.reject(new Error('unexpected operation'));
+  it('caps every group at five records', async () => {
+    const items = (['COMPANY', 'PRODUCT', 'PROJECT'] as const).flatMap((resourceType) =>
+      Array.from({ length: 6 }, (_, index) => ({
+        resourceType,
+        businessId: String(index + 1),
+        title: `${resourceType}-${index + 1}`,
+        tags: [],
+      }))
+    );
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'unified.search',
+      data: { total: items.length, pageNum: 1, pageSize: 15, items },
     });
 
     const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
 
-    expect(result.companies.items.map((item) => item.companyId)).toEqual(['1', '2', '3', '4', '5']);
-    expect(result.products.items.map((item) => item.productId)).toEqual(['1', '2', '3', '4', '5']);
-    expect(result.projects.items.map((item) => item.hpInfoId)).toEqual(['1', '2', '3', '4', '5']);
-  });
-
-  it('keeps the first record for duplicate business ids before applying each group limit', async () => {
-    const request = vi.fn<EnterpriseClient['request']>((operation) => {
-      if (operation.operation === 'company.list') {
-        return Promise.resolve({
-          operation: 'company.list',
-          data: {
-            list: [
-              { companyId: '1', name: 'First company' },
-              { companyId: '1', name: 'Duplicate company' },
-              ...Array.from({ length: 5 }, (_, index) => ({
-                companyId: String(index + 2),
-                name: `Company ${index + 2}`,
-              })),
-            ],
-            pageNum: 1,
-            pageSize: 5,
-            pages: 2,
-            total: 7,
-          },
-        });
-      }
-      if (operation.operation === 'product.list') {
-        return Promise.resolve({
-          operation: 'product.list',
-          data: {
-            list: [
-              { productId: '1', companyId: '1', name: 'First product' },
-              { productId: '1', companyId: '1', name: 'Duplicate product' },
-              ...Array.from({ length: 5 }, (_, index) => ({
-                productId: String(index + 2),
-                companyId: '1',
-                name: `Product ${index + 2}`,
-              })),
-            ],
-            pageNum: 1,
-            pageSize: 5,
-            pages: 2,
-            total: 7,
-          },
-        });
-      }
-      if (operation.operation === 'project.list') {
-        return Promise.resolve({
-          operation: 'project.list',
-          data: {
-            list: [
-              { hpInfoId: '1', projectName: 'First project' },
-              { hpInfoId: '1', projectName: 'Duplicate project' },
-              ...Array.from({ length: 5 }, (_, index) => ({
-                hpInfoId: String(index + 2),
-                projectName: `Project ${index + 2}`,
-              })),
-            ],
-            pageNum: 1,
-            pageSize: 5,
-            pages: 2,
-            total: 7,
-          },
-        });
-      }
-      return Promise.reject(new Error('unexpected operation'));
-    });
-
-    const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
-
-    expect(result.companies.items.map((item) => item.companyId)).toEqual(['1', '2', '3', '4', '5']);
-    expect(result.companies.items[0]?.name).toBe('First company');
-    expect(result.products.items.map((item) => item.productId)).toEqual(['1', '2', '3', '4', '5']);
-    expect(result.products.items[0]?.name).toBe('First product');
-    expect(result.projects.items.map((item) => item.hpInfoId)).toEqual(['1', '2', '3', '4', '5']);
-    expect(result.projects.items[0]?.projectName).toBe('First project');
-  });
-
-  it('keeps successful groups when one category fails', async () => {
-    const request = vi.fn<EnterpriseClient['request']>((operation) => {
-      if (operation.operation === 'company.list') return Promise.resolve(companyResponse());
-      if (operation.operation === 'product.list') return Promise.reject(new Error('raw backend failure'));
-      if (operation.operation === 'project.list') return Promise.resolve(projectResponse());
-      return Promise.reject(new Error('unexpected operation'));
-    });
-
-    const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
-
-    expect(result.companies.items[0]?.name).toBe('Liaoning Precision');
-    expect(result.products.errorCode).toBe('REQUEST_FAILED');
-    expect(result.projects.items[0]?.hpInfoId).toBe('33');
-    expect(result.errorCode).toBeNull();
-  });
-
-  it.each([
-    [{ code: 'NETWORK' }, 'NETWORK'],
-    [{ code: 'NOT_A_STABLE_CODE' }, 'REQUEST_FAILED'],
-    [
-      new Proxy(
-        {},
-        {
-          getOwnPropertyDescriptor: () => {
-            throw new Error('unsafe descriptor');
-          },
-        }
-      ),
-      'REQUEST_FAILED',
-    ],
-  ] as const)('normalizes an untrusted group rejection to %s', async (reason, expectedCode) => {
-    const request = vi.fn<EnterpriseClient['request']>((operation) => {
-      if (operation.operation === 'company.list') return Promise.reject(reason);
-      if (operation.operation === 'product.list') return Promise.resolve(productResponse());
-      if (operation.operation === 'project.list') return Promise.resolve(projectResponse());
-      return Promise.reject(new Error('unexpected operation'));
-    });
-
-    const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
-
-    expect(result.companies.errorCode).toBe(expectedCode);
-  });
-
-  it('returns a safe total error when every category fails', async () => {
-    const request = vi.fn<EnterpriseClient['request']>().mockRejectedValue(new Error('raw-openid-secret'));
-
-    const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
-
-    expect(result.companies.errorCode).toBe('REQUEST_FAILED');
-    expect(result.products.errorCode).toBe('REQUEST_FAILED');
-    expect(result.projects.errorCode).toBe('REQUEST_FAILED');
-    expect(result.errorCode).toBe('REQUEST_FAILED');
-  });
-
-  it('fails closed for a malformed group while preserving valid groups', async () => {
-    const request = vi.fn<EnterpriseClient['request']>((operation) => {
-      if (operation.operation === 'company.list') {
-        return Promise.resolve({
-          operation: 'company.list',
-          data: { list: [], pageNum: 1, pageSize: 99, pages: 0, total: 0 },
-        });
-      }
-      if (operation.operation === 'product.list') return Promise.resolve(productResponse());
-      if (operation.operation === 'project.list') return Promise.resolve(projectResponse());
-      return Promise.reject(new Error('unexpected operation'));
-    });
-
-    const result = await loadDashboardSearch(createClient(request), 'pump', new AbortController().signal);
-
-    expect(result.companies.errorCode).toBe('INVALID_RESPONSE');
-    expect(result.products.items).toHaveLength(1);
-    expect(result.projects.items).toHaveLength(1);
+    expect(result.companies.items).toHaveLength(5);
+    expect(result.products.items).toHaveLength(5);
+    expect(result.projects.items).toHaveLength(5);
   });
 
   it('does not publish results after the request is aborted', async () => {
@@ -323,7 +93,7 @@ describe('dashboard unified search loader', () => {
     const loading = loadDashboardSearch(createClient(request), 'pump', controller.signal);
 
     controller.abort();
-    pending.resolve(companyResponse());
+    pending.resolve(unifiedResponse());
 
     await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
   });
