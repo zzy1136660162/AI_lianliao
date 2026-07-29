@@ -1,27 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ENTERPRISE_IPC_ERROR_MESSAGES } from '@/common/enterprise/constants';
-import type {
-  EnterpriseCompanySummary,
-  EnterpriseIpcErrorCode,
-  EnterpriseProductSummary,
-  EnterpriseProjectSummary,
-} from '@/common/enterprise/contracts';
-import { loadCompanyList } from '@/renderer/pages/enterprise/companies/companyData';
-import { loadProductList } from '@/renderer/pages/enterprise/products/productData';
-import { loadProjectList } from '@/renderer/pages/enterprise/projects/projectData';
+import type { EnterpriseIpcErrorCode } from '@/common/enterprise/contracts';
+import type { UnifiedResourceType, UnifiedSearchItem } from '@/common/enterprise/unified-search/contracts';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
-export type DashboardSearchGroup<T> = {
-  items: T[];
+export type DashboardSearchGroup = {
+  items: UnifiedSearchItem[];
   errorCode: EnterpriseIpcErrorCode | null;
 };
 
 export type DashboardSearchResult = {
   query: string;
-  companies: DashboardSearchGroup<EnterpriseCompanySummary>;
-  products: DashboardSearchGroup<EnterpriseProductSummary>;
-  projects: DashboardSearchGroup<EnterpriseProjectSummary>;
+  companies: DashboardSearchGroup;
+  products: DashboardSearchGroup;
+  projects: DashboardSearchGroup;
   errorCode: EnterpriseIpcErrorCode | null;
 };
 
@@ -70,8 +63,7 @@ const safeErrorCode = (error: unknown): EnterpriseIpcErrorCode => {
 const isAbortError = (error: unknown): boolean => {
   if (typeof error !== 'object' || error === null) return false;
   try {
-    const descriptor = Object.getOwnPropertyDescriptor(error, 'name');
-    return descriptor?.value === 'AbortError';
+    return Object.getOwnPropertyDescriptor(error, 'name')?.value === 'AbortError';
   } catch {
     return false;
   }
@@ -85,31 +77,18 @@ const throwIfAborted = (signal: AbortSignal): void => {
 };
 
 /** Normalizes user input before it can become a cross-domain search request. */
-export const normalizeDashboardSearchQuery = (query: string): string => query.trim();
+export const normalizeDashboardSearchQuery = (query: string): string => query.trim().replace(/\s+/g, ' ');
 
 /** A valid unified-search term contains at least two Unicode code points. */
 export const isDashboardSearchQueryReady = (query: string): boolean =>
   Array.from(normalizeDashboardSearchQuery(query)).length >= 2;
 
-const settledGroup = <T>(
-  result: PromiseSettledResult<{ list: T[] }>,
-  getBusinessId: (item: T) => string
-): DashboardSearchGroup<T> => {
-  if (result.status === 'rejected') return { items: [], errorCode: safeErrorCode(result.reason) };
+const groupItems = (items: UnifiedSearchItem[], resourceType: UnifiedResourceType): DashboardSearchGroup => ({
+  items: items.filter((item) => item.resourceType === resourceType).slice(0, DASHBOARD_SEARCH_RESULT_LIMIT),
+  errorCode: null,
+});
 
-  const businessIds = new Set<string>();
-  const items: T[] = [];
-  for (const item of result.value.list) {
-    const businessId = getBusinessId(item);
-    if (businessIds.has(businessId)) continue;
-    businessIds.add(businessId);
-    items.push(item);
-    if (items.length === DASHBOARD_SEARCH_RESULT_LIMIT) break;
-  }
-  return { items, errorCode: null };
-};
-
-/** Runs the three strict catalog loaders concurrently and preserves independently successful groups. */
+/** Uses the same unified Solr search as H5, through the cloud-api safe adapter. */
 export const loadDashboardSearch = async (
   client: Pick<EnterpriseClient, 'request'>,
   rawQuery: string,
@@ -119,23 +98,25 @@ export const loadDashboardSearch = async (
   if (!isDashboardSearchQueryReady(query)) throw new DashboardDataError('INVALID_REQUEST');
   throwIfAborted(signal);
 
-  const [companyResult, productResult, projectResult] = await Promise.allSettled([
-    loadCompanyList(client, { keyword: query, pageNum: 1, pageSize: 5 }, signal),
-    loadProductList(client, { keyword: query, pageNum: 1, pageSize: 5 }, signal),
-    loadProjectList(client, { keyword: query, pageNum: 1, pageSize: 5 }, signal),
-  ]);
+  const response = await client.request({
+    operation: 'unified.search',
+    payload: {
+      keyword: query,
+      pageNum: 1,
+      pageSize: 15,
+      enableGroupTop: true,
+      groupTopN: DASHBOARD_SEARCH_RESULT_LIMIT,
+    },
+  });
   throwIfAborted(signal);
+  if (response.operation !== 'unified.search') throw new DashboardDataError('INVALID_RESPONSE');
 
-  const companies = settledGroup(companyResult, (company) => company.companyId);
-  const products = settledGroup(productResult, (product) => product.productId);
-  const projects = settledGroup(projectResult, (project) => project.hpInfoId);
-  const allFailed = [companies, products, projects].every((group) => group.errorCode !== null);
   return {
     query,
-    companies,
-    products,
-    projects,
-    errorCode: allFailed ? 'REQUEST_FAILED' : null,
+    companies: groupItems(response.data.items, 'COMPANY'),
+    products: groupItems(response.data.items, 'PRODUCT'),
+    projects: groupItems(response.data.items, 'PROJECT'),
+    errorCode: null,
   };
 };
 
@@ -159,10 +140,7 @@ export const useDashboardSearch = (
 
     if (!isDashboardSearchQueryReady(normalizedQuery)) {
       setIsLoading(false);
-      return () => {
-        controller.abort();
-        if (generation === requestGenerationRef.current) requestGenerationRef.current += 1;
-      };
+      return () => controller.abort();
     }
 
     setIsLoading(true);
@@ -171,22 +149,21 @@ export const useDashboardSearch = (
         timer = null;
         void loadDashboardSearch(client, normalizedQuery, controller.signal)
           .then((nextResult) => {
-            if (controller.signal.aborted || generation !== requestGenerationRef.current) return;
-            setResult(nextResult);
+            if (!controller.signal.aborted && generation === requestGenerationRef.current) setResult(nextResult);
           })
           .catch((error: unknown) => {
             if (controller.signal.aborted || isAbortError(error) || generation !== requestGenerationRef.current) return;
+            const errorCode = safeErrorCode(error);
             setResult({
               query: normalizedQuery,
-              companies: { items: [], errorCode: 'REQUEST_FAILED' },
-              products: { items: [], errorCode: 'REQUEST_FAILED' },
-              projects: { items: [], errorCode: 'REQUEST_FAILED' },
-              errorCode: 'REQUEST_FAILED',
+              companies: { items: [], errorCode },
+              products: { items: [], errorCode },
+              projects: { items: [], errorCode },
+              errorCode,
             });
           })
           .finally(() => {
-            if (controller.signal.aborted || generation !== requestGenerationRef.current) return;
-            setIsLoading(false);
+            if (!controller.signal.aborted && generation === requestGenerationRef.current) setIsLoading(false);
           });
       },
       Math.max(0, debounceMs)

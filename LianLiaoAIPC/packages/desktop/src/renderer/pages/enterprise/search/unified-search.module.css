@@ -1,0 +1,94 @@
+.page {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 18px;
+  padding: 30px 38px 44px;
+}
+
+.pageHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  align-items: end;
+  gap: 28px;
+}
+
+.pageHeader h1 {
+  margin: 8px 0 10px;
+  color: var(--color-text-1);
+  font-size: 38px;
+  line-height: 1.15;
+}
+
+.pageHeader p {
+  margin: 0;
+  color: var(--color-text-2);
+}
+
+.eyebrow {
+  color: #1677ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.headerRule {
+  height: 1px;
+  margin-bottom: 8px;
+  background: #8fb8ff;
+}
+
+.searchCard,
+.resultCard {
+  border: 1px solid #d5e4f7;
+  border-radius: var(--enterprise-radius-card, 15px);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(31, 91, 163, 0.08);
+}
+
+.searchCard {
+  padding: 18px;
+}
+
+.resultCard {
+  min-width: 0;
+  padding: 6px 16px 16px;
+  scroll-margin-top: 18px;
+}
+
+.searchButtonText {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.titleCell {
+  color: var(--color-text-1);
+}
+
+.titleCell mark {
+  border-radius: 3px;
+  background: #fff1b8;
+  color: inherit;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 4px 2px;
+  color: var(--color-text-2);
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: 24px 20px 36px;
+  }
+
+  .pageHeader {
+    grid-template-columns: 1fr;
+  }
+
+  .headerRule {
+    display: none;
+  }
+}

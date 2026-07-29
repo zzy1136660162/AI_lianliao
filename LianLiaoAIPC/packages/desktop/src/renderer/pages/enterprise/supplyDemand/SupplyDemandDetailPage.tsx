@@ -11,6 +11,7 @@ import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClien
 
 import { loadDemandDetail, parseDemandRouteParams } from './supplyDemandData';
 import styles from './supply-demand.module.css';
+import DemandContactCard from './DemandContactCard';
 
 export type SupplyDemandDetailPageProps = { client?: EnterpriseClient };
 
@@ -95,14 +96,8 @@ const SupplyDemandDetailPage: React.FC<SupplyDemandDetailPageProps> = ({ client 
           </div>
           <p>{detail.summary || t('enterprise.supplyDemand.notProvided')}</p>
           <Descriptions column={{ xs: 1, sm: 2 }} size='small'>
-            <Descriptions.Item label={t('enterprise.supplyDemand.columns.company')}>
-              {detail.companyName || t('enterprise.supplyDemand.notProvided')}
-            </Descriptions.Item>
             <Descriptions.Item label={t('enterprise.supplyDemand.columns.region')}>
               {[detail.city, detail.district].filter(Boolean).join(' / ') || t('enterprise.supplyDemand.notProvided')}
-            </Descriptions.Item>
-            <Descriptions.Item label={t('enterprise.supplyDemand.columns.address')}>
-              {detail.address || t('enterprise.supplyDemand.notProvided')}
             </Descriptions.Item>
             <Descriptions.Item label={t('enterprise.supplyDemand.columns.budget')}>
               {detail.budget || t('enterprise.supplyDemand.notProvided')}
@@ -120,22 +115,14 @@ const SupplyDemandDetailPage: React.FC<SupplyDemandDetailPageProps> = ({ client 
                   ? t('enterprise.supplyDemand.status.closed')
                   : t('enterprise.supplyDemand.notProvided')}
             </Descriptions.Item>
+            {detail.fields.map((field) => (
+              <Descriptions.Item key={field.key} label={field.label}>
+                {displayFieldValue(field)}
+              </Descriptions.Item>
+            ))}
           </Descriptions>
         </Card>
-
-        <Card className={styles.detailFields} title={t('enterprise.supplyDemand.detail.fieldsTitle')}>
-          {detail.fields.length > 0 ? (
-            <Descriptions className={styles.fieldGrid} column={{ xs: 1, sm: 2 }} size='small'>
-              {detail.fields.map((field) => (
-                <Descriptions.Item key={field.key} label={field.label}>
-                  {displayFieldValue(field)}
-                </Descriptions.Item>
-              ))}
-            </Descriptions>
-          ) : (
-            <p>{t('enterprise.supplyDemand.detail.noFields')}</p>
-          )}
-        </Card>
+        <DemandContactCard client={client} typeId={detail.typeId} demandId={detail.demandId} />
       </div>
     </section>
   );

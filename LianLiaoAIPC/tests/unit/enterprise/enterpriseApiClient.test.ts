@@ -79,6 +79,9 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
     total: 1,
   },
   'project.detail': { hpInfoId: '901', projectName: 'Factory' },
+  'project.contactUnlock': { isPurchased: true, inserted: true },
+  'contact.acquire': { type: true, msg: '', url: '', errType: 0, phone: '13800000000' },
+  'demand.types': [],
   'demand.list': {
     list: [{ demandId: '101', typeId: 0, typeName: 'Machining', title: 'Precision parts', primaryTags: [] }],
     pageNum: 1,
@@ -93,6 +96,27 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
     title: 'Precision parts',
     primaryTags: [],
     fields: [],
+  },
+  'demand.contactStatus': {
+    state: 'MEMBER_AVAILABLE',
+    memberLevel: 2,
+    remainingQuota: 3,
+    canAcquire: true,
+    canUpgrade: false,
+    contact: null,
+  },
+  'demand.contactAcquire': {
+    state: 'UNLOCKED',
+    canAcquire: false,
+    canUpgrade: false,
+    contact: { contactPhone: '13800000000' },
+  },
+  'unified.suggest': ['沈阳装备', '沈阳制造'],
+  'unified.search': {
+    total: 1,
+    pageNum: 1,
+    pageSize: 20,
+    items: [{ resourceType: 'COMPANY', businessId: '-1807', title: '沈阳企业', tags: [] }],
   },
 };
 
@@ -130,9 +154,27 @@ describe('enterprise API routes', () => {
       'project.drill': 'cloud-api/OpportunityController/getAiMaterialDrillList',
       'project.list': 'cloud-api/OpportunityController/getAiMaterialProjectList',
       'project.detail': 'cloud-api/OpportunityController/getAiMaterialProjectDetail',
+      'project.contactUnlock': 'cloud-api/OpportunityController/unlockAiMaterialProjectDetail',
+      'contact.acquire': 'cloud-api/CompanyController/getCanCallPhone',
       'demand.types': 'cloud-api/DemandQueryController/types',
       'demand.list': 'cloud-api/DemandQueryController/list',
       'demand.detail': 'cloud-api/DemandQueryController/detail',
+      'demand.publishTypes': 'cloud-api/DemandPublishController/types',
+      'demand.publishSchema': 'cloud-api/DemandPublishController/schema',
+      'demand.aiParse': 'cloud-api/DemandPublishController/parse',
+      'demand.aiConversation.start': 'cloud-api/DemandAiConversationController/start',
+      'demand.aiConversation.turn': 'cloud-api/DemandAiConversationController/turn',
+      'demand.aiConversation.confirmLine': 'cloud-api/DemandAiConversationController/confirm-line',
+      'demand.aiConversation.patch': 'cloud-api/DemandAiConversationController/patch',
+      'demand.aiConversation.resume': 'cloud-api/DemandAiConversationController/resume',
+      'demand.aiConversation.cancel': 'cloud-api/DemandAiConversationController/cancel',
+      'demand.aiConversation.complete': 'cloud-api/DemandAiConversationController/complete',
+      'demand.publish': 'cloud-api/DemandPublishController/publish',
+      'demand.uploadImage': 'cloud-api/DemandPublishController/image/upload',
+      'demand.contactStatus': 'cloud-api/DemandContactController/status',
+      'demand.contactAcquire': 'cloud-api/DemandContactController/acquire',
+      'unified.suggest': 'cloud-api/DesktopUnifiedSearchController/suggest',
+      'unified.search': 'cloud-api/DesktopUnifiedSearchController/search',
       'auth.create': 'cloud-api/CommonWxGZHQrCodeLogIn/desktop/create',
       'auth.poll': 'cloud-api/CommonWxGZHQrCodeLogIn/desktop/poll',
       'auth.userContext': 'cloud-api/DesktopEnterpriseController/userContext',
@@ -203,6 +245,64 @@ describe('EnterpriseApiClient base URL policy', () => {
       province: '辽宁省',
       city: '沈阳市',
       district: '浑南区',
+    });
+  });
+
+  it('injects the trusted session openId into contact requests', async () => {
+    const { calls, transport } = captureTransport('demand.contactStatus');
+    const client = new EnterpriseApiClient({
+      baseUrl: 'https://cloud.lslnii.com',
+      environment: 'production',
+      transport,
+    });
+
+    await client.request(
+      {
+        operation: 'demand.contactStatus',
+        payload: { demandId: '-101', typeId: 6 },
+      },
+      REGISTERED_CONTEXT
+    );
+
+    expect(calls[0]?.url).toBe('https://cloud.lslnii.com/cloud-api/DemandContactController/status');
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      demandId: '-101',
+      typeId: 6,
+      openId: REGISTERED_CONTEXT.openId,
+    });
+  });
+
+  it('serializes the unified search contract without caller-controlled transport fields', async () => {
+    const { calls, transport } = captureTransport('unified.search');
+    const client = new EnterpriseApiClient({
+      baseUrl: 'https://cloud.lslnii.com',
+      environment: 'production',
+      transport,
+    });
+
+    await client.request(
+      {
+        operation: 'unified.search',
+        payload: {
+          keyword: '工业互联网',
+          resourceTypes: ['COMPANY'],
+          pageNum: 1,
+          pageSize: 20,
+          enableGroupTop: true,
+          groupTopN: 5,
+        },
+      },
+      REGISTERED_CONTEXT
+    );
+
+    expect(calls[0]?.url).toBe('https://cloud.lslnii.com/cloud-api/DesktopUnifiedSearchController/search');
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      keyword: '工业互联网',
+      resourceTypes: ['COMPANY'],
+      pageNum: 1,
+      pageSize: 20,
+      enableGroupTop: true,
+      groupTopN: 5,
     });
   });
 
@@ -750,6 +850,197 @@ describe('EnterpriseApiClient serialization and context injection', () => {
     await expectApiError(client.request(request, { registered: false, openId: ' ' }), 'MISSING_CONTEXT');
 
     expect(calls).toBe(0);
+  });
+});
+
+describe('EnterpriseApiClient contact access', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('keeps the raw company phone in the main process and releases it only after H5 permission succeeds', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const transport: EnterpriseApiTransport = async (url, init) => {
+      calls.push({ url, init });
+      if (url.endsWith('/getDetailcompany')) {
+        return jsonResponse({
+          success: true,
+          data: {
+            company: {
+              id: '1807',
+              name: 'Acme',
+              phone: '13800000000',
+            },
+            product: { list: [], pageNum: 1, pageSize: 10, pages: 0, total: 0 },
+          },
+        });
+      }
+      return jsonResponse({
+        success: true,
+        data: { type: 'Y', msg: '', url: '', errType: 0 },
+      });
+    };
+    const client = new EnterpriseApiClient({ transport });
+
+    const detail = await client.request(
+      { operation: 'company.detail', payload: { companyId: '1807' } },
+      REGISTERED_CONTEXT
+    );
+    const access = await client.request(
+      {
+        operation: 'contact.acquire',
+        payload: { resourceType: 'COMPANY', resourceId: '1807' },
+      } as EnterpriseRequest,
+      REGISTERED_CONTEXT
+    );
+
+    expect(detail).toMatchObject({ data: { phone: '138********' } });
+    expect(access).toEqual({
+      operation: 'contact.acquire',
+      data: {
+        allowed: true,
+        errType: 0,
+        message: '',
+        actionUrl: '',
+        phone: '13800000000',
+      },
+    });
+    expect(calls[1]?.url).toBe('https://cloud.lslnii.com/cloud-api/CompanyController/getCanCallPhone');
+    expect(calls[1]?.init.headers).toEqual({
+      Accept: 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+    });
+    expect(String(calls[1]?.init.body)).toBe(
+      new URLSearchParams({
+        openId: REGISTERED_CONTEXT.openId,
+        toCompanyId: '1807',
+        toPhone: '13800000000',
+        aiMaterialProject: '0',
+        consumeQuota: '1',
+      }).toString()
+    );
+  });
+
+  it('injects trusted project membership fields into the project unlock request', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const transport: EnterpriseApiTransport = async (url, init) => {
+      calls.push({ url, init });
+      return jsonResponse({
+        success: true,
+        data: { isPurchased: true, inserted: true },
+      });
+    };
+    const client = new EnterpriseApiClient({ transport });
+
+    const response = await client.request(
+      {
+        operation: 'project.contactUnlock',
+        payload: { hpInfoId: '-901' },
+      } as EnterpriseRequest,
+      { ...REGISTERED_CONTEXT, companyLevel: 1 }
+    );
+
+    expect(response).toEqual({
+      operation: 'project.contactUnlock',
+      data: { purchased: true, inserted: true },
+    });
+    expect(calls[0]?.url).toBe(
+      'https://cloud.lslnii.com/cloud-api/OpportunityController/unlockAiMaterialProjectDetail'
+    );
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      hpInfoId: '-901',
+      openId: REGISTERED_CONTEXT.openId,
+      companyId: REGISTERED_CONTEXT.companyId,
+      companyLevel: 1,
+    });
+  });
+
+  it('checks project phone entitlement without consuming quota or exposing the raw phone before unlock', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const transport: EnterpriseApiTransport = async (url, init) => {
+      calls.push({ url, init });
+      if (url.endsWith('/getAiMaterialProjectDetail')) {
+        return jsonResponse({
+          success: true,
+          data: {
+            hpInfoId: '901',
+            projectName: 'Factory',
+            phone: '13800000000',
+            isPurchased: false,
+          },
+        });
+      }
+      return jsonResponse({
+        success: true,
+        data: { type: true, msg: '', url: '', errType: 0 },
+      });
+    };
+    const client = new EnterpriseApiClient({ transport });
+
+    await client.request({ operation: 'project.detail', payload: { hpInfoId: '901' } }, REGISTERED_CONTEXT);
+    const permission = await client.request(
+      {
+        operation: 'contact.acquire',
+        payload: { resourceType: 'PROJECT', resourceId: '901', consumeQuota: false },
+      },
+      REGISTERED_CONTEXT
+    );
+
+    expect(permission).toEqual({
+      operation: 'contact.acquire',
+      data: { allowed: true, errType: 0, message: '', actionUrl: '' },
+    });
+    expect(String(calls[1]?.init.body)).toBe(
+      new URLSearchParams({
+        openId: REGISTERED_CONTEXT.openId,
+        toCompanyId: '901',
+        toPhone: '13800000000',
+        aiMaterialProject: '1',
+        consumeQuota: '0',
+      }).toString()
+    );
+  });
+
+  it('reloads project detail when the protected contact cache has expired', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-28T01:00:00.000Z'));
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const transport: EnterpriseApiTransport = async (url, init) => {
+      calls.push({ url, init });
+      if (url.endsWith('/getAiMaterialProjectDetail')) {
+        return jsonResponse({
+          success: true,
+          data: {
+            hpInfoId: '901',
+            projectName: 'Factory',
+            phone: '13800000000',
+            isPurchased: false,
+          },
+        });
+      }
+      return jsonResponse({
+        success: true,
+        data: { type: true, msg: '', url: '', errType: 0 },
+      });
+    };
+    const client = new EnterpriseApiClient({ transport });
+
+    await client.request({ operation: 'project.detail', payload: { hpInfoId: '901' } }, REGISTERED_CONTEXT);
+    vi.advanceTimersByTime(10 * 60 * 1000 + 1);
+    const permission = await client.request(
+      {
+        operation: 'contact.acquire',
+        payload: { resourceType: 'PROJECT', resourceId: '901', consumeQuota: false },
+      },
+      REGISTERED_CONTEXT
+    );
+
+    expect(permission).toMatchObject({
+      operation: 'contact.acquire',
+      data: { allowed: true, errType: 0 },
+    });
+    expect(calls.filter(({ url }) => url.endsWith('/getAiMaterialProjectDetail'))).toHaveLength(2);
+    expect(calls.at(-1)?.url).toBe('https://cloud.lslnii.com/cloud-api/CompanyController/getCanCallPhone');
   });
 });
 

@@ -435,6 +435,18 @@ describe('company detail', () => {
           },
         };
       }
+      if (input.operation === 'contact.acquire') {
+        return {
+          operation: 'contact.acquire',
+          data: {
+            allowed: true,
+            errType: 0,
+            message: '',
+            actionUrl: '',
+            phone: rawPhone,
+          },
+        };
+      }
       return {
         operation: 'product.list',
         data: {
@@ -454,7 +466,13 @@ describe('company detail', () => {
     expect(container).not.toHaveTextContent(rawPhone);
     const contactSection = screen.getByText('enterprise.companyDetail.sections.contact').closest('.ll-ant-card');
     expect(contactSection).not.toBeNull();
-    expect(contactSection?.querySelector('button, a')).toBeNull();
+    expect(within(contactSection as HTMLElement).getByRole('button', { name: '获取联系方式' })).toBeVisible();
+    await userEvent.click(within(contactSection as HTMLElement).getByRole('button', { name: '获取联系方式' }));
+    expect(await within(contactSection as HTMLElement).findByText(rawPhone)).toBeVisible();
+    expect(request).toHaveBeenCalledWith({
+      operation: 'contact.acquire',
+      payload: { resourceType: 'COMPANY', resourceId: '42' },
+    });
     const summarySection = screen
       .getByText('enterprise.companyDetail.sections.businessSummary')
       .closest('.ll-ant-card');

@@ -88,6 +88,76 @@ describe('enterprise schemas', () => {
     expect(enterpriseLoginStatusSchema.safeParse('APPROVED').success).toBe(false);
   });
 
+  it('normalizes response progress and remaining days from a demand list row', () => {
+    expect(
+      parseEnterpriseResponse('demand.list', {
+        list: [
+          {
+            demandId: '101',
+            typeId: 8,
+            typeName: '链上千岗',
+            title: '数控操作工',
+            primaryTags: [],
+            grabCount: 3,
+            remainingGrabCount: 7,
+            remainingDays: 12,
+            capacityLabel: '10人',
+            statMode: 'APPLICATION',
+          },
+        ],
+        pageNum: 1,
+        pageSize: 20,
+        pages: 1,
+        total: 1,
+      })
+    ).toMatchObject({
+      data: {
+        list: [
+          {
+            grabCount: 3,
+            remainingGrabCount: 7,
+            remainingDays: 12,
+            capacityLabel: '10人',
+            statMode: 'APPLICATION',
+          },
+        ],
+      },
+    });
+  });
+
+  it('accepts a variant-aware publishing schema with grouped dictionary fields', () => {
+    expect(
+      parseEnterpriseResponse('demand.publishSchema', {
+        typeId: 8,
+        typeName: '链上千岗',
+        variantCode: 'TRAINING_SERVICE',
+        variants: [{ variantCode: 'TRAINING_SERVICE', variantName: '培训服务' }],
+        fields: [
+          {
+            sourceColumn: 'DEMAND_NAME',
+            fieldKey: 'title',
+            fieldLabel: '培训类型',
+            targetKind: 'BASE',
+            groupCode: 'CORE',
+            groupName: '核心需求',
+            groupOrder: 10,
+            displayOrder: 10,
+            inputType: 'MULTISELECT',
+            required: true,
+            maxLength: 500,
+            options: ['技能培训', '管理培训'],
+            valueSeparator: '、',
+          },
+        ],
+      })
+    ).toMatchObject({
+      data: {
+        variantCode: 'TRAINING_SERVICE',
+        fields: [{ fieldKey: 'title', inputType: 'MULTISELECT', groupName: '核心需求' }],
+      },
+    });
+  });
+
   it('normalizes numeric user and company identifiers to strings', () => {
     const context = enterpriseUserContextSchema.parse({
       registered: true,
@@ -664,6 +734,8 @@ describe('enterprise schemas', () => {
       COMPANY_NAME: 'Acme',
       PRODUCT_ABS: 'High-efficiency pump',
       COMP_PHONE: '13800000000',
+      COM_LEVEL: 3.1,
+      PAY_VIP: true,
     });
 
     expect(response).toEqual({
@@ -675,6 +747,8 @@ describe('enterprise schemas', () => {
         companyName: 'Acme',
         summary: 'High-efficiency pump',
         phone: '138********',
+        companyLevel: 3.1,
+        vip: true,
       },
     });
   });
@@ -1114,6 +1188,24 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it('accepts the numeric inputTime returned by the live project detail endpoint', () => {
+    expect(
+      parseEnterpriseResponse('project.detail', {
+        hpInfoId: 44605,
+        projectName: 'Factory Project',
+        inputTime: 1785142834000,
+        isPurchased: false,
+      })
+    ).toMatchObject({
+      operation: 'project.detail',
+      data: {
+        hpInfoId: '44605',
+        publishedAt: '1785142834000',
+        purchased: false,
+      },
+    });
+  });
+
   it.each([
     ['explicitly unpurchased', false],
     ['missing purchase state', undefined],
@@ -1130,7 +1222,7 @@ describe('enterprise schemas', () => {
     expect(JSON.stringify(response)).not.toContain('13800000000');
   });
 
-  it('keeps a purchased project phone available after the service confirms access', () => {
+  it('keeps a purchased project phone masked until the contact permission endpoint confirms access', () => {
     expect(
       parseEnterpriseResponse('project.detail', {
         HP_INFO_ID: 901,
@@ -1138,10 +1230,10 @@ describe('enterprise schemas', () => {
         PHONE: '13800000000',
         IS_PURCHASED: true,
       })
-    ).toMatchObject({ data: { phone: '13800000000', purchased: true } });
+    ).toMatchObject({ data: { phone: '138********', purchased: true } });
   });
 
-  it('keeps Unicode and slash-formatted phones unchanged when purchase access is explicit', () => {
+  it('masks Unicode and slash-formatted phones even when project purchase access is explicit', () => {
     expect(
       parseEnterpriseResponse('project.detail', {
         HP_INFO_ID: 901,
@@ -1149,7 +1241,7 @@ describe('enterprise schemas', () => {
         PHONE: '１３８/0000/0000 WeChat',
         IS_PURCHASED: true,
       })
-    ).toMatchObject({ data: { phone: '１３８/0000/0000 WeChat', purchased: true } });
+    ).toMatchObject({ data: { phone: '１３８/****/**** WeChat', purchased: true } });
   });
 
   it('accepts a precise ordinary decimal project investment string', () => {

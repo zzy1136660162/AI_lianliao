@@ -26,13 +26,17 @@ let tray: TrayInstance | null = null;
 let closeToTrayEnabled = false;
 let isQuitting = false;
 let mainWindowRef: BrowserWindow | null = null;
+let createMainWindowRef: (() => void) | null = null;
 let cachedActiveCount = 0;
 let customerServiceUnreadCount = 0;
 let customerConsultationUnreadCount = 0;
 let desktopNotificationUnreadCount = 0;
 
 const showAndFocusMainWindow = (): BrowserWindow | null => {
-  if (!mainWindowRef || mainWindowRef.isDestroyed()) return null;
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) {
+    createMainWindowRef?.();
+    return null;
+  }
   if (process.platform === 'darwin' && app.dock) {
     void app.dock.show();
   }
@@ -132,8 +136,11 @@ const getRealtimeServiceUnread = (): { count: number; labelKey: string } => {
   return { count, labelKey: 'enterprise.customerService.title' };
 };
 
-export const setTrayMainWindow = (win: BrowserWindow): void => {
+export const setTrayMainWindow = (win: BrowserWindow, createWindow?: () => void): void => {
   mainWindowRef = win;
+  if (createWindow) {
+    createMainWindowRef = createWindow;
+  }
 };
 
 export const getCloseToTrayEnabled = (): boolean => closeToTrayEnabled;
@@ -348,6 +355,12 @@ export const createOrUpdateTray = (): void => {
     tray = new Tray(icon);
     updateTrayPresentation();
     void buildTrayContextMenu().then((menu) => tray?.setContextMenu(menu));
+
+    // A single click is the most discoverable restore gesture on Windows and
+    // Linux. Keep double-click support for users accustomed to that gesture.
+    tray.on('click', () => {
+      showAndFocusMainWindow();
+    });
 
     tray.on('double-click', () => {
       showAndFocusMainWindow();

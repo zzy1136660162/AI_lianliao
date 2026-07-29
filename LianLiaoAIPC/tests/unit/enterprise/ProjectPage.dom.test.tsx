@@ -433,24 +433,37 @@ describe('project detail permission display', () => {
       </EnterpriseAntdProvider>
     );
 
-  it('hides protected fields and offers no unlock action when the project is not purchased', async () => {
-    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
-      operation: 'project.detail',
-      data: {
-        hpInfoId: '901',
-        projectName: 'Factory expansion',
-        constructionUnit: 'Secret owner',
-        contactName: 'Secret contact',
-        phone: '138********',
-        address: 'Secret address',
-        constructionNature: 'New build',
-        totalInvestment: 5000,
-        constructionPeriod: '2026-2027',
-        projectComposition: 'Plant and warehouse',
-        equipment: 'Production line',
-        materials: 'Steel and cement',
-        purchased: false,
-      },
+  it('hides protected fields until the H5-compatible project unlock succeeds and refreshes detail', async () => {
+    let purchased = false;
+    const request = vi.fn<EnterpriseClient['request']>(async (input) => {
+      if (input.operation === 'contact.acquire') {
+        return {
+          operation: 'contact.acquire',
+          data: { allowed: true, errType: 0, message: '', actionUrl: '' },
+        };
+      }
+      if (input.operation === 'project.contactUnlock') {
+        purchased = true;
+        return { operation: 'project.contactUnlock', data: { purchased: true, inserted: true } };
+      }
+      return {
+        operation: 'project.detail',
+        data: {
+          hpInfoId: '901',
+          projectName: 'Factory expansion',
+          constructionUnit: 'Secret owner',
+          contactName: 'Secret contact',
+          phone: '138********',
+          address: 'Secret address',
+          constructionNature: 'New build',
+          totalInvestment: 5000,
+          constructionPeriod: '2026-2027',
+          projectComposition: 'Plant and warehouse',
+          equipment: 'Production line',
+          materials: 'Steel and cement',
+          purchased,
+        },
+      };
     });
     const { container } = renderDetail(createClient(request));
 
@@ -459,12 +472,84 @@ describe('project detail permission display', () => {
     expect(container.querySelector('[class*="arco-"]')).not.toBeInTheDocument();
     expect(screen.getByText(/enterprise\.projectDetail\.lockedProjectTitle/)).toBeVisible();
     expect(screen.getByText('Plant and warehouse')).toBeVisible();
-    expect(container).not.toHaveTextContent('Secret owner');
+    expect(screen.getByText('Secret owner')).toHaveAttribute('data-protected', 'true');
     expect(container).not.toHaveTextContent('Factory expansion');
-    expect(container).not.toHaveTextContent('Secret contact');
+    expect(screen.getByText('Secret contact')).toHaveAttribute('data-protected', 'true');
     expect(container).not.toHaveTextContent('1380000');
-    expect(container).not.toHaveTextContent('Secret address');
-    expect(screen.queryByRole('button', { name: /unlock|解锁/i })).toBeNull();
+    expect(screen.getByText('Secret address')).toHaveAttribute('data-protected', 'true');
+    expect(screen.getByText('138********')).toHaveAttribute('data-protected', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'enterprise.projectDetail.unlock.action' }));
+    expect(await screen.findByText('Secret owner')).toBeVisible();
+    expect(screen.getByText('Secret owner')).not.toHaveAttribute('data-protected');
+    expect(screen.getByRole('button', { name: '获取联系方式' })).toBeVisible();
+    expect(request).toHaveBeenCalledWith({
+      operation: 'contact.acquire',
+      payload: { resourceType: 'PROJECT', resourceId: '901', consumeQuota: false },
+    });
+    expect(request).toHaveBeenCalledWith({
+      operation: 'project.contactUnlock',
+      payload: { hpInfoId: '901' },
+    });
+  });
+
+  it('does not misreport a technical unlock failure as a membership restriction', async () => {
+    const request = vi.fn<EnterpriseClient['request']>(async (input) => {
+      if (input.operation === 'contact.acquire') throw new Error('temporary failure');
+      return {
+        operation: 'project.detail',
+        data: {
+          hpInfoId: '901',
+          projectName: 'Factory expansion',
+          constructionUnit: 'Secret owner',
+          contactName: 'Secret contact',
+          phone: '138********',
+          address: 'Secret address',
+          purchased: false,
+        },
+      };
+    });
+    renderDetail(createClient(request));
+
+    await screen.findByText('enterprise.projectDetail.locked.title');
+    await userEvent.click(screen.getByRole('button', { name: 'enterprise.projectDetail.unlock.action' }));
+
+    expect(await screen.findByText('enterprise.projectDetail.unlock.failed')).toBeVisible();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens membership guidance only for an explicit membership entitlement response', async () => {
+    const request = vi.fn<EnterpriseClient['request']>(async (input) => {
+      if (input.operation === 'contact.acquire') {
+        return {
+          operation: 'contact.acquire',
+          data: { allowed: false, errType: 9, message: 'Quota reached', actionUrl: '' },
+        };
+      }
+      return {
+        operation: 'project.detail',
+        data: {
+          hpInfoId: '901',
+          projectName: 'Factory expansion',
+          constructionUnit: 'Secret owner',
+          contactName: 'Secret contact',
+          phone: '138********',
+          address: 'Secret address',
+          purchased: false,
+        },
+      };
+    });
+    renderDetail(createClient(request));
+
+    await screen.findByText('enterprise.projectDetail.locked.title');
+    await userEvent.click(screen.getByRole('button', { name: 'enterprise.projectDetail.unlock.action' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect(screen.getByText('Quota reached')).toBeInTheDocument();
+    expect(request).not.toHaveBeenCalledWith({
+      operation: 'project.contactUnlock',
+      payload: { hpInfoId: '901' },
+    });
   });
 
   it('shows authorized fields and renders rich-looking content as text for a purchased project', async () => {
@@ -490,7 +575,8 @@ describe('project detail permission display', () => {
 
     expect(await screen.findByText('Acme Manufacturing')).toBeVisible();
     expect(screen.getByText('Jane')).toBeVisible();
-    expect(screen.getByText('13800000000')).toBeVisible();
+    expect(screen.getByText('138********')).toBeVisible();
+    expect(screen.getByRole('button', { name: '获取联系方式' })).toBeVisible();
     expect(screen.getByText('<script>window.stolen=true</script>Plant')).toBeVisible();
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector("a[href^='tel:']")).toBeNull();

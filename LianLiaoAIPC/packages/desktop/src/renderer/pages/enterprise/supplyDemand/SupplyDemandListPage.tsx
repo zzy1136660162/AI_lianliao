@@ -1,7 +1,8 @@
 import { Button, Form, Input, Pagination, Select, Table, Tag, type TableColumnsType } from 'antd';
+import { Plus } from '@icon-park/react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import type {
   EnterpriseDemandSummary,
@@ -21,6 +22,7 @@ export type SupplyDemandListPageProps = { client?: EnterpriseClient };
 
 const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = enterpriseClient }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [draft, setDraft] = useState<DemandListFilters>({});
   const [filters, setFilters] = useState<DemandListFilters>({});
   const [pagination, setPagination] = useState({ pageNum: 1, pageSize: 20 });
@@ -85,7 +87,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       render: (_value, item) => (
         <div className={styles.titleCell}>
           <strong>{item.title}</strong>
-          <span>{item.companyName || t('enterprise.supplyDemand.notProvided')}</span>
+          <span>{item.summary || t('enterprise.supplyDemand.notProvided')}</span>
         </div>
       ),
     },
@@ -110,6 +112,35 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       render: (value?: string) => value || '-',
     },
     {
+      title: t('enterprise.supplyDemand.columns.progress'),
+      key: 'progress',
+      width: 138,
+      render: (_value, item) => (
+        <div className={styles.progressCell}>
+          <span>
+            {t(
+              item.statMode === 'APPLICATION'
+                ? 'enterprise.supplyDemand.stats.applied'
+                : 'enterprise.supplyDemand.stats.grabbed',
+              { count: item.grabCount ?? 0 }
+            )}
+          </span>
+          <span>{t('enterprise.supplyDemand.stats.remaining', { count: item.remainingGrabCount ?? 0 })}</span>
+          {item.capacityLabel ? (
+            <span>{t('enterprise.supplyDemand.stats.capacity', { value: item.capacityLabel })}</span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      title: t('enterprise.supplyDemand.columns.remainingDays'),
+      dataIndex: 'remainingDays',
+      key: 'remainingDays',
+      width: 100,
+      render: (value?: number) =>
+        value === undefined ? '-' : t('enterprise.supplyDemand.stats.daysRemaining', { count: value }),
+    },
+    {
       title: t('enterprise.supplyDemand.columns.publishedAt'),
       dataIndex: 'publishedAt',
       key: 'publishedAt',
@@ -124,6 +155,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       render: (value?: number) => {
         if (value === 0) return <Tag color='green'>{t('enterprise.supplyDemand.status.open')}</Tag>;
         if (value === 1) return <Tag>{t('enterprise.supplyDemand.status.closed')}</Tag>;
+        if (value === 2) return <Tag color='default'>{t('enterprise.supplyDemand.status.expired')}</Tag>;
         return '-';
       },
     },
@@ -133,10 +165,11 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       width: 160,
       render: (_value, item) => (
         <div className={styles.rowActions}>
-          <Button type='link' onClick={() => setSelected(item)}>
+          <Button className={styles.rowAction} type='link' onClick={() => setSelected(item)}>
             {t('enterprise.supplyDemand.actions.preview')}
           </Button>
           <Link
+            className={styles.rowAction}
             aria-label={t('enterprise.supplyDemand.actions.detail')}
             to={`/enterprise/supply-demand/${encodeURIComponent(String(item.typeId))}/${encodeURIComponent(item.demandId)}`}
           >
@@ -193,7 +226,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
             dataSource={page.list}
             pagination={false}
             loading={loading}
-            scroll={{ x: 1000 }}
+            scroll={{ x: 1320 }}
           />
           <div className={styles.paginationBar}>
             <span>{t('enterprise.supplyDemand.total', { total: page.total })}</span>
@@ -223,7 +256,12 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
           <h1 id='enterprise-supply-demand-title'>{t('enterprise.routes.supplyDemand.title')}</h1>
           <p>{t('enterprise.routes.supplyDemand.description')}</p>
         </div>
-        <span className={styles.headerRule} aria-hidden='true' />
+        <div className={styles.headerActions}>
+          <Button type='primary' icon={<Plus />} onClick={() => navigate('/enterprise/supply-demand/publish')}>
+            {t('enterprise.supplyDemand.actions.publish')}
+          </Button>
+          <span className={styles.headerRule} aria-hidden='true' />
+        </div>
       </header>
 
       <Form className={styles.filterForm} layout='vertical' onFinish={search}>
@@ -268,6 +306,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
             options={[
               { value: 0, label: t('enterprise.supplyDemand.status.open') },
               { value: 1, label: t('enterprise.supplyDemand.status.closed') },
+              { value: 2, label: t('enterprise.supplyDemand.status.expired') },
             ]}
             onChange={(status) => setDraft((current) => ({ ...current, status }))}
           />

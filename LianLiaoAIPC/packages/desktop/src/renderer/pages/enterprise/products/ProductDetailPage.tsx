@@ -1,11 +1,23 @@
-import { CubeFive, Left } from '@icon-park/react';
-import { Button, Card, Tag } from 'antd';
-import React, { useEffect, useState } from 'react';
+import { BuildingFour, CubeFive, Left } from '@icon-park/react';
+import { Button, Tag } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import type { EnterpriseProductDetail } from '@/common/enterprise/contracts';
+import EnterpriseContactAccessPanel from '@/renderer/pages/enterprise/contact/EnterpriseContactAccessPanel';
+import {
+  DetailColumns,
+  DetailHeroCard,
+  DetailSectionCard,
+  StickyDetailSidebar,
+} from '@/renderer/pages/enterprise/layout/catalog/DetailLayout';
+import {
+  createCatalogReturnState,
+  readCatalogReturnState,
+} from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
+import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
@@ -44,9 +56,17 @@ export const DetailImage: React.FC<{ product: EnterpriseProductDetail }> = ({ pr
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpriseClient }) => {
   const { productId } = useParams();
   const { t } = useTranslation();
+  const location = useLocation();
   const navigate = useNavigate();
+  const catalogReturn = useMemo(() => readCatalogReturnState(location.state, 'products'), [location.state]);
   const detail = useProductDetail(client, productId);
   const missing = t('enterprise.products.missing');
+
+  const backToList = () => {
+    navigate(catalogReturn?.path ?? '/enterprise/products', {
+      state: catalogReturn ? createCatalogReturnState(catalogReturn) : undefined,
+    });
+  };
 
   const renderContent = () => {
     if (detail.isInvalidId) {
@@ -76,10 +96,45 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
     const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
     const displayIndustry = product.industry || product.companyIndustry;
     const showCompanyIndustry = Boolean(product.companyIndustry) && product.companyIndustry !== displayIndustry;
+    const sidebar = (
+      <StickyDetailSidebar ariaLabel={t('enterprise.productDetail.sections.contact')}>
+        <DetailSectionCard title={t('enterprise.products.fields.company')}>
+          <div className={styles.companySummary}>
+            <BuildingFour size={28} aria-hidden='true' />
+            <div>
+              <Link
+                className={styles.detailCompanyLink}
+                to={`/enterprise/companies/${encodeURIComponent(product.companyId)}`}
+              >
+                {product.companyName || missing}
+              </Link>
+              {product.companyLevel !== undefined ? (
+                <CompanyMembershipBadge level={product.companyLevel} compact />
+              ) : null}
+            </div>
+          </div>
+        </DetailSectionCard>
+        <DetailSectionCard title={t('enterprise.productDetail.sections.contact')}>
+          <dl className={styles.detailFacts}>
+            <div>
+              <dt>{t('enterprise.products.fields.contactName')}</dt>
+              <dd>{product.contactName || missing}</dd>
+            </div>
+          </dl>
+          <EnterpriseContactAccessPanel
+            client={client}
+            resourceType='PRODUCT'
+            resourceId={product.productId}
+            maskedPhone={product.phone}
+          />
+          <p className={styles.permissionNote}>{t('enterprise.productDetail.contactPermissionNote')}</p>
+        </DetailSectionCard>
+      </StickyDetailSidebar>
+    );
+
     return (
       <div className={styles.detailBody}>
-        <section className={styles.detailHero} aria-labelledby='product-name'>
-          <DetailImage product={product} />
+        <DetailHeroCard media={<DetailImage product={product} />} ariaLabelledBy='product-name'>
           <div className={styles.detailIdentity}>
             <span className={styles.eyebrow}>{t('enterprise.productDetail.profileEyebrow')}</span>
             <h2 id='product-name'>{product.name}</h2>
@@ -87,14 +142,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
               {displayIndustry ? <Tag>{displayIndustry}</Tag> : null}
               <Tag>{region}</Tag>
             </div>
-            <Link className={styles.detailCompanyLink} to={`/enterprise/companies/${product.companyId}`}>
-              {product.companyName || missing}
-            </Link>
           </div>
-        </section>
+        </DetailHeroCard>
 
-        <div className={styles.detailColumns}>
-          <Card title={t('enterprise.productDetail.sections.profile')} variant='outlined'>
+        <DetailColumns sidebar={sidebar}>
+          <DetailSectionCard title={t('enterprise.productDetail.sections.profile')}>
             <dl className={styles.detailFacts}>
               <div>
                 <dt>{t('enterprise.products.fields.company')}</dt>
@@ -119,24 +171,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
                 <dd>{product.address || missing}</dd>
               </div>
             </dl>
-          </Card>
-          <Card title={t('enterprise.productDetail.sections.contact')} variant='outlined'>
-            <dl className={styles.detailFacts}>
-              <div>
-                <dt>{t('enterprise.products.fields.contactName')}</dt>
-                <dd>{product.contactName || missing}</dd>
-              </div>
-              <div>
-                <dt>{t('enterprise.products.fields.phone')}</dt>
-                <dd>{product.phone || missing}</dd>
-              </div>
-            </dl>
-            <p className={styles.permissionNote}>{t('enterprise.productDetail.contactPermissionNote')}</p>
-          </Card>
-        </div>
-        <Card title={t('enterprise.productDetail.sections.summary')} variant='outlined'>
-          <p className={styles.plainText}>{product.summary || missing}</p>
-        </Card>
+          </DetailSectionCard>
+          <DetailSectionCard title={t('enterprise.productDetail.sections.summary')}>
+            <p className={styles.plainText}>{product.summary || missing}</p>
+          </DetailSectionCard>
+        </DetailColumns>
       </div>
     );
   };
@@ -144,7 +183,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
   return (
     <section className={styles.page} aria-labelledby='product-detail-title'>
       <header className={styles.detailPageHeader}>
-        <Button type='text' icon={<Left />} onClick={() => navigate('/enterprise/products')}>
+        <Button type='text' icon={<Left />} onClick={backToList}>
           {t('enterprise.productDetail.backToList')}
         </Button>
         <div>
@@ -152,7 +191,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
           <h1 id='product-detail-title'>{t('enterprise.routes.productDetail.title')}</h1>
         </div>
       </header>
-      <div className={styles.content}>{renderContent()}</div>
+      <div className={styles.detailContent}>{renderContent()}</div>
     </section>
   );
 };

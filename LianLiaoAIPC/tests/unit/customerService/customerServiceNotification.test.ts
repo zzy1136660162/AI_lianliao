@@ -593,9 +593,12 @@ describe('customer-service native notification target', () => {
   it('updates the existing tray tooltip and menu without recreating the tray', async () => {
     vi.resetModules();
     vi.doUnmock('@process/utils/tray');
+    const trayHandlers: Record<string, () => void> = {};
     const trayInstance = {
       destroy: vi.fn(),
-      on: vi.fn(),
+      on: vi.fn((event: string, handler: () => void) => {
+        trayHandlers[event] = handler;
+      }),
       setContextMenu: vi.fn(),
       setTitle: vi.fn(),
       setToolTip: vi.fn(),
@@ -619,13 +622,27 @@ describe('customer-service native notification target', () => {
       },
     }));
     vi.doMock('@process/services/i18n', () => ({ default: { t: (key: string) => key } }));
-    const { createOrUpdateTray, destroyTray, setCustomerServiceUnreadCount } = await import('@process/utils/tray');
+    const { createOrUpdateTray, destroyTray, setCustomerServiceUnreadCount, setTrayMainWindow } =
+      await import('@process/utils/tray');
+    const window = {
+      focus: vi.fn(),
+      isDestroyed: vi.fn(() => false),
+      isMinimized: vi.fn(() => true),
+      restore: vi.fn(),
+      show: vi.fn(),
+    };
+    setTrayMainWindow(window as never);
 
     createOrUpdateTray();
     setCustomerServiceUnreadCount(4);
+    expect(trayHandlers.click).toBeTypeOf('function');
+    trayHandlers.click?.();
 
     await vi.waitFor(() => expect(trayInstance.setContextMenu).toHaveBeenCalled());
     expect(Tray).toHaveBeenCalledTimes(1);
+    expect(window.restore).toHaveBeenCalledOnce();
+    expect(window.show).toHaveBeenCalledOnce();
+    expect(window.focus).toHaveBeenCalledOnce();
     expect(trayInstance.setToolTip).toHaveBeenLastCalledWith(
       expect.stringContaining(`${DESKTOP_PRODUCT_NAME} · enterprise.customerService.title: 4`)
     );
@@ -637,6 +654,54 @@ describe('customer-service native notification target', () => {
         }),
       ])
     );
+    destroyTray();
+  });
+
+  it('recreates a destroyed main window from the permanent tray entry', async () => {
+    vi.resetModules();
+    vi.doUnmock('@process/utils/tray');
+    const trayHandlers: Record<string, () => void> = {};
+    const trayInstance = {
+      destroy: vi.fn(),
+      on: vi.fn((event: string, handler: () => void) => {
+        trayHandlers[event] = handler;
+      }),
+      setContextMenu: vi.fn(),
+      setTitle: vi.fn(),
+      setToolTip: vi.fn(),
+    };
+    const Tray = vi.fn(function TrayMock() {
+      return trayInstance;
+    });
+    vi.doMock('@/common/electronSafe', () => ({
+      electronApp: { isPackaged: false },
+      electronMenu: { buildFromTemplate: vi.fn(() => ({})) },
+      electronNativeImage: {
+        createFromPath: vi.fn(() => ({ resize: vi.fn(() => ({})) })),
+      },
+      electronTray: Tray,
+    }));
+    vi.doMock('@/common', () => ({
+      ipcBridge: {
+        conversation: { activeCount: { invoke: vi.fn(async () => ({ count: 0 })) } },
+        database: { getUserConversations: { invoke: vi.fn(async () => ({ items: [] })) } },
+      },
+    }));
+    vi.doMock('@process/services/i18n', () => ({ default: { t: (key: string) => key } }));
+    const { createOrUpdateTray, destroyTray, setTrayMainWindow } = await import('@process/utils/tray');
+    const createWindow = vi.fn();
+    setTrayMainWindow(
+      {
+        isDestroyed: vi.fn(() => true),
+      } as never,
+      createWindow
+    );
+
+    createOrUpdateTray();
+    expect(trayHandlers.click).toBeTypeOf('function');
+    trayHandlers.click?.();
+
+    expect(createWindow).toHaveBeenCalledOnce();
     destroyTray();
   });
 

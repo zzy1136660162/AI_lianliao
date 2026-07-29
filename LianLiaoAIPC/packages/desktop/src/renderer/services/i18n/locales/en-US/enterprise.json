@@ -202,7 +202,8 @@
     },
     "status": {
       "open": "Open",
-      "closed": "Closed"
+      "closed": "Closed",
+      "expired": "Expired"
     },
     "columns": {
       "title": "Demand",
@@ -211,10 +212,19 @@
       "region": "Region",
       "address": "Address",
       "budget": "Budget",
+      "progress": "Response progress",
+      "remainingDays": "Days left",
       "publishedAt": "Published",
       "endTime": "Deadline",
       "status": "Status",
       "actions": "Actions"
+    },
+    "stats": {
+      "grabbed": "Claimed {{count}}",
+      "applied": "Applied {{count}}",
+      "remaining": "Remaining {{count}}",
+      "capacity": "Capacity {{value}}",
+      "daysRemaining": "{{count}} days"
     },
     "actions": {
       "search": "Search demand",
@@ -222,7 +232,8 @@
       "preview": "Quick preview",
       "detail": "View details",
       "closePreview": "Close preview",
-      "back": "Back to demand exchange"
+      "back": "Back to demand exchange",
+      "publish": "Publish"
     },
     "preview": {
       "title": "Demand quick preview"
@@ -245,6 +256,71 @@
     "errors": {
       "invalidRoute": "The demand detail address is invalid",
       "invalidRouteDescription": "Return to the demand exchange and select a valid record."
+    },
+    "publish": {
+      "eyebrow": "Publish industrial demand",
+      "title": "Publish supply and demand",
+      "description": "Choose a business line, complete the structured information, and submit it for platform review.",
+      "typeTitle": "1. Select a business line",
+      "typePlaceholder": "Select the type of supply or demand",
+      "variantPlaceholder": "Select a sub-business type",
+      "otherGroup": "Other information",
+      "formTitle": "2. Complete the demand information",
+      "loadingSchema": "Loading the publishing form",
+      "selectType": "Select a business line to generate the form",
+      "actions": {
+        "clear": "Clear form",
+        "submit": "Submit for review"
+      },
+      "image": {
+        "action": "Upload image",
+        "hint": "JPG, PNG, WebP or GIF; up to {{count}} images",
+        "error": "Image upload failed. Please try again.",
+        "uploadedName": "Uploaded image"
+      },
+      "ai": {
+        "title": "AI quick parsing",
+        "description": "Describe the requirement in natural language. AI will fill suggestions into the form for your review.",
+        "placeholder": "Example: We need 200 machined stainless-steel parts delivered to Shenyang by the end of next month, with a budget of RMB 100,000?200,000...",
+        "action": "Parse and fill",
+        "parsing": "AI is structuring the information",
+        "applied": "AI suggestions have been filled in",
+        "review": "AI suggestions are references only. Please review and edit them before submission."
+      },
+      "aiConversation": {
+        "title": "AI publishing assistant",
+        "startTitle": "Describe what you want to publish",
+        "startHint": "AI identifies the business line first, asks when uncertain, and then completes the form step by step.",
+        "startPlaceholder": "Example: We need 200 machined 304 stainless-steel parts delivered to Shenyang within one month...",
+        "startAction": "Let AI fill the form",
+        "continueAction": "Send and continue",
+        "currentLine": "Current business line: {{name}}",
+        "discoveringLine": "Identifying the business line",
+        "completion": "{{value}}% complete",
+        "candidateTitle": "Choose the best matching business line",
+        "switchTitle": "AI suggests switching the business line",
+        "rejectSwitch": "Keep current line",
+        "warningTitle": "Needs your attention",
+        "aiFilled": "AI filled",
+        "manualFilled": "Manually edited",
+        "retry": "Retry",
+        "reviewTitle": "Key information is ready",
+        "reviewHint": "Review the form and submit it manually. AI never publishes automatically.",
+        "cancel": "Cancel AI assistance",
+        "unavailable": "AI is temporarily unavailable. Your entered information is preserved."
+      },
+      "success": "Submitted successfully and awaiting review",
+      "validation": {
+        "required": "{{label}} is required",
+        "minLength": "{{label}} must contain at least {{count}} characters"
+      },
+      "errors": {
+        "types": "Unable to load publishable business types. Please try again later.",
+        "schema": "Unable to load the publishing form. Please try again later.",
+        "description": "Enter at least 5 characters before AI parsing.",
+        "ai": "AI parsing is temporarily unavailable. You can continue filling the form manually.",
+        "publish": "Publishing failed. Check the form and try again."
+      }
     }
   },
   "dashboard": {
@@ -582,6 +658,11 @@
     "error": {
       "title": "The project profile could not be loaded",
       "description": "The enterprise service did not return a valid project record. Try again."
+    },
+    "unlock": {
+      "action": "Unlock now",
+      "membershipRequired": "Your current viewing allowance is exhausted. Upgrade your membership to continue.",
+      "failed": "Contact details could not be unlocked. Try again."
     }
   },
   "consultation": {
@@ -593,7 +674,10 @@
       "title": "Chat with Lianliao support",
       "description": "Text and images are supported; history is restored automatically."
     },
-    "accessibility": { "timeline": "Consultation message history", "composer": "Consultation message composer" },
+    "accessibility": {
+      "timeline": "Consultation message history",
+      "composer": "Consultation message composer"
+    },
     "timeline": {
       "loading": "Connecting to a service agent",
       "unavailable": "The consultation is temporarily unavailable",
@@ -634,7 +718,11 @@
       "reconnecting": "Reconnecting automatically",
       "disconnected": "Disconnected"
     },
-    "delivery": { "sending": "Sending", "delivered": "Sent", "failed": "Failed" },
+    "delivery": {
+      "sending": "Sending",
+      "delivered": "Sent",
+      "failed": "Failed"
+    },
     "actions": {
       "retry": "Reconnect",
       "retryMessage": "Retry",
@@ -662,7 +750,9 @@
   },
   "customerService": {
     "title": "Customer service",
-    "queue": { "eyebrow": "Lianliao live support" },
+    "queue": {
+      "eyebrow": "Lianliao live support"
+    },
     "accessibility": {
       "workspace": "Customer service workspace",
       "queue": "Conversation queue",
@@ -671,7 +761,11 @@
       "profile": "Customer and company profile",
       "composer": "Reply composer"
     },
-    "queues": { "pending": "Awaiting reply", "active": "In progress", "closed": "Closed" },
+    "queues": {
+      "pending": "Awaiting reply",
+      "active": "In progress",
+      "closed": "Closed"
+    },
     "search": {
       "placeholder": "Search customer, phone, or company",
       "ariaLabel": "Search customer service conversations"
@@ -691,7 +785,11 @@
       "imageAlt": "Customer service image",
       "staffFallback": "Support agent"
     },
-    "delivery": { "sending": "Sending", "delivered": "Delivered", "failed": "Failed" },
+    "delivery": {
+      "sending": "Sending",
+      "delivered": "Delivered",
+      "failed": "Failed"
+    },
     "composer": {
       "placeholder": "Type a reply. Enter to send; Shift + Enter for a new line",
       "hint": "Enter to send · Shift + Enter for a new line",
@@ -717,7 +815,11 @@
       "online": "Online",
       "offline": "Offline"
     },
-    "status": { "waiting": "Waiting", "active": "In progress", "closed": "Closed" },
+    "status": {
+      "waiting": "Waiting",
+      "active": "In progress",
+      "closed": "Closed"
+    },
     "connection": {
       "idle": "Not connected",
       "connecting": "Connecting",

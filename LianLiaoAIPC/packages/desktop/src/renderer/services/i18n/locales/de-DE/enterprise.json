@@ -200,7 +200,11 @@
       "district": "Bezirk",
       "status": "Status"
     },
-    "status": { "open": "Laufend", "closed": "Beendet" },
+    "status": {
+      "open": "Laufend",
+      "closed": "Beendet",
+      "expired": "Abgelaufen"
+    },
     "columns": {
       "title": "Bedarf",
       "type": "Typ",
@@ -208,10 +212,19 @@
       "region": "Region",
       "address": "Adresse",
       "budget": "Budget",
+      "progress": "Antwortfortschritt",
+      "remainingDays": "Verbleibende Tage",
       "publishedAt": "Veröffentlicht",
       "endTime": "Frist",
       "status": "Status",
       "actions": "Aktionen"
+    },
+    "stats": {
+      "grabbed": "{{count}} angenommen",
+      "applied": "{{count}} Bewerbungen",
+      "remaining": "{{count}} verbleibend",
+      "capacity": "Bedarf {{value}}",
+      "daysRemaining": "{{count}} Tage"
     },
     "actions": {
       "search": "Bedarfe suchen",
@@ -219,9 +232,12 @@
       "preview": "Schnellansicht",
       "detail": "Details anzeigen",
       "closePreview": "Vorschau schließen",
-      "back": "Zur Bedarfsliste"
+      "back": "Zur Bedarfsliste",
+      "publish": "Publish"
     },
-    "preview": { "title": "Bedarfsschnellansicht" },
+    "preview": {
+      "title": "Bedarfsschnellansicht"
+    },
     "detail": {
       "summaryTitle": "Bedarfsübersicht",
       "fieldsTitle": "Geschäftsfelder",
@@ -240,6 +256,71 @@
     "errors": {
       "invalidRoute": "Die Adresse der Bedarfsdetails ist ungültig",
       "invalidRouteDescription": "Zur Bedarfsliste zurückkehren und einen gültigen Eintrag wählen."
+    },
+    "publish": {
+      "eyebrow": "Publish industrial demand",
+      "title": "Publish supply and demand",
+      "description": "Choose a business line, complete the structured information, and submit it for platform review.",
+      "typeTitle": "1. Select a business line",
+      "typePlaceholder": "Select the type of supply or demand",
+      "variantPlaceholder": "Untergeschäft auswählen",
+      "otherGroup": "Weitere Angaben",
+      "formTitle": "2. Complete the demand information",
+      "loadingSchema": "Loading the publishing form",
+      "selectType": "Select a business line to generate the form",
+      "actions": {
+        "clear": "Clear form",
+        "submit": "Submit for review"
+      },
+      "image": {
+        "action": "Bild hochladen",
+        "hint": "JPG, PNG, WebP oder GIF; höchstens {{count}} Bilder",
+        "error": "Das Bild konnte nicht hochgeladen werden. Bitte erneut versuchen.",
+        "uploadedName": "Hochgeladenes Bild"
+      },
+      "ai": {
+        "title": "AI quick parsing",
+        "description": "Describe the requirement in natural language. AI will fill suggestions into the form for your review.",
+        "placeholder": "Example: We need 200 machined stainless-steel parts delivered to Shenyang by the end of next month, with a budget of RMB 100,000?200,000...",
+        "action": "Parse and fill",
+        "parsing": "AI is structuring the information",
+        "applied": "AI suggestions have been filled in",
+        "review": "AI suggestions are references only. Please review and edit them before submission."
+      },
+      "aiConversation": {
+        "title": "AI publishing assistant",
+        "startTitle": "Describe what you want to publish",
+        "startHint": "AI identifies the business line first, asks when uncertain, and then completes the form step by step.",
+        "startPlaceholder": "Example: We need 200 machined 304 stainless-steel parts delivered to Shenyang within one month...",
+        "startAction": "Let AI fill the form",
+        "continueAction": "Send and continue",
+        "currentLine": "Current business line: {{name}}",
+        "discoveringLine": "Identifying the business line",
+        "completion": "{{value}}% complete",
+        "candidateTitle": "Choose the best matching business line",
+        "switchTitle": "AI suggests switching the business line",
+        "rejectSwitch": "Keep current line",
+        "warningTitle": "Needs your attention",
+        "aiFilled": "AI filled",
+        "manualFilled": "Manually edited",
+        "retry": "Retry",
+        "reviewTitle": "Key information is ready",
+        "reviewHint": "Review the form and submit it manually. AI never publishes automatically.",
+        "cancel": "Cancel AI assistance",
+        "unavailable": "AI is temporarily unavailable. Your entered information is preserved."
+      },
+      "success": "Submitted successfully and awaiting review",
+      "validation": {
+        "required": "{{label}} is required",
+        "minLength": "{{label}} must contain at least {{count}} characters"
+      },
+      "errors": {
+        "types": "Unable to load publishable business types. Please try again later.",
+        "schema": "Unable to load the publishing form. Please try again later.",
+        "description": "Enter at least 5 characters before AI parsing.",
+        "ai": "AI parsing is temporarily unavailable. You can continue filling the form manually.",
+        "publish": "Publishing failed. Check the form and try again."
+      }
     }
   },
   "dashboard": {
@@ -597,6 +678,11 @@
     "error": {
       "title": "The project profile could not be loaded",
       "description": "The enterprise service did not return a valid project record. Try again."
+    },
+    "unlock": {
+      "action": "Unlock now",
+      "membershipRequired": "Your current viewing allowance is exhausted. Upgrade your membership to continue.",
+      "failed": "Contact details could not be unlocked. Try again."
     }
   },
   "consultation": {
@@ -608,7 +694,10 @@
       "title": "Chat with Lianliao support",
       "description": "Text and images are supported; history is restored automatically."
     },
-    "accessibility": { "timeline": "Consultation message history", "composer": "Consultation message composer" },
+    "accessibility": {
+      "timeline": "Consultation message history",
+      "composer": "Consultation message composer"
+    },
     "timeline": {
       "loading": "Connecting to a service agent",
       "unavailable": "The consultation is temporarily unavailable",
@@ -649,7 +738,11 @@
       "reconnecting": "Reconnecting automatically",
       "disconnected": "Disconnected"
     },
-    "delivery": { "sending": "Sending", "delivered": "Sent", "failed": "Failed" },
+    "delivery": {
+      "sending": "Sending",
+      "delivered": "Sent",
+      "failed": "Failed"
+    },
     "actions": {
       "retry": "Reconnect",
       "retryMessage": "Retry",
@@ -677,7 +770,9 @@
   },
   "customerService": {
     "title": "Customer service",
-    "queue": { "eyebrow": "Lianliao live support" },
+    "queue": {
+      "eyebrow": "Lianliao live support"
+    },
     "accessibility": {
       "workspace": "Customer service workspace",
       "queue": "Conversation queue",
@@ -686,7 +781,11 @@
       "profile": "Customer and company profile",
       "composer": "Reply composer"
     },
-    "queues": { "pending": "Awaiting reply", "active": "In progress", "closed": "Closed" },
+    "queues": {
+      "pending": "Awaiting reply",
+      "active": "In progress",
+      "closed": "Closed"
+    },
     "search": {
       "placeholder": "Search customer, phone, or company",
       "ariaLabel": "Search customer service conversations"
@@ -706,7 +805,11 @@
       "imageAlt": "Customer service image",
       "staffFallback": "Support agent"
     },
-    "delivery": { "sending": "Sending", "delivered": "Delivered", "failed": "Failed" },
+    "delivery": {
+      "sending": "Sending",
+      "delivered": "Delivered",
+      "failed": "Failed"
+    },
     "composer": {
       "placeholder": "Type a reply. Enter to send; Shift + Enter for a new line",
       "hint": "Enter to send · Shift + Enter for a new line",
@@ -732,7 +835,11 @@
       "online": "Online",
       "offline": "Offline"
     },
-    "status": { "waiting": "Waiting", "active": "In progress", "closed": "Closed" },
+    "status": {
+      "waiting": "Waiting",
+      "active": "In progress",
+      "closed": "Closed"
+    },
     "connection": {
       "idle": "Not connected",
       "connecting": "Connecting",

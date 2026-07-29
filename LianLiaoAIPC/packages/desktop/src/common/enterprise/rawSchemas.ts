@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import { ENTERPRISE_LOGIN_STATUSES, ENTERPRISE_PROJECT_DRILL_LEVELS } from './constants';
+import { UNIFIED_RESOURCE_TYPES } from './unified-search/contracts';
+import { ENTERPRISE_CONTACT_RESOURCE_TYPES } from './contact-access/contracts';
 import { isEnterpriseEntityId } from './entityId';
 
 const rawTextSchema = z.string().nullish();
@@ -254,8 +256,8 @@ export const enterpriseProductRawSchema = passthroughRawSchema({
     'PHONE',
   ] as const,
   identifiers: ['id', 'ID', 'productId', 'PRODUCT_ID', 'companyId', 'COMPANY_ID'] as const,
-  numbers: [] as const,
-  booleans: ['isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
+  numbers: ['comLevel', 'COM_LEVEL', 'companyLevel', 'COMPANY_LEVEL'] as const,
+  booleans: ['vip', 'VIP', 'payVip', 'PAY_VIP', 'isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
 });
 
 export const enterpriseProjectRawSchema = passthroughRawSchema({
@@ -292,8 +294,6 @@ export const enterpriseProjectRawSchema = passthroughRawSchema({
     'XIANGMUXINGZHI',
     'publishDate',
     'PUBLISH_DATE',
-    'inputTime',
-    'INPUT_TIME',
     'constructionPeriod',
     'CONSTRUCTION_PERIOD',
     'buildCycleText',
@@ -364,7 +364,7 @@ export const enterpriseProjectRawSchema = passthroughRawSchema({
     'FOLLOW_STATUS',
   ] as const,
   identifiers: ['id', 'ID', 'hpInfoId', 'HP_INFO_ID', 'dbId', 'DB_ID'] as const,
-  numbers: ['totalInvestment', 'TOTAL_INVESTMENT', 'zongtouzi', 'ZONGTOUZI'] as const,
+  numbers: ['totalInvestment', 'TOTAL_INVESTMENT', 'zongtouzi', 'ZONGTOUZI', 'inputTime', 'INPUT_TIME'] as const,
   booleans: [
     'isCollect',
     'IS_COLLECT',
@@ -396,6 +396,11 @@ export const enterpriseDemandTypeOptionRawSchema = guardedObject(
     .object({
       typeId: rawNumberSchema,
       typeName: rawTextSchema,
+      groupCode: rawTextSchema,
+      groupName: rawTextSchema,
+      displayOrder: rawNumberSchema,
+      variantEnabled: rawBooleanSchema,
+      statMode: rawTextSchema,
     })
     .passthrough(),
   ['typeId', 'typeName']
@@ -434,6 +439,12 @@ export const enterpriseDemandRawSchema = guardedObject(
       GRAB_COUNT: rawNumberSchema,
       remainingGrabCount: rawNumberSchema,
       REMAINING_GRAB_COUNT: rawNumberSchema,
+      remainingDays: rawNumberSchema,
+      REMAINING_DAYS: rawNumberSchema,
+      capacityLabel: rawTextSchema,
+      CAPACITY_LABEL: rawTextSchema,
+      statMode: rawTextSchema,
+      STAT_MODE: rawTextSchema,
       primaryTags: z.array(z.string()).optional(),
       PRIMARY_TAGS: z.array(z.string()).optional(),
       fields: z.array(enterpriseDemandDetailFieldRawSchema).optional(),
@@ -568,7 +579,16 @@ export const userContextRawSchema = passthroughRawSchema({
     'roleId',
     'ROLE_ID',
   ] as const,
-  numbers: ['companyLevel', 'COMPANY_LEVEL', 'comLevel', 'COM_LEVEL'] as const,
+  numbers: [
+    'companyLevel',
+    'COMPANY_LEVEL',
+    'comLevel',
+    'COM_LEVEL',
+    'remainingDemandQuota',
+    'REMAINING_DEMAND_QUOTA',
+    'payResNum',
+    'PAY_RES_NUM',
+  ] as const,
   booleans: ['registered', 'REGISTERED'] as const,
 });
 
@@ -660,6 +680,16 @@ const projectDashboardPayloadSchema = guardedObject(z.object({ runId: projectSho
 const projectDetailPayloadSchema = guardedObject(z.object({ hpInfoId: projectRequestIdentifierSchema }).strict(), [
   'hpInfoId',
 ]);
+const contactAcquirePayloadSchema = guardedObject(
+  z
+    .object({
+      resourceType: z.enum(ENTERPRISE_CONTACT_RESOURCE_TYPES),
+      resourceId: projectRequestIdentifierSchema,
+      consumeQuota: z.boolean().optional(),
+    })
+    .strict(),
+  ['resourceType', 'resourceId']
+);
 const demandListQuerySchema = guardedObject(
   z
     .object({
@@ -684,6 +714,147 @@ const demandDetailPayloadSchema = guardedObject(
   ['demandId', 'typeId']
 );
 const demandTypesPayloadSchema = guardedObject(z.object({}).strict());
+const demandContactPayloadSchema = demandDetailPayloadSchema;
+const demandPublishSchemaPayloadSchema = guardedObject(
+  z
+    .object({
+      typeId: nonNegativeIntegerSchema,
+      variantCode: z.string().trim().min(1).max(50).optional(),
+    })
+    .strict(),
+  ['typeId']
+);
+const demandAiParsePayloadSchema = guardedObject(
+  z
+    .object({
+      typeId: nonNegativeIntegerSchema,
+      variantCode: z.string().trim().min(1).max(50).optional(),
+      description: z.string().trim().min(5).max(5000),
+    })
+    .strict(),
+  ['typeId', 'description']
+);
+const demandAiUuidSchema = z.string().uuid();
+const demandAiVersionSchema = z.number().int().positive();
+const demandAiSessionIdSchema = demandAiUuidSchema;
+const demandAiRequestIdSchema = demandAiUuidSchema;
+const demandAiConversationStartPayloadSchema = guardedObject(
+  z
+    .object({
+      requestId: demandAiRequestIdSchema,
+      initialMessage: z.string().trim().min(2).max(5000),
+    })
+    .strict(),
+  ['requestId', 'initialMessage']
+);
+const demandAiConversationTurnPayloadSchema = guardedObject(
+  z
+    .object({
+      sessionId: demandAiSessionIdSchema,
+      requestId: demandAiRequestIdSchema,
+      version: demandAiVersionSchema,
+      message: z.string().trim().min(2).max(5000),
+    })
+    .strict(),
+  ['sessionId', 'requestId', 'version', 'message']
+);
+const demandAiConversationConfirmLinePayloadSchema = guardedObject(
+  z
+    .object({
+      sessionId: demandAiSessionIdSchema,
+      requestId: demandAiRequestIdSchema,
+      version: demandAiVersionSchema,
+      typeId: nonNegativeIntegerSchema,
+      variantCode: z.string().trim().min(1).max(50).optional(),
+      confirmSwitch: z.boolean().optional(),
+    })
+    .strict(),
+  ['sessionId', 'requestId', 'version', 'typeId']
+);
+const demandAiConversationPatchPayloadSchema = guardedObject(
+  z
+    .object({
+      sessionId: demandAiSessionIdSchema,
+      requestId: demandAiRequestIdSchema,
+      version: demandAiVersionSchema,
+      fields: z
+        .record(z.string().trim().min(1).max(100), z.string().max(4000))
+        .refine((value) => Object.keys(value).length > 0 && Object.keys(value).length <= 50),
+    })
+    .strict(),
+  ['sessionId', 'requestId', 'version', 'fields']
+);
+const demandAiConversationResumePayloadSchema = guardedObject(
+  z.object({ sessionId: demandAiSessionIdSchema.optional() }).strict()
+);
+const demandAiConversationSessionPayloadSchema = guardedObject(
+  z
+    .object({
+      sessionId: demandAiSessionIdSchema,
+      requestId: demandAiRequestIdSchema,
+      version: demandAiVersionSchema,
+    })
+    .strict(),
+  ['sessionId', 'requestId', 'version']
+);
+const demandAiConversationCompletePayloadSchema = guardedObject(
+  z
+    .object({
+      sessionId: demandAiSessionIdSchema,
+      requestId: demandAiRequestIdSchema,
+      version: demandAiVersionSchema,
+      demandId: z.string().regex(/^-?[1-9][0-9]{0,30}$/),
+    })
+    .strict(),
+  ['sessionId', 'requestId', 'version', 'demandId']
+);
+const demandPublishPayloadSchema = guardedObject(
+  z
+    .object({
+      typeId: nonNegativeIntegerSchema,
+      variantCode: z.string().trim().min(1).max(50).optional(),
+      title: z.string().trim().min(1).max(500),
+      summary: z.string().trim().max(4000).optional(),
+      province: z.string().trim().max(50).optional(),
+      city: z.string().trim().max(50).optional(),
+      district: z.string().trim().max(100).optional(),
+      address: z.string().trim().max(255).optional(),
+      budget: z.string().trim().max(255).optional(),
+      endTime: z.string().trim().max(14).optional(),
+      fields: z.record(z.string(), z.string().max(4000)),
+    })
+    .strict(),
+  ['typeId', 'title', 'fields']
+);
+const demandUploadImagePayloadSchema = guardedObject(
+  z
+    .object({
+      fileName: z.string().trim().min(1).max(255),
+      mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']),
+      bytes: z
+        .array(z.number().int().min(0).max(255))
+        .min(1)
+        .max(10 * 1024 * 1024),
+    })
+    .strict(),
+  ['fileName', 'mimeType', 'bytes']
+);
+const unifiedSuggestPayloadSchema = guardedObject(z.object({ keyword: z.string().trim().min(2).max(100) }).strict(), [
+  'keyword',
+]);
+const unifiedSearchPayloadSchema = guardedObject(
+  z
+    .object({
+      keyword: z.string().trim().min(2).max(100),
+      resourceTypes: z.array(z.enum(UNIFIED_RESOURCE_TYPES)).max(3).optional(),
+      pageNum: projectPageNumSchema,
+      pageSize: positiveIntegerSchema.refine((value) => value <= 50, 'Page size is too large'),
+      enableGroupTop: z.boolean(),
+      groupTopN: positiveIntegerSchema.refine((value) => value <= 20, 'Group size is too large'),
+    })
+    .strict(),
+  ['keyword', 'pageNum', 'pageSize', 'enableGroupTop', 'groupTopN']
+);
 
 const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('company.list'), payload: companyListQuerySchema }).strict(),
@@ -714,9 +885,62 @@ const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
       payload: projectDetailPayloadSchema,
     })
     .strict(),
+  z.object({ operation: z.literal('contact.acquire'), payload: contactAcquirePayloadSchema }).strict(),
+  z.object({ operation: z.literal('project.contactUnlock'), payload: projectDetailPayloadSchema }).strict(),
   z.object({ operation: z.literal('demand.types'), payload: demandTypesPayloadSchema }).strict(),
   z.object({ operation: z.literal('demand.list'), payload: demandListQuerySchema }).strict(),
   z.object({ operation: z.literal('demand.detail'), payload: demandDetailPayloadSchema }).strict(),
+  z.object({ operation: z.literal('demand.contactStatus'), payload: demandContactPayloadSchema }).strict(),
+  z.object({ operation: z.literal('demand.contactAcquire'), payload: demandContactPayloadSchema }).strict(),
+  z.object({ operation: z.literal('demand.publishTypes'), payload: demandTypesPayloadSchema }).strict(),
+  z.object({ operation: z.literal('demand.publishSchema'), payload: demandPublishSchemaPayloadSchema }).strict(),
+  z.object({ operation: z.literal('demand.aiParse'), payload: demandAiParsePayloadSchema }).strict(),
+  z
+    .object({
+      operation: z.literal('demand.aiConversation.start'),
+      payload: demandAiConversationStartPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('demand.aiConversation.turn'),
+      payload: demandAiConversationTurnPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('demand.aiConversation.confirmLine'),
+      payload: demandAiConversationConfirmLinePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('demand.aiConversation.patch'),
+      payload: demandAiConversationPatchPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('demand.aiConversation.resume'),
+      payload: demandAiConversationResumePayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('demand.aiConversation.cancel'),
+      payload: demandAiConversationSessionPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('demand.aiConversation.complete'),
+      payload: demandAiConversationCompletePayloadSchema,
+    })
+    .strict(),
+  z.object({ operation: z.literal('demand.publish'), payload: demandPublishPayloadSchema }).strict(),
+  z.object({ operation: z.literal('demand.uploadImage'), payload: demandUploadImagePayloadSchema }).strict(),
+  z.object({ operation: z.literal('unified.suggest'), payload: unifiedSuggestPayloadSchema }).strict(),
+  z.object({ operation: z.literal('unified.search'), payload: unifiedSearchPayloadSchema }).strict(),
 ]);
 
 export const enterpriseRequestSchema = guardedObject(enterpriseRequestUnionSchema, ['operation', 'payload']);

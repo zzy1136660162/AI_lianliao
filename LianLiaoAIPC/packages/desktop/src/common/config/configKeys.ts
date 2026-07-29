@@ -22,6 +22,8 @@ export type ConfigKeyMap = {
   'guid.lastAssistantId': string | undefined;
   'upload.saveToWorkspace': boolean | undefined;
   'system.closeToTray': boolean | undefined;
+  'system.closeToTrayDefaultV1Applied': boolean | undefined;
+  'system.startOnBootDefaultV1Applied': boolean | undefined;
   'system.notificationEnabled': boolean | undefined;
   'system.cronNotificationEnabled': boolean | undefined;
   'system.keepAwake': boolean | undefined;

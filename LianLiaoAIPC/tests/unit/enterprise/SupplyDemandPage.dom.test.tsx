@@ -67,7 +67,10 @@ const detailResponse: EnterpriseResponse = {
     ...listResponse.data.list[0],
     address: '沈阳经济技术开发区',
     summary: '需要长期稳定供应商',
-    fields: [{ key: 'processType', label: '加工工艺', value: '车削', valueType: 'TEXT' }],
+    fields: [
+      { key: 'purchaseQuantity', label: '采购数量', value: '1', valueType: 'NUMBER' },
+      { key: 'productParameters', label: '产品参数', value: '车削', valueType: 'TEXT' },
+    ],
   },
 };
 
@@ -143,11 +146,23 @@ describe('supply-demand pages', () => {
 
     expect(await screen.findByText('精密零件加工')).toBeVisible();
     expect(screen.getByText('机加外包')).toBeVisible();
-    expect(screen.getByText('辽宁装备制造有限公司')).toBeVisible();
+    expect(screen.queryByText('辽宁装备制造有限公司')).not.toBeInTheDocument();
     expect(screen.getAllByText('enterprise.supplyDemand.columns.status')[0]).toBeVisible();
     expect(screen.queryByText(/open.?id/i)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: 'enterprise.supplyDemand.actions.detail' }));
+    const previewAction = screen.getByRole('button', {
+      name: 'enterprise.supplyDemand.actions.preview',
+    });
+    const detailAction = screen.getByRole('link', {
+      name: 'enterprise.supplyDemand.actions.detail',
+    });
+
+    // 操作入口共享不可换行样式，避免窄列中的“查看详情”被拆成两行。
+    expect(previewAction.className).toContain('rowAction');
+    expect(detailAction.className).toContain('rowAction');
+    expect(detailAction.parentElement?.className).toContain('rowActions');
+
+    await userEvent.click(detailAction);
     expect(screen.getByLabelText('location')).toHaveTextContent('/enterprise/supply-demand/0/101');
   });
 
@@ -156,9 +171,15 @@ describe('supply-demand pages', () => {
     renderDetail('/enterprise/supply-demand/0/101', client);
 
     expect(await screen.findByRole('heading', { name: '精密零件加工' })).toBeVisible();
-    expect(screen.getByText('加工工艺')).toBeVisible();
+    expect(screen.queryByText('enterprise.supplyDemand.detail.fieldsTitle')).not.toBeInTheDocument();
+    expect(screen.getByText('采购数量')).toBeVisible();
+    expect(screen.getByText('产品参数')).toBeVisible();
+    expect(screen.getByText('1')).toBeVisible();
     expect(screen.getAllByText('车削')).toHaveLength(2);
     expect(screen.getByText('需要长期稳定供应商')).toBeVisible();
+    expect(screen.queryByText('辽宁装备制造有限公司')).not.toBeInTheDocument();
+    expect(screen.queryByText('沈阳经济技术开发区')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.ll-ant-card')).toHaveLength(2);
   });
 
   it('submits trimmed filters and resets to page one', async () => {

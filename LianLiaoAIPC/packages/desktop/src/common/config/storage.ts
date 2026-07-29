@@ -46,6 +46,9 @@ export interface IConfigStorageRefer {
   'upload.saveToWorkspace'?: boolean;
   // 关闭窗口时最小化到系统托盘 / Minimize to system tray when closing window
   'system.closeToTray'?: boolean;
+  /** Versioned one-shot defaults. Once recorded, later user choices must win. */
+  'system.closeToTrayDefaultV1Applied'?: boolean;
+  'system.startOnBootDefaultV1Applied'?: boolean;
   // 任务完成时显示系统通知 / Show system notification when task completes
   'system.notificationEnabled'?: boolean;
   // 定时任务完成时显示系统通知 / Show system notification when scheduled task completes

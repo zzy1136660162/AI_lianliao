@@ -1,7 +1,12 @@
 import { z } from 'zod';
 
 import type {
+  DemandAiConversationSnapshot,
   EnterpriseCompanySummary,
+  EnterpriseDemandAiParseResult,
+  EnterpriseDemandImage,
+  EnterpriseDemandPublishResult,
+  EnterpriseDemandPublishSchema,
   EnterpriseDemandSummary,
   EnterpriseDemandTypeOption,
   EnterpriseOperation,
@@ -11,6 +16,9 @@ import type {
   EnterpriseUserContext,
 } from './contracts';
 import { enterpriseNormalizers } from './normalizers';
+import { parseDemandContactAccess } from './demand-contact/schemas';
+import { parseUnifiedSearchResult, parseUnifiedSearchSuggestions } from './unified-search/schemas';
+import { parseEnterpriseContactAccess, parseEnterpriseProjectContactUnlock } from './contact-access/schemas';
 import {
   commonResultSchema,
   enterpriseCompanyDetailEnvelopeRawSchema,
@@ -20,6 +28,157 @@ import {
   enterpriseRequestSchema,
   userContextRawSchema,
 } from './rawSchemas';
+
+const demandPublishFieldSchema = z
+  .object({
+    sourceColumn: z.string().nullish(),
+    fieldKey: z.string().min(1),
+    fieldLabel: z.string().min(1),
+    targetKind: z.enum(['BASE', 'DYNAMIC']).nullish(),
+    groupCode: z.string().nullish(),
+    groupName: z.string().nullish(),
+    groupOrder: z.number().int().nullish(),
+    displayOrder: z.number().int().nullish(),
+    inputType: z.enum(['TEXT', 'TEXTAREA', 'NUMBER', 'DATE', 'SELECT', 'MULTISELECT', 'IMAGE']),
+    required: z.boolean(),
+    placeholder: z.string().nullish(),
+    maxLength: z.number().int().positive(),
+    options: z.array(z.string()),
+    visibleWhenJson: z.string().nullish(),
+    validationJson: z.string().nullish(),
+    defaultValue: z.string().nullish(),
+    controlPropsJson: z.string().nullish(),
+    valueSeparator: z.string().nullish(),
+    aiHint: z.string().nullish(),
+  })
+  .passthrough()
+  .transform((field) => ({
+    ...(field.sourceColumn ? { sourceColumn: field.sourceColumn } : {}),
+    fieldKey: field.fieldKey,
+    fieldLabel: field.fieldLabel,
+    ...(field.targetKind ? { targetKind: field.targetKind } : {}),
+    ...(field.groupCode ? { groupCode: field.groupCode } : {}),
+    ...(field.groupName ? { groupName: field.groupName } : {}),
+    ...(field.groupOrder === null || field.groupOrder === undefined ? {} : { groupOrder: field.groupOrder }),
+    ...(field.displayOrder === null || field.displayOrder === undefined ? {} : { displayOrder: field.displayOrder }),
+    inputType: field.inputType,
+    required: field.required,
+    ...(field.placeholder ? { placeholder: field.placeholder } : {}),
+    maxLength: field.maxLength,
+    options: field.options,
+    ...(field.visibleWhenJson ? { visibleWhenJson: field.visibleWhenJson } : {}),
+    ...(field.validationJson ? { validationJson: field.validationJson } : {}),
+    ...(field.defaultValue ? { defaultValue: field.defaultValue } : {}),
+    ...(field.controlPropsJson ? { controlPropsJson: field.controlPropsJson } : {}),
+    ...(field.valueSeparator ? { valueSeparator: field.valueSeparator } : {}),
+    ...(field.aiHint ? { aiHint: field.aiHint } : {}),
+  }));
+
+const demandPublishSchemaResponse = z
+  .object({
+    typeId: z.number().int().nonnegative(),
+    typeName: z.string().min(1),
+    variantCode: z.string().min(1).default('DEFAULT'),
+    variants: z
+      .array(
+        z
+          .object({
+            variantCode: z.string().min(1),
+            variantName: z.string().min(1),
+          })
+          .passthrough()
+      )
+      .default([]),
+    fields: z.array(demandPublishFieldSchema),
+  })
+  .passthrough();
+
+const demandAiParseResponse = z
+  .object({
+    suggestedFields: z.record(z.string(), z.string()),
+    warnings: z.array(z.string()),
+  })
+  .passthrough();
+
+const demandAiFieldSnapshotResponse = z
+  .object({
+    value: z.string(),
+    source: z.enum(['AI', 'MANUAL', 'SYSTEM']),
+    confidence: z.number().min(0).max(1).nullish(),
+    updatedTurn: z.number().int().nonnegative(),
+    locked: z.boolean(),
+  })
+  .passthrough()
+  .transform((value) => ({
+    value: value.value,
+    source: value.source,
+    ...(value.confidence === null || value.confidence === undefined ? {} : { confidence: value.confidence }),
+    updatedTurn: value.updatedTurn,
+    locked: value.locked,
+  }));
+
+const demandAiLineCandidateResponse = z
+  .object({
+    typeId: z.number().int().nonnegative(),
+    typeName: z.string().min(1),
+    variantCode: z.string().min(1).nullish(),
+    variantName: z.string().min(1).nullish(),
+    confidence: z.number().min(0).max(1),
+    reason: z.string().max(300).nullish(),
+  })
+  .passthrough();
+
+const demandAiConversationResponse = z
+  .object({
+    sessionId: z.string().uuid(),
+    version: z.number().int().positive(),
+    state: z.enum([
+      'DISCOVERING_LINE',
+      'CONFIRMING_LINE',
+      'COLLECTING_FIELDS',
+      'CONFIRMING_SWITCH',
+      'REVIEW_READY',
+      'SUBMITTED',
+      'CANCELLED',
+    ]),
+    action: z.enum(['ASK', 'CONFIRM_LINE', 'APPLY_PATCH', 'CONFIRM_SWITCH', 'REVIEW_READY', 'RETRY_AVAILABLE']),
+    message: z.string().min(1).max(1000),
+    lineDecision: z
+      .object({
+        typeId: z.number().int().nonnegative().nullish(),
+        typeName: z.string().min(1).nullish(),
+        variantCode: z.string().min(1).nullish(),
+        confidence: z.number().min(0).max(1).nullish(),
+        candidates: z.array(demandAiLineCandidateResponse).max(3),
+      })
+      .passthrough(),
+    fieldPatch: z.record(z.string(), z.string()),
+    formValues: z.record(z.string(), demandAiFieldSnapshotResponse),
+    missingRequiredFields: z.array(z.string().min(1).max(100)).max(100),
+    warnings: z.array(z.string().max(300)).max(10),
+    completion: z.number().min(0).max(1),
+    submittedDemandId: z.string().regex(/^-?[1-9][0-9]{0,30}$/).nullish(),
+  })
+  .passthrough();
+
+const demandPublishResultResponse = z
+  .object({
+    demandId: z.union([z.string(), z.number()]).transform((value) => String(value)),
+    typeId: z.number().int().nonnegative(),
+    reviewStatus: z.literal('PENDING'),
+  })
+  .passthrough()
+  .refine((value) => /^-?[1-9][0-9]{0,30}$/.test(value.demandId), 'Invalid demand identifier');
+
+const demandImageResponse = z
+  .object({
+    url: z.string().url().startsWith('https://'),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    sizeBytes: z.number().int().positive(),
+    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp', 'image/gif']),
+  })
+  .passthrough();
 
 const {
   describeParseError,
@@ -103,7 +262,12 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
         };
       case 'project.detail':
         return { operation, data: normalizeProjectDetail(input) };
+      case 'contact.acquire':
+        return { operation, data: parseEnterpriseContactAccess(input) };
+      case 'project.contactUnlock':
+        return { operation, data: parseEnterpriseProjectContactUnlock(input) };
       case 'demand.types':
+      case 'demand.publishTypes':
         return {
           operation,
           data: z
@@ -120,6 +284,32 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
         };
       case 'demand.detail':
         return { operation, data: normalizeDemandDetail(input) };
+      case 'demand.contactStatus':
+      case 'demand.contactAcquire':
+        return { operation, data: parseDemandContactAccess(input) };
+      case 'demand.publishSchema':
+        return { operation, data: demandPublishSchemaResponse.parse(input) as EnterpriseDemandPublishSchema };
+      case 'demand.aiParse':
+        return { operation, data: demandAiParseResponse.parse(input) as EnterpriseDemandAiParseResult };
+      case 'demand.aiConversation.start':
+      case 'demand.aiConversation.turn':
+      case 'demand.aiConversation.confirmLine':
+      case 'demand.aiConversation.patch':
+      case 'demand.aiConversation.resume':
+      case 'demand.aiConversation.cancel':
+      case 'demand.aiConversation.complete':
+        return {
+          operation,
+          data: demandAiConversationResponse.parse(input) as DemandAiConversationSnapshot,
+        } as EnterpriseResponse;
+      case 'demand.publish':
+        return { operation, data: demandPublishResultResponse.parse(input) as EnterpriseDemandPublishResult };
+      case 'demand.uploadImage':
+        return { operation, data: demandImageResponse.parse(input) as EnterpriseDemandImage };
+      case 'unified.suggest':
+        return { operation, data: parseUnifiedSearchSuggestions(input) };
+      case 'unified.search':
+        return { operation, data: parseUnifiedSearchResult(input) };
     }
   } catch (error) {
     if (error instanceof Error && error.message.startsWith(`[${operation}]`)) throw error;

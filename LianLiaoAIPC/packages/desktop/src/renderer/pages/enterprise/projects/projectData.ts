@@ -143,6 +143,23 @@ export class ProjectDataError extends Error {
   }
 }
 
+const PROJECT_MEMBERSHIP_ERROR_TYPES = new Set([5, 6, 7, 8, 9]);
+
+/** Permission denial returned by the H5-compatible project contact preflight. */
+export class ProjectContactPermissionError extends ProjectDataError {
+  declare readonly errType: number;
+  declare readonly detail: string;
+  declare readonly membershipRequired: boolean;
+
+  constructor(errType: number, detail: string) {
+    super('API_FAILURE');
+    this.name = 'ProjectContactPermissionError';
+    this.errType = errType;
+    this.detail = detail;
+    this.membershipRequired = PROJECT_MEMBERSHIP_ERROR_TYPES.has(errType);
+  }
+}
+
 const isEnterpriseErrorCode = (value: unknown): value is EnterpriseIpcErrorCode =>
   typeof value === 'string' && Object.prototype.hasOwnProperty.call(ENTERPRISE_IPC_ERROR_MESSAGES, value);
 
@@ -517,6 +534,33 @@ export const loadProjectDetail = async (
   const detail = parseProjectDetailRecord(parseEnterpriseOperationData(response, 'project.detail'));
   if (!detail || detail.hpInfoId !== validId) throw new ProjectDataError('INVALID_RESPONSE');
   return detail;
+};
+
+/** Unlocks a protected project using the trusted login identity injected by the main process. */
+export const unlockProjectContact = async (
+  client: Pick<EnterpriseClient, 'request'>,
+  hpInfoId: string
+): Promise<void> => {
+  const validId = parseProjectId(hpInfoId);
+  // H5 first checks project membership/quota without consuming a phone lookup.
+  // The actual quota is consumed only when the user later requests the phone.
+  const permission = await client.request({
+    operation: 'contact.acquire',
+    payload: { resourceType: 'PROJECT', resourceId: validId, consumeQuota: false },
+  });
+  if (permission.operation !== 'contact.acquire' || permission.data.allowed !== true) {
+    if (permission.operation === 'contact.acquire') {
+      throw new ProjectContactPermissionError(permission.data.errType, permission.data.message);
+    }
+    throw new ProjectDataError('INVALID_RESPONSE');
+  }
+  const response = await client.request({
+    operation: 'project.contactUnlock',
+    payload: { hpInfoId: validId },
+  });
+  if (response.operation !== 'project.contactUnlock' || response.data.purchased !== true) {
+    throw new ProjectDataError('API_FAILURE');
+  }
 };
 
 export const useProjectDashboard = (client: Pick<EnterpriseClient, 'request'>): ProjectDashboardState => {

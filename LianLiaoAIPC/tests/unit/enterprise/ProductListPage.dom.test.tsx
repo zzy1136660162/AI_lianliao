@@ -161,6 +161,7 @@ describe('product catalog interactions', () => {
     expect(screen.getByText('Liaoning / Shenyang / Hunnan')).toBeVisible();
     expect(screen.getByText('<strong>High pressure</strong>')).toBeVisible();
     expect(container.querySelector('strong strong')).toBeNull();
+    expect(container).not.toHaveTextContent('009');
   });
 
   it('keeps old cards during pagination, clears quick view and ignores stale responses', async () => {
@@ -315,21 +316,34 @@ describe('product detail', () => {
       </EnterpriseAntdProvider>
     );
 
-  it('maps H5-backed fields as plain text and never offers dialing or unlocking', async () => {
-    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
-      operation: 'product.detail',
-      data: {
-        productId: '9',
-        companyId: '42',
-        name: 'Industrial pump',
-        companyName: 'Alpha Hydraulics',
-        industry: 'Equipment',
-        companyIndustry: 'Machinery',
-        phone: '1380000****',
-        address: 'No. 8 Industry Road',
-        summary: '<script>window.stolen=true</script>High pressure',
-      },
-    });
+  it('maps H5-backed fields as plain text and reveals the telephone only after permission succeeds', async () => {
+    const request = vi.fn<EnterpriseClient['request']>(async (input) =>
+      input.operation === 'contact.acquire'
+        ? {
+            operation: 'contact.acquire',
+            data: {
+              allowed: true,
+              errType: 0,
+              message: '',
+              actionUrl: '',
+              phone: '13800000000',
+            },
+          }
+        : {
+            operation: 'product.detail',
+            data: {
+              productId: '9',
+              companyId: '42',
+              name: 'Industrial pump',
+              companyName: 'Alpha Hydraulics',
+              industry: 'Equipment',
+              companyIndustry: 'Machinery',
+              phone: '1380000****',
+              address: 'No. 8 Industry Road',
+              summary: '<script>window.stolen=true</script>High pressure',
+            },
+          }
+    );
     const { container } = renderDetail(createClient(request));
 
     expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
@@ -341,7 +355,13 @@ describe('product detail', () => {
     expect(container.querySelector('script')).toBeNull();
     expect(screen.getByRole('link', { name: 'Alpha Hydraulics' })).toHaveAttribute('href', '/enterprise/companies/42');
     expect(container.querySelector("a[href^='tel:']")).toBeNull();
-    expect(screen.queryByRole('button', { name: /unlock|拨号|解锁/i })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: '获取联系方式' }));
+    expect(await screen.findByText('13800000000')).toBeVisible();
+    expect(screen.getByRole('button', { name: '拨打电话' })).toBeVisible();
+    expect(request).toHaveBeenCalledWith({
+      operation: 'contact.acquire',
+      payload: { resourceType: 'PRODUCT', resourceId: '9' },
+    });
   });
 
   it('rejects a nonnumeric route without requesting or echoing it', async () => {

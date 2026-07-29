@@ -9,6 +9,12 @@ import {
   loadDemandTypes,
   parseDemandRouteParams,
 } from '@/renderer/pages/enterprise/supplyDemand/supplyDemandData';
+import {
+  allowsCustomPublishOption,
+  isPublishFieldVisible,
+  serializePublishFieldValue,
+} from '@/renderer/pages/enterprise/supplyDemand/Publish/publishFormMetadata';
+import type { EnterpriseDemandPublishField } from '@/common/enterprise/contracts';
 
 const createClient = (request: EnterpriseClient['request']): Pick<EnterpriseClient, 'request'> => ({ request });
 
@@ -69,9 +75,13 @@ describe('supply-demand data boundary', () => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(response);
     const query = buildDemandListQuery({}, { pageNum: 1, pageSize: 20 });
 
-    await expect(loadDemandList(createClient(request), query, new AbortController().signal)).resolves.toEqual(
-      response.data
-    );
+    const result = await loadDemandList(createClient(request), query, new AbortController().signal);
+
+    expect(result).toEqual({
+      ...response.data,
+      list: response.data.list.map(({ companyName: _companyName, ...item }) => item),
+    });
+    expect(result.list[0]).not.toHaveProperty('companyName');
     expect(request).toHaveBeenCalledWith({ operation: 'demand.list', payload: query });
   });
 
@@ -158,5 +168,42 @@ describe('supply-demand data boundary', () => {
     expect(() => parseDemandRouteParams(typeId, demandId)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ROUTE' })
     );
+  });
+});
+
+describe('supply-demand publish metadata', () => {
+  const conditionalField: EnterpriseDemandPublishField = {
+    fieldKey: 'otherIndustry',
+    fieldLabel: '其他行业',
+    inputType: 'TEXT',
+    required: false,
+    maxLength: 255,
+    options: [],
+    visibleWhenJson: '{"field":"industry","operator":"CONTAINS","value":"其他"}',
+  };
+
+  it('shows a conditional H5-compatible field only when its dependency contains the configured option', () => {
+    expect(isPublishFieldVisible(conditionalField, { industry: ['装备制造', '其他'] })).toBe(true);
+    expect(isPublishFieldVisible(conditionalField, { industry: ['装备制造'] })).toBe(false);
+  });
+
+  it('fails open for malformed display metadata while the server remains authoritative', () => {
+    expect(
+      isPublishFieldVisible({ ...conditionalField, visibleWhenJson: '{not-json' }, { industry: ['装备制造'] })
+    ).toBe(true);
+  });
+
+  it('uses the dictionary-configured separator when serializing multiple H5 option values', () => {
+    expect(
+      serializePublishFieldValue(
+        { ...conditionalField, inputType: 'MULTISELECT', valueSeparator: '、' },
+        ['纸制品', '木制品']
+      )
+    ).toBe('纸制品、木制品');
+  });
+
+  it('enables a single custom option only when the generic control metadata allows it', () => {
+    expect(allowsCustomPublishOption({ ...conditionalField, controlPropsJson: '{"allowCustom":true}' })).toBe(true);
+    expect(allowsCustomPublishOption({ ...conditionalField, controlPropsJson: '{"allowCustom":false}' })).toBe(false);
   });
 });
