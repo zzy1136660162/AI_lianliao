@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.1.30](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.29...desktop-v2.1.30) (2026-08-05)
+
+### Desktop
+
+#### Features
+
+- **enterprise:** 重新设计企业码与重点产品列表，增加辽宁省市区联动筛选与高密度信息卡片
+- **assistant:** 增加可复用的产业检索助手，统一支持企业、产品和在建项目检索
+- **model:** 桌面 AI 默认模型支持从受管业务模型配置中加载
+- **service:** 完善客户在线咨询、客服接待、消息提醒与会话恢复流程
+- **desktop:** 增加链辽品牌登录界面、中文托盘菜单、正式环境复制保护与渲染进程恢复
+
+#### Bug Fixes
+
+- **contact:** 联系方式权限改为实时向服务端校验，避免使用过期本地状态
+- **catalog:** 增强企业、产品和项目详情的数据归一化与降级查询
+- **customer-service:** 保持消息列表独立滚动，对话输入区始终可见
+- **conversation:** 修复 AI 回答完成后仍显示“正在处理”的状态同步问题
+- **security:** 清理企业介绍中的脚本和样式内容，防止非业务文本泄露到界面
+
+---
+
 ## [2.1.29](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.28...desktop-v2.1.29) (2026-07-27)
 
 ### Desktop
