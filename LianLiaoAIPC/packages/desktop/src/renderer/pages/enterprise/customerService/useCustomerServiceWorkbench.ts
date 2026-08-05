@@ -27,6 +27,11 @@ const SIGNED_BUSINESS_ID = /^-?[1-9]\d*$/;
 
 type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 type ReadableCustomerMessage = { messageId: string | null; senderType: CustomerServiceMessage['senderType'] };
+type PendingSend = {
+  conversationId: string;
+  requestId: string | null;
+  timeout: ReturnType<typeof setTimeout>;
+};
 
 const isAllowedImageType = (value: string): value is AllowedImageType =>
   ALLOWED_IMAGE_TYPES.some((type) => type === value);
@@ -84,9 +89,7 @@ export const useCustomerServiceWorkbench = (
   const mountedRef = useRef(false);
   const stateRef = useRef(state);
   const viewingLatestRef = useRef(true);
-  const pendingSendTimeoutsRef = useRef(
-    new Map<string, { conversationId: string; timeout: ReturnType<typeof setTimeout> }>()
-  );
+  const pendingSendTimeoutsRef = useRef(new Map<string, PendingSend>());
 
   useEffect(() => {
     stateRef.current = state;
@@ -98,15 +101,53 @@ export const useCustomerServiceWorkbench = (
     pendingSendTimeoutsRef.current.delete(clientMessageId);
   }, []);
 
-  const failAllPendingSends = useCallback((): void => {
-    const pendingSends = [...pendingSendTimeoutsRef.current.entries()];
-    for (const [clientMessageId, pending] of pendingSends) {
+  const failPendingSendByRequestId = useCallback(
+    (requestId: string): void => {
+      const matched = [...pendingSendTimeoutsRef.current.entries()].find(
+        ([, pending]) => pending.requestId === requestId
+      );
+      if (!matched) return;
+      const [clientMessageId, pending] = matched;
       clearPendingSendTimeout(clientMessageId);
       if (mountedRef.current) {
         dispatch({ type: 'message.failed', conversationId: pending.conversationId, clientMessageId });
       }
-    }
-  }, [clearPendingSendTimeout]);
+    },
+    [clearPendingSendTimeout]
+  );
+
+  const reconcilePendingSend = useCallback(
+    async (conversationId: string, clientMessageId: string): Promise<void> => {
+      if (!pendingSendTimeoutsRef.current.has(clientMessageId)) return;
+      try {
+        const history = await client.getHistory({ conversationId, limit: PAGE_SIZE });
+        const confirmed = history.items.find((message) => message.clientMessageId === clientMessageId);
+        if (confirmed) {
+          clearPendingSendTimeout(clientMessageId);
+          if (mountedRef.current) {
+            dispatch({
+              type: 'event.received',
+              event: {
+                event: 'message.created',
+                eventId: `history-reconcile:${confirmed.messageId}`,
+                requestId: null,
+                conversationId,
+                serverTime: Date.now(),
+                payload: confirmed,
+              },
+              viewingLatest: viewingLatestRef.current && stateRef.current.selectedConversationId === conversationId,
+            });
+          }
+          return;
+        }
+      } catch {
+        // A failed confirmation request must not leave the optimistic message pending forever.
+      }
+      clearPendingSendTimeout(clientMessageId);
+      if (mountedRef.current) dispatch({ type: 'message.failed', conversationId, clientMessageId });
+    },
+    [clearPendingSendTimeout, client]
+  );
 
   const updateDeepLink = useCallback(
     (conversationId: string) => {
@@ -223,7 +264,7 @@ export const useCustomerServiceWorkbench = (
       if (event.event === 'message.created') {
         clearPendingSendTimeout((event.payload as CustomerServiceMessage).clientMessageId);
       }
-      if (event.event === 'error') failAllPendingSends();
+      if (event.event === 'error' && event.requestId) failPendingSendByRequestId(event.requestId);
 
       if (event.event === 'message.created') {
         const message = event.payload as CustomerServiceMessage;
@@ -259,7 +300,7 @@ export const useCustomerServiceWorkbench = (
       pendingSendTimeoutsRef.current.clear();
       void client.disconnect().catch((): undefined => undefined);
     };
-  }, [clearPendingSendTimeout, client, failAllPendingSends, initialize]);
+  }, [clearPendingSendTimeout, client, failPendingSendByRequestId, initialize]);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -315,17 +356,19 @@ export const useCustomerServiceWorkbench = (
       clearPendingSendTimeout(clientMessageId);
       pendingSendTimeoutsRef.current.set(clientMessageId, {
         conversationId,
+        requestId: null,
         timeout: setTimeout(() => {
-          pendingSendTimeoutsRef.current.delete(clientMessageId);
-          if (mountedRef.current) dispatch({ type: 'message.failed', conversationId, clientMessageId });
+          void reconcilePendingSend(conversationId, clientMessageId);
         }, SEND_ACK_TIMEOUT_MS),
       });
       try {
-        await client.sendMessage(
+        const requestId = await client.sendMessage(
           messageType === 'TEXT'
             ? { conversationId, clientMessageId, messageType, textContent: textContent ?? '' }
             : { conversationId, clientMessageId, messageType, image: image! }
         );
+        const pending = pendingSendTimeoutsRef.current.get(clientMessageId);
+        if (pending) pending.requestId = requestId;
         return true;
       } catch {
         clearPendingSendTimeout(clientMessageId);
@@ -333,7 +376,7 @@ export const useCustomerServiceWorkbench = (
         return false;
       }
     },
-    [clearPendingSendTimeout, client]
+    [clearPendingSendTimeout, client, reconcilePendingSend]
   );
 
   const sendText = useCallback(

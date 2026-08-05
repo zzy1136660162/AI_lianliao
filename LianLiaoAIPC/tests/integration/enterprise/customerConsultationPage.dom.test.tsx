@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -30,7 +30,10 @@ beforeAll(() => {
   Object.defineProperty(document, 'hasFocus', { configurable: true, value: vi.fn(() => true) });
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const conversation: CustomerServiceConversation = {
   conversationId: '-8',
@@ -179,6 +182,47 @@ describe('CustomerConsultationPage', () => {
 
     expect(await screen.findByText('enterprise.consultation.delivery.failed')).toBeVisible();
     expect(screen.getByText('enterprise.consultation.actions.retryMessage')).toBeVisible();
+  });
+
+  it('reconciles server history before treating a missing realtime acknowledgement as a failure', async () => {
+    const client = createClient();
+    render(<CustomerConsultationPage client={client} />);
+    await screen.findByTestId('customer-consultation-timeline');
+
+    vi.useFakeTimers();
+    fireEvent.change(screen.getByPlaceholderText('enterprise.consultation.composer.placeholder'), {
+      target: { value: 'persisted-without-realtime-ack' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'enterprise.consultation.composer.send' }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    const request = vi.mocked(client.sendMessage).mock.calls[0]?.[0];
+    expect(request).toBeDefined();
+    vi.mocked(client.getHistory).mockResolvedValue({
+      items: [
+        historyMessage,
+        {
+          ...historyMessage,
+          messageId: '-25',
+          clientMessageId: request?.clientMessageId ?? '',
+          textContent: 'persisted-without-realtime-ack',
+          createdAt: 1_700_000_000_800,
+        },
+      ],
+      nextCursor: null,
+      hasMore: false,
+    });
+    const historyCallsBeforeTimeout = vi.mocked(client.getHistory).mock.calls.length;
+
+    await act(async () => {
+      vi.advanceTimersByTime(15_000);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(vi.mocked(client.getHistory).mock.calls.length).toBeGreaterThan(historyCallsBeforeTimeout);
+    expect(screen.queryByText('enterprise.consultation.delivery.failed')).not.toBeInTheDocument();
   });
 
   it('keeps the main-process connection alive after leaving the consultation route', async () => {

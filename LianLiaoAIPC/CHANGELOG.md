@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.31](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.30...desktop-v2.1.31) (2026-08-05)
+
+### Desktop
+
+#### Bug Fixes
+
+- **customer-service:** 发送确认超时后回查服务端消息，并按请求精确处理失败，避免已送达消息被误报失败
+
+---
+
 ## [2.1.30](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.29...desktop-v2.1.30) (2026-08-05)
 
 ### Desktop

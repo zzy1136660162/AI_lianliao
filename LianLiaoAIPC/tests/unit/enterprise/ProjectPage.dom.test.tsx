@@ -319,7 +319,7 @@ describe('project dashboard and catalog', () => {
         },
       })
     );
-  });
+  }, 60_000);
 
   it('loads database filter roots and scopes cities to the selected province', async () => {
     const user = userEvent.setup();

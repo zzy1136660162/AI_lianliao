@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Outlet, Route, Routes, useLocation } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { CUSTOMER_SERVICE_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-
 import type {
   CustomerServiceConversation,
   CustomerServiceMessage,
+  CustomerServiceServerEnvelope,
 } from '@/common/enterprise/customer-service/contracts';
 import EnterpriseShell from '@/renderer/pages/enterprise/layout/EnterpriseShell';
 import CustomerServiceWorkbench from '@/renderer/pages/enterprise/customerService/CustomerServiceWorkbench';
@@ -106,43 +107,52 @@ const historyMessage: CustomerServiceMessage = {
   createdAt: 1_700_000_000_000,
 };
 
-const createClient = (): CustomerServiceClient => ({
-  connect: vi.fn(async () => ({ state: 'CONNECTED' as const, reconnectAttempt: 0, unreadCount: 2 })),
-  disconnect: vi.fn(async () => undefined),
-  listConversations: vi.fn(async (request) => ({
-    items:
-      request.status === 'CLOSED'
-        ? [conversation('-10', { status: 'CLOSED', staffFirstReplyAt: 1_700_000_000_100 })]
-        : [conversation('-8'), conversation('-9', { staffFirstReplyAt: 1_700_000_000_100, staffUnreadCount: 0 })],
-    nextCursor: null,
-    hasMore: false,
-  })),
-  getConversation: vi.fn(async ({ conversationId }) =>
-    conversationId === '-10'
-      ? conversation('-10', { status: 'CLOSED', staffFirstReplyAt: 1_700_000_000_100 })
-      : conversation(conversationId)
-  ),
-  getHistory: vi.fn(async ({ conversationId }) => ({
-    items: conversationId === '-8' ? [historyMessage] : [],
-    nextCursor: null,
-    hasMore: false,
-  })),
-  sendMessage: vi.fn(async () => '33333333-3333-4333-8333-333333333333'),
-  markRead: vi.fn(async ({ messageId }) => ({ advanced: true, lastReadMessageId: messageId })),
-  uploadImage: vi.fn(async () => ({
-    url: 'https://www.lslnii.com/customer-service/evidence.png',
-    width: 100,
-    height: 100,
-    sizeBytes: '1000',
-    mimeType: 'image/png',
-  })),
-  listCandidates: vi.fn(async () => ({ items: [], nextCursor: null, hasMore: false })),
-  transferConversation: vi.fn(async (request) =>
-    conversation(request.conversationId, { staffUserId: request.targetStaffUserId })
-  ),
-  closeConversation: vi.fn(async (request) => conversation(request.conversationId, { status: 'CLOSED' })),
-  onEvent: vi.fn((): (() => void) => (): void => undefined),
-});
+const createClient = (): CustomerServiceClient & { emit: (event: CustomerServiceServerEnvelope) => void } => {
+  let listener: ((event: CustomerServiceServerEnvelope) => void) | null = null;
+  return {
+    connect: vi.fn(async () => ({ state: 'CONNECTED' as const, reconnectAttempt: 0, unreadCount: 2 })),
+    disconnect: vi.fn(async () => undefined),
+    listConversations: vi.fn(async (request) => ({
+      items:
+        request.status === 'CLOSED'
+          ? [conversation('-10', { status: 'CLOSED', staffFirstReplyAt: 1_700_000_000_100 })]
+          : [conversation('-8'), conversation('-9', { staffFirstReplyAt: 1_700_000_000_100, staffUnreadCount: 0 })],
+      nextCursor: null,
+      hasMore: false,
+    })),
+    getConversation: vi.fn(async ({ conversationId }) =>
+      conversationId === '-10'
+        ? conversation('-10', { status: 'CLOSED', staffFirstReplyAt: 1_700_000_000_100 })
+        : conversation(conversationId)
+    ),
+    getHistory: vi.fn(async ({ conversationId }) => ({
+      items: conversationId === '-8' ? [historyMessage] : [],
+      nextCursor: null,
+      hasMore: false,
+    })),
+    sendMessage: vi.fn(async () => '33333333-3333-4333-8333-333333333333'),
+    markRead: vi.fn(async ({ messageId }) => ({ advanced: true, lastReadMessageId: messageId })),
+    uploadImage: vi.fn(async () => ({
+      url: 'https://www.lslnii.com/customer-service/evidence.png',
+      width: 100,
+      height: 100,
+      sizeBytes: '1000',
+      mimeType: 'image/png',
+    })),
+    listCandidates: vi.fn(async () => ({ items: [], nextCursor: null, hasMore: false })),
+    transferConversation: vi.fn(async (request) =>
+      conversation(request.conversationId, { staffUserId: request.targetStaffUserId })
+    ),
+    closeConversation: vi.fn(async (request) => conversation(request.conversationId, { status: 'CLOSED' })),
+    onEvent: vi.fn((nextListener) => {
+      listener = nextListener;
+      return () => {
+        listener = null;
+      };
+    }),
+    emit: (event) => listener?.(event),
+  };
+};
 
 const LocationProbe: React.FC = () => {
   const location = useLocation();
@@ -180,6 +190,40 @@ describe('desktop customer-service workbench', () => {
 
     expect(await screen.findByPlaceholderText('enterprise.customerService.composer.placeholder')).toBeDisabled();
     expect(screen.getByText('enterprise.customerService.composer.closed')).toBeVisible();
+  });
+
+  it('marks only the send request named by a server error as failed', async () => {
+    const client = createClient();
+    vi.mocked(client.sendMessage)
+      .mockResolvedValueOnce('33333333-3333-4333-8333-333333333333')
+      .mockResolvedValueOnce('44444444-4444-4444-8444-444444444444');
+    render(
+      <MemoryRouter initialEntries={['/enterprise/customer-service']}>
+        <CustomerServiceWorkbench client={client} currentStaffUserId='-19' />
+      </MemoryRouter>
+    );
+    await screen.findByTestId('customer-service-timeline-scroll');
+
+    const input = screen.getByPlaceholderText('enterprise.customerService.composer.placeholder');
+    await userEvent.type(input, 'first-pending-message');
+    await userEvent.click(screen.getByRole('button', { name: 'enterprise.customerService.composer.send' }));
+    await userEvent.type(input, 'second-pending-message');
+    await userEvent.click(screen.getByRole('button', { name: 'enterprise.customerService.composer.send' }));
+    await waitFor(() => expect(client.sendMessage).toHaveBeenCalledTimes(2));
+
+    act(() => {
+      client.emit({
+        event: 'error',
+        eventId: 'staff-send-error-1',
+        requestId: '33333333-3333-4333-8333-333333333333',
+        conversationId: '-8',
+        serverTime: 1_700_000_000_300,
+        payload: { code: 'INTERNAL_ERROR', message: 'service unavailable' },
+      });
+    });
+
+    expect(await screen.findAllByText('enterprise.customerService.delivery.failed')).toHaveLength(1);
+    expect(screen.getAllByText('enterprise.customerService.delivery.sending')).toHaveLength(1);
   });
 
   it('uses a full-width enterprise work area and shows the role-gated navigation entry', async () => {
