@@ -112,12 +112,12 @@ GitHub 只执行仓库根目录 `.github/workflows` 中的工作流。本仓库�
 1. 确认 `LianLiaoAIPC/package.json` 中的版本已经提交到 `master`。
 2. 打开 GitHub 仓库的 `Actions` 页面。
 3. 选择 `Release LianLiaoAIPC`。
-4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.30`。
-5. 工作流并行构建 Windows x64/ARM64、macOS Intel/Apple Silicon 和 Ubuntu x64；任一平台失败时 Release 保持草稿状态。
+4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.32`；`release_scope` 默认使用 `all`。
+5. `all` 会并行构建 Windows x64/ARM64、macOS Intel/Apple Silicon 和 Ubuntu x64；明确只发布 Windows x64 时选择 `windows-x64`，其他平台不会启动构建。
 6. 在 Releases 页面下载长期保留的 `desktop-v2.1.30` 正式安装包和 `SHA256SUMS.txt`。
 7. Actions 页面只保留一个轻量发布报告 Artifact，其中包含版本、Commit、文件大小和 SHA256，不重复保存安装包。
 
-多平台安装包先上传到草稿 GitHub Release，资产集合和 SHA256 全部验证通过后才转为公开发布。macOS 首版使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示。Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
+安装包先上传到草稿 GitHub Release，所选发布范围的资产集合和 SHA256 全部验证通过后才转为公开发布。常规正式版本仍应使用 `all`；`windows-x64` 仅用于用户明确要求的 Windows 专项发布。macOS 首版使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示。Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
 
 ## 桌面安装包发布位置
 
@@ -144,6 +144,20 @@ Cloud Service 源码位于：
 ```text
 E:\ZZY_PROJECT\lianshang_liaoning\cloud-service
 ```
+
+构建 `cloud-api` 时，在 Cloud Service 根目录执行：
+
+```powershell
+mvn.cmd -pl cloud-api -DskipTests package
+```
+
+生产部署必须使用 Spring Boot 插件输出的可执行胖包：
+
+```text
+E:\ZZY_PROJECT\lianshang_liaoning\cloud-service\target\cloud-api-1.0-SNAPSHOT.jar
+```
+
+不要使用 `cloud-api\target\cloud-api-1.0-SNAPSHOT.jar`；该文件是模块瘦包，不包含完整运行依赖。上传前应检查部署包内含 `BOOT-INF/` 和 Spring Boot Loader，并核对本地、临时上传文件及最终远端文件的大小和 SHA256。
 
 部署清单：
 

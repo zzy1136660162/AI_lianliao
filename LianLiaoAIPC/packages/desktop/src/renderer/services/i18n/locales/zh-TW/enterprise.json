@@ -773,6 +773,9 @@
       "staff": "Lianliao support",
       "imageAlt": "Consultation image"
     },
+    "notification": {
+      "newReply": "新的客服回覆訊息"
+    },
     "composer": {
       "placeholder": "Enter your question",
       "image": "Send image",

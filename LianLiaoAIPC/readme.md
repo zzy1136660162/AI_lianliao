@@ -8,7 +8,7 @@ Core 固定从 [zzy1136660162/AI_lianliao Releases](https://github.com/zzy113666
 
 需要使用当前开发代理时，请在同一个 PowerShell 会话设置 `$env:HTTPS_PROXY='http://127.0.0.1:7897'` 和 `$env:HTTP_PROXY='http://127.0.0.1:7897'`。
 
-Windows x64 正式安装包由根目录 `.github/workflows/lianliao-aipc-release.yml` 构建。手动输入版本必须与本目录 `package.json` 一致；工作流优先发布 `desktop-v<version>` GitHub Release，再删除旧 AIPC Artifact 并尝试上传保留 30 天的当前 Artifact。若 GitHub Artifact 存储额度尚未回收，Release 仍会正常发布，Artifact 步骤只记录警告。当前安装包尚未配置 Windows 代码签名证书，测试安装时可能出现 SmartScreen 提示。
+正式安装包由根目录 `.github/workflows/lianliao-aipc-release.yml` 构建。手动输入版本必须与本目录 `package.json` 一致；默认 `release_scope=all` 发布全部平台，用户明确要求 Windows 专项发布时可选择 `windows-x64`。工作流发布 `desktop-v<version>` GitHub Release，并只保留一个轻量发布报告 Artifact。当前安装包尚未配置 Windows 代码签名证书，测试安装时可能出现 SmartScreen 提示。
 
 ## 手动 HTTP 代理
 

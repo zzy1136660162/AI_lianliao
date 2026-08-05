@@ -37,9 +37,9 @@ describe('Windows ARM64 installer hardening', () => {
   });
 
   it('keeps Windows ARM64 coverage in the release build matrix', () => {
-    expect(releaseWorkflow).toContain('key: windows-arm64');
-    expect(releaseWorkflow).toContain('runner: windows-11-arm');
-    expect(releaseWorkflow).toContain('runtime: win32-arm64');
-    expect(releaseWorkflow).toContain('command: bun run build-win:arm64');
+    expect(releaseWorkflow).toContain('"key":"windows-arm64"');
+    expect(releaseWorkflow).toContain('"runner":"windows-11-arm"');
+    expect(releaseWorkflow).toContain('"runtime":"win32-arm64"');
+    expect(releaseWorkflow).toContain('"command":"bun run build-win:arm64"');
   });
 });

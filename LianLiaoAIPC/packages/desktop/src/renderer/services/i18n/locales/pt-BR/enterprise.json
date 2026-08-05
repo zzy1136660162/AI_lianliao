@@ -773,6 +773,9 @@
       "staff": "Lianliao support",
       "imageAlt": "Consultation image"
     },
+    "notification": {
+      "newReply": "Nova resposta do atendimento"
+    },
     "composer": {
       "placeholder": "Enter your question",
       "image": "Send image",

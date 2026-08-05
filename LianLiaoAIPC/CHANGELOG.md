@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.32](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.31...desktop-v2.1.32) (2026-08-05)
+
+### Desktop
+
+#### Bug Fixes
+
+- **customer-service:** 客户咨询消息区域独立滚动，确保输入框始终可见
+- **notification:** 客服新回复的 Windows 桌面提醒固定显示中文文案
+
+#### Release
+
+- 本次仅发布 Windows x64 安装包；macOS、Linux 与 Windows ARM64 不参与构建
+
+---
+
 ## [2.1.31](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.30...desktop-v2.1.31) (2026-08-05)
 
 ### Desktop

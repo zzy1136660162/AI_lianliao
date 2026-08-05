@@ -753,6 +753,9 @@
       "staff": "链辽客服",
       "imageAlt": "咨询消息图片"
     },
+    "notification": {
+      "newReply": "新的客服回复消息"
+    },
     "composer": {
       "placeholder": "请输入想咨询的问题",
       "image": "发送图片",

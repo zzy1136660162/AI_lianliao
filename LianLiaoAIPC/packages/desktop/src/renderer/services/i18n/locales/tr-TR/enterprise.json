@@ -773,6 +773,9 @@
       "staff": "Lianliao support",
       "imageAlt": "Consultation image"
     },
+    "notification": {
+      "newReply": "Yeni müşteri hizmetleri yanıtı"
+    },
     "composer": {
       "placeholder": "Enter your question",
       "image": "Send image",

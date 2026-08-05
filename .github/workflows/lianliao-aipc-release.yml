@@ -7,6 +7,14 @@ on:
         description: Desktop version without v, for example 2.1.28
         required: true
         type: string
+      release_scope:
+        description: Platforms included in this release
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - windows-x64
 
 permissions:
   actions: write
@@ -23,6 +31,9 @@ jobs:
     outputs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
+      release_scope: ${{ steps.release.outputs.release_scope }}
+      matrix_json: ${{ steps.release.outputs.matrix_json }}
+      platforms: ${{ steps.release.outputs.platforms }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
@@ -39,6 +50,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           INPUT_VERSION: ${{ inputs.version }}
+          INPUT_RELEASE_SCOPE: ${{ inputs.release_scope }}
         run: |
           set -euo pipefail
           version="$(printf '%s' "${INPUT_VERSION}" | xargs)"
@@ -64,12 +76,32 @@ jobs:
           fi
 
           node scripts/verifyAioncoreReleaseLock.js
-          for runtime in win32-x64 win32-arm64 darwin-x64 darwin-arm64 linux-x64; do
-            node scripts/verifyAioncoreReleaseLock.js "${runtime}" >/dev/null
-          done
+
+          release_scope="$(printf '%s' "${INPUT_RELEASE_SCOPE}" | xargs)"
+          case "${release_scope}" in
+            all)
+              for runtime in win32-x64 win32-arm64 darwin-x64 darwin-arm64 linux-x64; do
+                node scripts/verifyAioncoreReleaseLock.js "${runtime}" >/dev/null
+              done
+              matrix_json='{"include":[{"key":"windows-x64","runner":"windows-latest","runtime":"win32-x64","command":"bun run build-win:x64","source_suffixes":"win-x64.exe","asset_suffixes":"win-x64.exe"},{"key":"windows-arm64","runner":"windows-11-arm","runtime":"win32-arm64","command":"bun run build-win:arm64","source_suffixes":"win-arm64.exe","asset_suffixes":"win-arm64.exe"},{"key":"macos-x64","runner":"macos-15-intel","runtime":"darwin-x64","command":"bun run build-mac:x64","source_suffixes":"mac-x64.dmg mac-x64.zip","asset_suffixes":"mac-x64.dmg mac-x64.zip"},{"key":"macos-arm64","runner":"macos-15","runtime":"darwin-arm64","command":"bun run build-mac:arm64","source_suffixes":"mac-arm64.dmg mac-arm64.zip","asset_suffixes":"mac-arm64.dmg mac-arm64.zip"},{"key":"linux-x64","runner":"ubuntu-22.04","runtime":"linux-x64","command":"bun run build-deb","source_suffixes":"linux-amd64.deb","asset_suffixes":"linux-x64.deb"}]}'
+              platforms='Windows x64/ARM64, macOS x64/ARM64, Ubuntu x64'
+              ;;
+            windows-x64)
+              node scripts/verifyAioncoreReleaseLock.js win32-x64 >/dev/null
+              matrix_json='{"include":[{"key":"windows-x64","runner":"windows-latest","runtime":"win32-x64","command":"bun run build-win:x64","source_suffixes":"win-x64.exe","asset_suffixes":"win-x64.exe"}]}'
+              platforms='Windows x64'
+              ;;
+            *)
+              echo "Unsupported release scope: ${release_scope}" >&2
+              exit 1
+              ;;
+          esac
 
           echo "version=${version}" >> "${GITHUB_OUTPUT}"
           echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "release_scope=${release_scope}" >> "${GITHUB_OUTPUT}"
+          echo "matrix_json=${matrix_json}" >> "${GITHUB_OUTPUT}"
+          echo "platforms=${platforms}" >> "${GITHUB_OUTPUT}"
 
   create-draft-release:
     name: Create draft GitHub Release
@@ -79,18 +111,25 @@ jobs:
       - name: Create release notes
         env:
           VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_SCOPE: ${{ needs.validate.outputs.release_scope }}
         run: |
-          cat > release-notes.md <<EOF
-          ## 链上辽宁·产业云城 AI桌面平台 v${VERSION}
-
-          - Windows：x64、ARM64 安装程序
-          - macOS：Intel x64、Apple Silicon ARM64 的 DMG 和 ZIP
-          - Ubuntu：x64 DEB
-          - LianLiaoAICore：由 \`LianLiaoAIPC/aioncore-release-lock.json\` 固定版本和 SHA256
-          - 完整性校验：下载后请使用同页 \`SHA256SUMS.txt\`
-          - Windows 签名：当前未配置代码签名证书，SmartScreen 可能显示安全提示
-          - macOS 签名：当前使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示
-          EOF
+          {
+            echo "## 链上辽宁·产业云城 AI桌面平台 v${VERSION}"
+            echo
+            if [[ "${RELEASE_SCOPE}" == "windows-x64" ]]; then
+              echo "- 本次为 Windows x64 专项发布，不包含 macOS、Linux 或 Windows ARM64 安装包"
+            else
+              echo "- Windows：x64、ARM64 安装程序"
+              echo "- macOS：Intel x64、Apple Silicon ARM64 的 DMG 和 ZIP"
+              echo "- Ubuntu：x64 DEB"
+            fi
+            echo '- LianLiaoAICore：由 `LianLiaoAIPC/aioncore-release-lock.json` 固定版本和 SHA256'
+            echo '- 完整性校验：下载后请使用同页 `SHA256SUMS.txt`'
+            echo '- Windows 签名：当前未配置代码签名证书，SmartScreen 可能显示安全提示'
+            if [[ "${RELEASE_SCOPE}" == "all" ]]; then
+              echo '- macOS 签名：当前使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示'
+            fi
+          } > release-notes.md
 
       - name: Create draft Release
         env:
@@ -112,40 +151,7 @@ jobs:
       - create-draft-release
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - key: windows-x64
-            runner: windows-latest
-            runtime: win32-x64
-            command: bun run build-win:x64
-            source_suffixes: win-x64.exe
-            asset_suffixes: win-x64.exe
-          - key: windows-arm64
-            runner: windows-11-arm
-            runtime: win32-arm64
-            command: bun run build-win:arm64
-            source_suffixes: win-arm64.exe
-            asset_suffixes: win-arm64.exe
-          - key: macos-x64
-            runner: macos-15-intel
-            runtime: darwin-x64
-            command: bun run build-mac:x64
-            source_suffixes: mac-x64.dmg mac-x64.zip
-            asset_suffixes: mac-x64.dmg mac-x64.zip
-          - key: macos-arm64
-            runner: macos-15
-            runtime: darwin-arm64
-            command: bun run build-mac:arm64
-            source_suffixes: mac-arm64.dmg mac-arm64.zip
-            asset_suffixes: mac-arm64.dmg mac-arm64.zip
-          - key: linux-x64
-            runner: ubuntu-22.04
-            runtime: linux-x64
-            command: bun run build-deb
-            # electron-builder follows Debian's amd64 architecture spelling.
-            # The public Release keeps the cross-platform x64 naming contract.
-            source_suffixes: linux-amd64.deb
-            asset_suffixes: linux-x64.deb
+      matrix: ${{ fromJSON(needs.validate.outputs.matrix_json) }}
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
@@ -276,17 +282,22 @@ jobs:
       - name: Verify complete asset set and generate SHA256SUMS.txt
         env:
           VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_SCOPE: ${{ needs.validate.outputs.release_scope }}
         run: |
           set -euo pipefail
-          expected=(
-            "LianLiaoAIPC-${VERSION}-win-x64.exe"
-            "LianLiaoAIPC-${VERSION}-win-arm64.exe"
-            "LianLiaoAIPC-${VERSION}-mac-x64.dmg"
-            "LianLiaoAIPC-${VERSION}-mac-x64.zip"
-            "LianLiaoAIPC-${VERSION}-mac-arm64.dmg"
-            "LianLiaoAIPC-${VERSION}-mac-arm64.zip"
-            "LianLiaoAIPC-${VERSION}-linux-x64.deb"
-          )
+          if [[ "${RELEASE_SCOPE}" == "windows-x64" ]]; then
+            expected=("LianLiaoAIPC-${VERSION}-win-x64.exe")
+          else
+            expected=(
+              "LianLiaoAIPC-${VERSION}-win-x64.exe"
+              "LianLiaoAIPC-${VERSION}-win-arm64.exe"
+              "LianLiaoAIPC-${VERSION}-mac-x64.dmg"
+              "LianLiaoAIPC-${VERSION}-mac-x64.zip"
+              "LianLiaoAIPC-${VERSION}-mac-arm64.dmg"
+              "LianLiaoAIPC-${VERSION}-mac-arm64.zip"
+              "LianLiaoAIPC-${VERSION}-linux-x64.deb"
+            )
+          fi
           mapfile -t actual < <(find release-assets -maxdepth 1 -type f -printf '%f\n' | sort)
           mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
           diff -u <(printf '%s\n' "${wanted[@]}") <(printf '%s\n' "${actual[@]}")
@@ -305,18 +316,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.validate.outputs.tag }}
           VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_SCOPE: ${{ needs.validate.outputs.release_scope }}
         run: |
           set -euo pipefail
-          expected=(
-            "LianLiaoAIPC-${VERSION}-win-x64.exe"
-            "LianLiaoAIPC-${VERSION}-win-arm64.exe"
-            "LianLiaoAIPC-${VERSION}-mac-x64.dmg"
-            "LianLiaoAIPC-${VERSION}-mac-x64.zip"
-            "LianLiaoAIPC-${VERSION}-mac-arm64.dmg"
-            "LianLiaoAIPC-${VERSION}-mac-arm64.zip"
-            "LianLiaoAIPC-${VERSION}-linux-x64.deb"
-            "SHA256SUMS.txt"
-          )
+          if [[ "${RELEASE_SCOPE}" == "windows-x64" ]]; then
+            expected=(
+              "LianLiaoAIPC-${VERSION}-win-x64.exe"
+              "SHA256SUMS.txt"
+            )
+          else
+            expected=(
+              "LianLiaoAIPC-${VERSION}-win-x64.exe"
+              "LianLiaoAIPC-${VERSION}-win-arm64.exe"
+              "LianLiaoAIPC-${VERSION}-mac-x64.dmg"
+              "LianLiaoAIPC-${VERSION}-mac-x64.zip"
+              "LianLiaoAIPC-${VERSION}-mac-arm64.dmg"
+              "LianLiaoAIPC-${VERSION}-mac-arm64.zip"
+              "LianLiaoAIPC-${VERSION}-linux-x64.deb"
+              "SHA256SUMS.txt"
+            )
+          fi
           mapfile -t actual < <(
             gh release view "${TAG}" \
               --repo "${GITHUB_REPOSITORY}" \
@@ -331,6 +350,7 @@ jobs:
         env:
           TAG: ${{ needs.validate.outputs.tag }}
           VERSION: ${{ needs.validate.outputs.version }}
+          PLATFORMS: ${{ needs.validate.outputs.platforms }}
         run: |
           set -euo pipefail
           mkdir -p release-report
@@ -386,7 +406,7 @@ jobs:
             echo
             echo "- Release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Platforms: Windows x64/ARM64, macOS x64/ARM64, Ubuntu x64"
+            echo "- Platforms: ${PLATFORMS}"
             if [[ "${{ steps.report_artifact.outcome }}" != "success" ]]; then
               echo "- Actions Artifact: upload failed; formal Release assets are unaffected"
             else

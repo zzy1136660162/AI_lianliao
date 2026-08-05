@@ -6,10 +6,12 @@ import type {
   CustomerServiceConversation,
 } from '@/common/enterprise/customer-service/contracts';
 import {
+  getCustomerServiceDesktopNotificationBody,
   initCustomerConsultationBridge,
   type CustomerConsultationBridgeGateway,
   type CustomerServiceIpcMain,
 } from '@/process/bridge/enterpriseBridge';
+import i18n, { i18nReady } from '@process/services/i18n';
 
 const conversation: CustomerServiceConversation = {
   conversationId: '-8',
@@ -77,6 +79,18 @@ const makeGateway = (): CustomerConsultationBridgeGateway => ({
 });
 
 describe('customer-consultation IPC bridge', () => {
+  it('keeps native customer reply reminders in Chinese while the main process uses English', async () => {
+    await i18nReady;
+    const previousLanguage = i18n.resolvedLanguage || i18n.language;
+    await i18n.changeLanguage('en-US');
+
+    try {
+      await expect(getCustomerServiceDesktopNotificationBody()).resolves.toBe('新的客服回复消息');
+    } finally {
+      if (previousLanguage) await i18n.changeLanguage(previousLanguage);
+    }
+  });
+
   it('registers only customer consultation channels', () => {
     const { handlers, ipcMain } = makeIpcMain();
     initCustomerConsultationBridge({ gateway: makeGateway(), ipcMain, senderGuard: () => true });

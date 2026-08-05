@@ -6,6 +6,22 @@ const desktopRoot = resolve(__dirname, '../../..');
 const repositoryRoot = resolve(desktopRoot, '..');
 const workflow = readFileSync(resolve(repositoryRoot, '.github/workflows/lianliao-aipc-release.yml'), 'utf8');
 
+interface ReleaseMatrixEntry {
+  key: string;
+  runner: string;
+  runtime: string;
+  command: string;
+  source_suffixes: string;
+  asset_suffixes: string;
+}
+
+const readScopeMatrix = (scope: 'all' | 'windows-x64'): ReleaseMatrixEntry[] => {
+  const scopeSection = workflow.slice(workflow.indexOf(`            ${scope})`));
+  const match = scopeSection.match(/matrix_json='([^']+)'/);
+  if (!match) throw new Error(`Missing release matrix for scope: ${scope}`);
+  return (JSON.parse(match[1]) as { include: ReleaseMatrixEntry[] }).include;
+};
+
 describe('LianLiaoAIPC multi-platform release workflow', () => {
   it('uses validation, draft, platform build, and publish gates', () => {
     expect(workflow).toContain('name: Release LianLiaoAIPC');
@@ -17,18 +33,28 @@ describe('LianLiaoAIPC multi-platform release workflow', () => {
   });
 
   it('builds the five supported desktop targets on native runners', () => {
-    [
-      'runner: windows-latest',
-      'runner: windows-11-arm',
-      'runner: macos-15-intel',
-      'runner: macos-15',
-      'runner: ubuntu-22.04',
-      'bun run build-win:x64',
-      'bun run build-win:arm64',
-      'bun run build-mac:x64',
-      'bun run build-mac:arm64',
-      'bun run build-deb',
-    ].forEach((value) => expect(workflow).toContain(value));
+    expect(readScopeMatrix('all')).toMatchObject([
+      { key: 'windows-x64', runner: 'windows-latest', command: 'bun run build-win:x64' },
+      { key: 'windows-arm64', runner: 'windows-11-arm', command: 'bun run build-win:arm64' },
+      { key: 'macos-x64', runner: 'macos-15-intel', command: 'bun run build-mac:x64' },
+      { key: 'macos-arm64', runner: 'macos-15', command: 'bun run build-mac:arm64' },
+      { key: 'linux-x64', runner: 'ubuntu-22.04', command: 'bun run build-deb' },
+    ]);
+  });
+
+  it('supports an explicit Windows x64-only release without scheduling other runners', () => {
+    expect(workflow).toContain('release_scope:');
+    expect(workflow).toContain('- windows-x64');
+    expect(readScopeMatrix('windows-x64')).toEqual([
+      {
+        key: 'windows-x64',
+        runner: 'windows-latest',
+        runtime: 'win32-x64',
+        command: 'bun run build-win:x64',
+        source_suffixes: 'win-x64.exe',
+        asset_suffixes: 'win-x64.exe',
+      },
+    ]);
   });
 
   it('requires the complete installer set before publishing', () => {
@@ -61,8 +87,10 @@ describe('LianLiaoAIPC multi-platform release workflow', () => {
 
     expect(uploadStep).not.toContain('mapfile');
     expect(uploadStep).toContain('while IFS= read -r asset');
-    expect(workflow).toContain('source_suffixes: linux-amd64.deb');
-    expect(workflow).toContain('asset_suffixes: linux-x64.deb');
+    expect(readScopeMatrix('all').find(({ key }) => key === 'linux-x64')).toMatchObject({
+      source_suffixes: 'linux-amd64.deb',
+      asset_suffixes: 'linux-x64.deb',
+    });
   });
 
   it('pins the build toolchain and never embeds credentials or upstream Core fallbacks', () => {

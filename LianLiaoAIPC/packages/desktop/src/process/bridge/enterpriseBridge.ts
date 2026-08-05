@@ -108,7 +108,7 @@ import {
   getDefaultDesktopManagedAiModelService,
   type DesktopManagedAiModelService,
 } from '@process/services/enterprise/desktopManagedAiModelService';
-import i18n from '@process/services/i18n';
+import i18n, { i18nReady } from '@process/services/i18n';
 import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
 import { enterpriseSessionEvents } from '@process/services/enterprise/enterpriseSessionEvents';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
@@ -865,6 +865,16 @@ const broadcastCustomerServiceEvent = (event: CustomerServiceServerEnvelope): vo
   }
 };
 
+/**
+ * Keeps Chain Liaoning customer-service desktop reminders in Chinese even when
+ * the general application language is English or has not finished syncing.
+ * In-page labels continue to use the active locale.
+ */
+export async function getCustomerServiceDesktopNotificationBody(): Promise<string> {
+  await i18nReady;
+  return i18n.getFixedT('zh-CN')('enterprise.consultation.notification.newReply');
+}
+
 const getDefaultCustomerServiceGateway = (): CustomerServiceBridgeGateway => {
   defaultCustomerServiceGateway ??= new CustomerServiceGateway({
     sessionStore: getDefaultSessionStore(),
@@ -1036,7 +1046,7 @@ const getDefaultCustomerConsultationGateway = (): CustomerConsultationBridgeGate
         const title = message.senderName?.trim() || i18n.t('enterprise.consultation.timeline.staff');
         // Keep message content off desktop lock screens. A fixed localized
         // summary still tells the customer why the notification appeared.
-        const body = i18n.t('enterprise.consultation.timeline.newMessages');
+        const body = await getCustomerServiceDesktopNotificationBody();
         await showNotification({ title, body, customer_consultation: true });
       },
       setUnreadCount: setCustomerConsultationUnreadCount,
@@ -1189,12 +1199,12 @@ const getDefaultDesktopNotificationGateway = (): DesktopNotificationBridgeGatewa
     sessionStore: getDefaultSessionStore(),
     desktopIntegration: {
       shouldNotify: shouldNotifyDesktopNotification,
-      showNotification: ({ notification }) => {
+      showNotification: async ({ notification }) => {
         // Customer-service notification content is intentionally replaced even
         // if an upstream publisher accidentally included a message preview.
         const body =
           notification.type === 'CUSTOMER_SERVICE'
-            ? i18n.t('enterprise.customerService.timeline.newMessages')
+            ? await getCustomerServiceDesktopNotificationBody()
             : (notification.content?.trim() || notification.title).slice(0, 160);
         return showNotification({
           title: notification.title,

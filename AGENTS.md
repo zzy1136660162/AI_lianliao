@@ -53,6 +53,7 @@
 ## Cloud Service 服务部署
 
 - Cloud Service 源码目录固定为 `E:\ZZY_PROJECT\lianshang_liaoning\cloud-service`。
+- 构建 `cloud-api` 后，生产部署包固定取 `E:\ZZY_PROJECT\lianshang_liaoning\cloud-service\target\cloud-api-1.0-SNAPSHOT.jar`。这是 Spring Boot 插件输出的可执行胖包；不得把 `cloud-api\target\cloud-api-1.0-SNAPSHOT.jar` 模块瘦包上传到服务器。部署前应确认 JAR 内存在 `BOOT-INF/` 和 Spring Boot Loader，并核对文件大小与 SHA256。
 - 服务器 `10.2.202.23` 的部署目录为 `/mnt/web`，包含：
   - `cloud-admin-1.0-SNAPSHOT.jar`
   - `cloud-api-1.0-SNAPSHOT.jar`

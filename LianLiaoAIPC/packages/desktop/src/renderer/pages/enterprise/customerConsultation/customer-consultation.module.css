@@ -109,10 +109,13 @@
 }
 
 .chatCard :global(.ant-card-body) {
-  display: grid;
+  display: flex;
   height: 100%;
+  min-width: 0;
   min-height: 0;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .profileCard :global(.ant-card-body) {
@@ -127,6 +130,7 @@
 .chatHeader {
   display: flex;
   min-width: 0;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -178,8 +182,15 @@
   color: var(--enterprise-text-secondary);
 }
 
+.loadingState {
+  min-height: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
 .timelineRegion {
   position: relative;
+  flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
   background: #fbfdff;
@@ -189,7 +200,10 @@
   height: 100%;
   min-height: 0;
   padding: 18px 22px;
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
+  overscroll-behavior: contain;
   scrollbar-gutter: stable;
 }
 
@@ -297,6 +311,7 @@
 
 .composer {
   display: grid;
+  flex: 0 0 auto;
   gap: 9px;
   padding: 14px 18px 16px;
   border-top: 1px solid var(--enterprise-border);

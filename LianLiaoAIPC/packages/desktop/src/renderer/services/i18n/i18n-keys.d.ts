@@ -974,6 +974,7 @@ export type I18nKey =
   | 'enterprise.consultation.errors.send'
   | 'enterprise.consultation.errors.upload'
   | 'enterprise.consultation.eyebrow'
+  | 'enterprise.consultation.notification.newReply'
   | 'enterprise.consultation.profile.company'
   | 'enterprise.consultation.profile.notProvided'
   | 'enterprise.consultation.profile.promiseText'

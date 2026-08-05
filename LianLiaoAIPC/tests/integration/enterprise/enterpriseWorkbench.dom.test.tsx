@@ -22,6 +22,10 @@ const chartMocks = vi.hoisted(() => ({
   use: vi.fn(),
 }));
 
+// The complete suite runs hundreds of DOM tests concurrently. Keep protected
+// route assertions deterministic under CI load without adding production waits.
+const ROUTE_RENDER_TIMEOUT = 15_000;
+
 vi.mock('echarts/core', () => ({ init: chartMocks.init, use: chartMocks.use }));
 vi.mock('echarts/charts', () => ({ BarChart: {} }));
 vi.mock('echarts/components', () => ({ GridComponent: {}, LegendComponent: {}, TooltipComponent: {} }));
@@ -546,7 +550,11 @@ describe('enterprise desktop core workbench', () => {
     );
 
     expect(
-      await screen.findByRole('heading', { name: 'enterprise.routes.dashboard.title' }, { timeout: 5000 })
+      await screen.findByRole(
+        'heading',
+        { name: 'enterprise.routes.dashboard.title' },
+        { timeout: ROUTE_RENDER_TIMEOUT }
+      )
     ).toBeVisible();
     expect(rawBridge.restoreSession).toHaveBeenCalledTimes(1);
     sensitiveAudit.assertNeverObserved(container);
@@ -556,10 +564,10 @@ describe('enterprise desktop core workbench', () => {
     sensitiveAudit.assertNeverObserved(container);
     await user.click(companyOption);
 
-    expect(await screen.findByRole('heading', { name: COMPANY_NAME }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: COMPANY_NAME }, { timeout: ROUTE_RENDER_TIMEOUT })).toBeVisible();
     sensitiveAudit.assertNeverObserved(container);
     await user.click(screen.getByRole('link', { name: new RegExp(PRODUCT_NAME) }));
-    expect(await screen.findByRole('heading', { name: PRODUCT_NAME }, { timeout: 5000 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: PRODUCT_NAME }, { timeout: ROUTE_RENDER_TIMEOUT })).toBeVisible();
     sensitiveAudit.assertNeverObserved(container);
 
     await user.click(screen.getByRole('link', { name: 'enterprise.navigation.projects' }));
@@ -575,11 +583,11 @@ describe('enterprise desktop core workbench', () => {
         expect(screen.getByRole('status', { name: 'current route' })).toHaveTextContent(
           `/enterprise/projects/${PROJECT_ID}`
         ),
-      { timeout: 5000 }
+      { timeout: ROUTE_RENDER_TIMEOUT }
     );
     expect(screen.getByRole('heading', { name: 'enterprise.routes.projectDetail.title' })).toBeVisible();
     await waitFor(() => expect(container.querySelectorAll('[data-protected="true"]')).toHaveLength(4), {
-      timeout: 5000,
+      timeout: ROUTE_RENDER_TIMEOUT,
     });
     expect(screen.getByRole('heading', { name: /^enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible();
 
@@ -600,7 +608,9 @@ describe('enterprise desktop core workbench', () => {
     expect(rawBridge.clearSession).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole('link', { name: 'open legacy guid' }));
-    expect(await screen.findByRole('heading', { name: 'legacy-guid-route' }, { timeout: 5000 })).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: 'legacy-guid-route' }, { timeout: ROUTE_RENDER_TIMEOUT })
+    ).toBeVisible();
     expect(screen.getByRole('status', { name: 'current route' })).toHaveTextContent('/guid');
     sensitiveAudit.stop(container);
   }, 120_000);
