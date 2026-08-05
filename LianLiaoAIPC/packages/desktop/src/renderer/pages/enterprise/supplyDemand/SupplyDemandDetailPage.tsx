@@ -122,7 +122,12 @@ const SupplyDemandDetailPage: React.FC<SupplyDemandDetailPageProps> = ({ client 
             ))}
           </Descriptions>
         </Card>
-        <DemandContactCard client={client} typeId={detail.typeId} demandId={detail.demandId} />
+        <DemandContactCard
+          client={client}
+          typeId={detail.typeId}
+          demandId={detail.demandId}
+          demandTitle={detail.title}
+        />
       </div>
     </section>
   );

@@ -2,10 +2,14 @@ import { Copy, PhoneTelephone } from '@icon-park/react';
 import { Alert, Button, Space } from 'antd';
 import React, { useState } from 'react';
 
-import { ENTERPRISE_REGISTRATION_URL } from '@/common/enterprise/constants';
+import { ENTERPRISE_CERTIFICATION_URL, ENTERPRISE_REGISTRATION_URL } from '@/common/enterprise/constants';
 import type { EnterpriseContactResourceType } from '@/common/enterprise/contact-access/contracts';
 import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import {
+  getCurrentEnterprisePagePath,
+  recordEnterpriseBehavior,
+} from '@/renderer/services/enterprise/enterpriseBehaviorLog';
 import { openExternalUrl } from '@/renderer/utils/platform';
 
 import { copyEnterprisePhone, dialEnterprisePhone } from './contactActions';
@@ -16,11 +20,11 @@ export type EnterpriseContactAccessPanelProps = {
   client: Pick<EnterpriseClient, 'request'>;
   resourceType: EnterpriseContactResourceType;
   resourceId: string;
+  resourceTitle?: string;
+  toCompanyId?: string;
+  toCompanyName?: string;
   maskedPhone?: string;
 };
-
-const MEMBERSHIP_ERROR_TYPES = new Set([5, 6, 7, 8, 9]);
-const REGISTRATION_ERROR_TYPES = new Set([1, 2]);
 
 /**
  * Shared enterprise/product/project phone permission boundary.
@@ -33,6 +37,9 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
   client,
   resourceType,
   resourceId,
+  resourceTitle,
+  toCompanyId,
+  toCompanyName,
   maskedPhone,
 }) => {
   const [phone, setPhone] = useState<string>();
@@ -56,6 +63,23 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
       });
       if (response.operation !== 'contact.acquire') throw new Error('ENTERPRISE_OPERATION_MISMATCH');
       const access = response.data;
+      void recordEnterpriseBehavior(
+        {
+          eventType: 'CONTACT_ACQUIRE',
+          moduleName: `链辽AI桌面端-${resourceType === 'COMPANY' ? '企业码' : resourceType === 'PRODUCT' ? '重点产品' : '在建项目'}`,
+          title: `获取${resourceTitle || resourceId}联系方式`,
+          pagePath: getCurrentEnterprisePagePath(),
+          targetId: resourceId,
+          ...(toCompanyId ? { toCompanyId } : {}),
+          ...(toCompanyName ? { toCompanyName } : {}),
+          params: {
+            resourceType,
+            allowed: access.allowed,
+            action: access.action,
+          },
+        },
+        client
+      );
       if (access.allowed && access.phone) {
         setPhone(access.phone);
         setNoticeType('success');
@@ -65,18 +89,34 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
 
       setNoticeType('warning');
       setNotice(access.message || '当前账号暂时无法获取该联系方式。');
-      if (MEMBERSHIP_ERROR_TYPES.has(access.errType)) {
-        setMembershipOpen(true);
-        return;
-      }
-      if (REGISTRATION_ERROR_TYPES.has(access.errType)) {
-        await openExternalUrl(access.actionUrl || ENTERPRISE_REGISTRATION_URL);
-      } else if (access.actionUrl) {
-        await openExternalUrl(access.actionUrl);
+      switch (access.action) {
+        case 'UPGRADE':
+          setMembershipOpen(true);
+          break;
+        case 'REGISTER':
+          await openExternalUrl(ENTERPRISE_REGISTRATION_URL);
+          break;
+        case 'CERTIFY':
+          await openExternalUrl(ENTERPRISE_CERTIFICATION_URL);
+          break;
+        case 'NONE':
+        case 'RETRY':
+          break;
       }
     } catch {
+      void recordEnterpriseBehavior(
+        {
+          eventType: 'CONTACT_ACQUIRE',
+          moduleName: `链辽AI桌面端-${resourceType === 'COMPANY' ? '企业码' : resourceType === 'PRODUCT' ? '重点产品' : '在建项目'}`,
+          title: `获取${resourceTitle || resourceId}联系方式`,
+          pagePath: getCurrentEnterprisePagePath(),
+          targetId: resourceId,
+          params: { resourceType, outcome: 'FAILED' },
+        },
+        client
+      );
       setNoticeType('error');
-      setNotice('联系方式权限校验失败，请稍后重试。');
+      setNotice('联系方式服务暂不可用，请稍后重试。');
     } finally {
       setLoading(false);
     }
@@ -98,9 +138,33 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
     if (!phone) return;
     try {
       const opened = await dialEnterprisePhone(phone);
+      void recordEnterpriseBehavior(
+        {
+          eventType: 'PHONE_DIAL',
+          moduleName: `链辽AI桌面端-${resourceType === 'COMPANY' ? '企业码' : resourceType === 'PRODUCT' ? '重点产品' : '在建项目'}`,
+          title: `拨打${resourceTitle || resourceId}联系电话`,
+          pagePath: getCurrentEnterprisePagePath(),
+          targetId: resourceId,
+          ...(toCompanyId ? { toCompanyId } : {}),
+          ...(toCompanyName ? { toCompanyName } : {}),
+          params: { resourceType, opened },
+        },
+        client
+      );
       setNoticeType(opened ? 'success' : 'warning');
       setNotice(opened ? '已调用系统拨号应用。' : '该号码格式不支持直接拨打，请先复制号码。');
     } catch {
+      void recordEnterpriseBehavior(
+        {
+          eventType: 'PHONE_DIAL',
+          moduleName: `链辽AI桌面端-${resourceType === 'COMPANY' ? '企业码' : resourceType === 'PRODUCT' ? '重点产品' : '在建项目'}`,
+          title: `拨打${resourceTitle || resourceId}联系电话`,
+          pagePath: getCurrentEnterprisePagePath(),
+          targetId: resourceId,
+          params: { resourceType, opened: false },
+        },
+        client
+      );
       setNoticeType('error');
       setNotice('系统拨号应用暂时无法打开，请先复制号码。');
     }

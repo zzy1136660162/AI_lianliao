@@ -40,8 +40,19 @@ vi.mock('@/common', () => ({
       },
     },
     conversation: {
-      warmup: {
-        invoke: vi.fn().mockResolvedValue(undefined),
+      ensureRuntime: {
+        invoke: vi.fn().mockResolvedValue({
+          recovered: false,
+          config_options: [],
+          runtime: {
+            state: 'idle',
+            can_send_message: true,
+            has_task: false,
+            is_processing: false,
+            pending_confirmations: 0,
+            turn_id: null,
+          },
+        }),
       },
       getSlashCommands: {
         invoke: getSlashCommandsInvokeMock,

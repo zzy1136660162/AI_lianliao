@@ -1,5 +1,5 @@
-import { Card, Empty, Statistic } from 'antd';
-import React, { useMemo } from 'react';
+import { Card, Collapse, Empty, Statistic } from 'antd';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import EnterpriseChart from '@/renderer/pages/enterprise/charts/EnterpriseChart';
@@ -13,7 +13,7 @@ import styles from './project-workspace.module.css';
 
 export type ProjectDashboardProps = { data: ProjectDashboardBundle };
 
-const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
+const ProjectDashboardContent: React.FC<ProjectDashboardProps> = ({ data }) => {
   const { t } = useTranslation();
   const { dashboard, drillItems } = data;
   const reducedMotion = useMemo(() => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false, []);
@@ -41,17 +41,7 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
   ] as const;
 
   return (
-    <section className={styles.dashboard} aria-labelledby='project-dashboard-title'>
-      <div className={styles.sectionHeading}>
-        <div>
-          <span>{t('enterprise.projects.dashboard.eyebrow')}</span>
-          <h2 id='project-dashboard-title'>{t('enterprise.projects.dashboard.title')}</h2>
-        </div>
-        {dashboard.updatedAt ? (
-          <p>{t('enterprise.projects.dashboard.updatedAt', { date: dashboard.updatedAt })}</p>
-        ) : null}
-      </div>
-
+    <>
       <div className={styles.metricGrid}>
         {metrics.map(([key, value], index) => (
           <Card key={key} className={index < 2 ? styles.metricPrimary : styles.metricCard} variant='outlined'>
@@ -112,6 +102,46 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
           <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyCategory} />
         )}
       </Card>
+    </>
+  );
+};
+
+const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
+  const { t } = useTranslation();
+  const [activeKeys, setActiveKeys] = useState<string[]>([]);
+  const expanded = activeKeys.includes('overview');
+  const { dashboard } = data;
+
+  return (
+    <section className={styles.dashboard} aria-labelledby='project-dashboard-title'>
+      <Collapse
+        className={styles.dashboardCollapse}
+        bordered={false}
+        activeKey={activeKeys}
+        onChange={(keys) => setActiveKeys(Array.isArray(keys) ? keys : [keys])}
+        items={[
+          {
+            key: 'overview',
+            label: (
+              <div className={styles.dashboardHeading}>
+                <div>
+                  <span>{t('enterprise.projects.dashboard.eyebrow')}</span>
+                  <h2 id='project-dashboard-title'>{t('enterprise.projects.dashboard.title')}</h2>
+                </div>
+                <div className={styles.dashboardHeadingMeta}>
+                  {dashboard.updatedAt ? (
+                    <p>{t('enterprise.projects.dashboard.updatedAt', { date: dashboard.updatedAt })}</p>
+                  ) : null}
+                  <span>
+                    {t(expanded ? 'enterprise.projects.dashboard.collapse' : 'enterprise.projects.dashboard.expand')}
+                  </span>
+                </div>
+              </div>
+            ),
+            children: expanded ? <ProjectDashboardContent data={data} /> : null,
+          },
+        ]}
+      />
     </section>
   );
 };

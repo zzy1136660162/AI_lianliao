@@ -1,10 +1,10 @@
 import { Refresh, Search } from '@icon-park/react';
-import { Button, Form, Input, InputNumber } from 'antd';
+import { Button, Form, Input, InputNumber, Select } from 'antd';
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
-import type { EnterpriseProjectSummary } from '@/common/enterprise/contracts';
+import type { EnterpriseProjectFilterDimension, EnterpriseProjectSummary } from '@/common/enterprise/contracts';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
@@ -16,14 +16,23 @@ import { useProjectCatalog, useProjectDashboard } from './projectData';
 import ProjectQuickView from './ProjectQuickView';
 import ProjectTable from './ProjectTable';
 import styles from './project-workspace.module.css';
+import { useProjectFilterOptions } from './useProjectFilterOptions';
 
 export type ProjectPageProps = { client?: EnterpriseClient };
+
+const MATERIAL_FILTER_DIMENSIONS: EnterpriseProjectFilterDimension[] = [
+  'categoryL1',
+  'categoryL2',
+  'materialShortName',
+  'materialName',
+];
 
 const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const overview = useProjectDashboard(client);
   const catalog = useProjectCatalog(client);
+  const filterOptions = useProjectFilterOptions(client);
   const [draftFilters, setDraftFilters] = useState<ProjectFilters>({});
   const [selectedProject, setSelectedProject] = useState<EnterpriseProjectSummary | null>(null);
   const selectionTriggerRef = useRef<HTMLTableRowElement | null>(null);
@@ -49,6 +58,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
   };
   const resetFilters = () => {
     setDraftFilters({});
+    filterOptions.reset();
     clearPreviewAndFocus(catalogSectionRef.current);
     catalog.applyFilters({});
   };
@@ -60,6 +70,71 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
   const retry = () => {
     overview.retry();
     catalog.retry();
+  };
+
+  const changeDatabaseFilter = (field: EnterpriseProjectFilterDimension, value: string | undefined) => {
+    const next: ProjectFilters = { ...draftFilters, [field]: value };
+    if (field === 'province') {
+      next.city = undefined;
+      next.categoryL1 = undefined;
+      next.categoryL2 = undefined;
+      next.materialShortName = undefined;
+      next.materialName = undefined;
+      filterOptions.clear(['city', ...MATERIAL_FILTER_DIMENSIONS]);
+      if (value) void filterOptions.load({ dimension: 'city', province: value });
+      void filterOptions.load({ dimension: 'categoryL1', province: value });
+    } else if (field === 'city') {
+      next.categoryL1 = undefined;
+      next.categoryL2 = undefined;
+      next.materialShortName = undefined;
+      next.materialName = undefined;
+      filterOptions.clear(MATERIAL_FILTER_DIMENSIONS);
+      void filterOptions.load({
+        dimension: 'categoryL1',
+        province: next.province,
+        city: value,
+      });
+    } else if (field === 'categoryL1') {
+      next.categoryL2 = undefined;
+      next.materialShortName = undefined;
+      next.materialName = undefined;
+      filterOptions.clear(['categoryL2', 'materialShortName', 'materialName']);
+      if (value) {
+        void filterOptions.load({
+          dimension: 'categoryL2',
+          province: next.province,
+          city: next.city,
+          categoryL1: value,
+        });
+      }
+    } else if (field === 'categoryL2') {
+      next.materialShortName = undefined;
+      next.materialName = undefined;
+      filterOptions.clear(['materialShortName', 'materialName']);
+      if (value && next.categoryL1) {
+        void filterOptions.load({
+          dimension: 'materialShortName',
+          province: next.province,
+          city: next.city,
+          categoryL1: next.categoryL1,
+          categoryL2: value,
+        });
+      }
+    } else if (field === 'materialShortName') {
+      next.materialName = undefined;
+      filterOptions.clear(['materialName']);
+      if (value && next.categoryL1 && next.categoryL2) {
+        void filterOptions.load({
+          dimension: 'materialName',
+          province: next.province,
+          city: next.city,
+          categoryL1: next.categoryL1,
+          categoryL2: next.categoryL2,
+          materialShortName: value,
+        });
+      }
+    }
+    setDraftFilters(next);
   };
 
   const renderWorkspace = () => {
@@ -99,7 +174,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
               <span>{t('enterprise.projects.catalog.eyebrow')}</span>
               <h2 id='project-catalog-title'>{t('enterprise.projects.catalog.title')}</h2>
             </div>
-            <p>{t('enterprise.projects.catalog.description')}</p>
+            {/*<p>{t('enterprise.projects.catalog.description')}</p>*/}
           </div>
           {!catalog.data.list.length ? (
             <EnterprisePageState
@@ -135,24 +210,14 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
     );
   };
 
-  const textFields = [
-    'keyword',
+  const databaseFields: EnterpriseProjectFilterDimension[] = [
+    'province',
+    'city',
     'categoryL1',
     'categoryL2',
     'materialShortName',
     'materialName',
-    'province',
-    'city',
-  ] as const;
-  const textFieldLimits: Record<(typeof textFields)[number], number> = {
-    keyword: 100,
-    categoryL1: 200,
-    categoryL2: 200,
-    materialShortName: 200,
-    materialName: 200,
-    province: 100,
-    city: 100,
-  };
+  ];
 
   return (
     <section className={styles.page} aria-labelledby='project-page-title'>
@@ -166,17 +231,48 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
       </header>
 
       <Form className={styles.filterForm} layout='vertical' onFinish={applyFilters}>
-        {textFields.map((field) => (
-          <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
-            <Input
-              value={draftFilters[field]}
-              maxLength={textFieldLimits[field]}
-              allowClear
-              placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, [field]: event.target.value }))}
-            />
-          </Form.Item>
-        ))}
+        <Form.Item label={t('enterprise.projects.filters.keywordLabel')}>
+          <Input
+            value={draftFilters.keyword}
+            maxLength={100}
+            allowClear
+            placeholder={t('enterprise.projects.filters.keywordPlaceholder')}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
+          />
+        </Form.Item>
+        {databaseFields.map((field) => {
+          const state = filterOptions.states[field];
+          const disabled =
+            (field === 'city' && !draftFilters.province) ||
+            (field === 'categoryL2' && !draftFilters.categoryL1) ||
+            (field === 'materialShortName' && !draftFilters.categoryL2) ||
+            (field === 'materialName' && !draftFilters.materialShortName);
+          const notFoundContent = state.loading
+            ? t('enterprise.projects.filters.optionsLoading')
+            : state.failed
+              ? t('enterprise.projects.filters.optionsError')
+              : t('enterprise.projects.filters.optionsEmpty');
+          return (
+            <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
+              <Select
+                value={draftFilters[field]}
+                aria-label={t(`enterprise.projects.filters.${field}Label`)}
+                allowClear
+                showSearch
+                loading={state.loading}
+                disabled={disabled}
+                optionFilterProp='label'
+                notFoundContent={<span className={styles.optionState}>{notFoundContent}</span>}
+                options={state.options.map((option) => ({
+                  value: option.value,
+                  label: `${option.label} (${option.projectCount})`,
+                }))}
+                placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
+                onChange={(selected) => changeDatabaseFilter(field, selected)}
+              />
+            </Form.Item>
+          );
+        })}
         {(['minInvestment', 'maxInvestment'] as const).map((field) => (
           <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
             <InputNumber

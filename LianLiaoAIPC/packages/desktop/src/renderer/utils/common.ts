@@ -13,6 +13,14 @@ export const removeStack = (...args: Array<() => void>) => {
   };
 };
 
+export const stripHtmlTags = (html: string): string => {
+  if (!html) return '';
+  // Remove executable/non-content blocks together with their bodies before
+  // flattening the remaining rich text. Keeping script text would expose
+  // implementation fragments such as `window.foo=...` in company profiles.
+  return html.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').replace(/<[^>]*>/g, '');
+};
+
 /**
  * Tool confirmation outcome enum
  * This is a local copy to avoid importing the entire tools module from aioncli-core

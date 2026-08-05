@@ -5,6 +5,7 @@
  */
 
 import type { IProvider, TProviderWithModel } from '@/common/config/storage';
+import { DESKTOP_MANAGED_AI_PROVIDER_ID } from '@/common/enterprise/managed-ai-model/contracts';
 import { useGoogleAuthModels } from '@/renderer/hooks/agent/useGoogleAuthModels';
 import { useProvidersQuery } from '@/renderer/hooks/agent/useModelProviderList';
 import { hasAvailableModels } from '../utils/modelUtils';
@@ -49,7 +50,7 @@ export type GuidModelSelectionResult = {
  */
 export const useGuidModelSelection = (agentKey: ProviderAgentKey = 'aionrs'): GuidModelSelectionResult => {
   const { isGoogleAuth } = useGoogleAuthModels();
-  const { data: modelConfig } = useProvidersQuery();
+  const { data: modelConfig, mutate: refreshProviders } = useProvidersQuery();
 
   const modelList = useMemo(() => {
     const allProviders: IProvider[] = (modelConfig || []).filter((platform) => !!platform.models.length);
@@ -63,6 +64,19 @@ export const useGuidModelSelection = (agentKey: ProviderAgentKey = 'aionrs'): Gu
 
   const [current_model, _setCurrentModel] = useState<TProviderWithModel>();
   const selectedModelKeyRef = useRef<string | null>(null);
+  const managedSyncStartedRef = useRef(false);
+
+  // Startup synchronization is best-effort; retry once when the AI workspace
+  // opens, then refresh the local AionCore provider list on success or cache use.
+  useEffect(() => {
+    if (managedSyncStartedRef.current) return;
+    managedSyncStartedRef.current = true;
+    const sync = window.electronAPI?.desktopManagedAi?.sync;
+    if (!sync) return;
+    void sync().then((result) => {
+      if (result.state !== 'unavailable') void refreshProviders();
+    });
+  }, [refreshProviders]);
 
   const setCurrentModel = useCallback(
     async (model_info: TProviderWithModel, _options?: { persistPreference?: boolean }) => {
@@ -73,27 +87,27 @@ export const useGuidModelSelection = (agentKey: ProviderAgentKey = 'aionrs'): Gu
   );
 
   const resetCurrentModel = useCallback(
-    async (options?: { persistPreference?: boolean }) => {
+    async (_options?: { persistPreference?: boolean }) => {
       if (!modelList || modelList.length === 0) {
         return;
       }
 
       selectedModelKeyRef.current = null;
 
-      const defaultModel = modelList[0];
+      const defaultModel = modelList.find((provider) => provider.id === DESKTOP_MANAGED_AI_PROVIDER_ID) ?? modelList[0];
       const resolvedUseModel = defaultModel?.models[0] ?? '';
 
       if (!defaultModel || !resolvedUseModel) return;
 
-      await setCurrentModel(
-        {
-          ...defaultModel,
-          use_model: resolvedUseModel,
-        },
-        options
-      );
+      // A reset is a system-selected fallback rather than an explicit user choice.
+      // Keep selectedModelKeyRef empty so a managed provider arriving after the
+      // cloud synchronization can replace an earlier first-provider fallback.
+      _setCurrentModel({
+        ...defaultModel,
+        use_model: resolvedUseModel,
+      });
     },
-    [modelList, setCurrentModel]
+    [modelList]
   );
 
   // Set default model when modelList or agent changes
@@ -102,13 +116,19 @@ export const useGuidModelSelection = (agentKey: ProviderAgentKey = 'aionrs'): Gu
       if (!modelList || modelList.length === 0) {
         return;
       }
-      const currentKey = selectedModelKeyRef.current || buildModelKey(current_model?.id, current_model?.use_model);
-      if (isModelKeyAvailable(currentKey, modelList)) {
-        if (!selectedModelKeyRef.current && currentKey) {
-          selectedModelKeyRef.current = currentKey;
-        }
+      const selectedKey = selectedModelKeyRef.current;
+      if (isModelKeyAvailable(selectedKey, modelList)) {
         return;
       }
+
+      // A removed manual model no longer blocks the centrally managed default.
+      selectedModelKeyRef.current = null;
+      const defaultProvider =
+        modelList.find((provider) => provider.id === DESKTOP_MANAGED_AI_PROVIDER_ID) ?? modelList[0];
+      const defaultKey = buildModelKey(defaultProvider?.id, defaultProvider?.models[0]);
+      const currentKey = buildModelKey(current_model?.id, current_model?.use_model);
+      if (currentKey === defaultKey) return;
+
       await resetCurrentModel();
     };
 

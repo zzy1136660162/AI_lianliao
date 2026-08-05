@@ -8,6 +8,7 @@ import {
   createCompanyQueryKey,
   isPaginationOnlyCompanyQueryChange,
   loadCompanyDetailBundle,
+  loadCompanyIndustryOptions,
   loadCompanyList,
   parseCompanyId,
   parseSafeCompanyImageUrl,
@@ -146,6 +147,39 @@ describe('company catalog response boundaries', () => {
     expect(request).toHaveBeenCalledWith({ operation: 'company.list', payload: query });
   });
 
+  it('preserves the dense company profile and its bounded featured products', async () => {
+    const company = {
+      companyId: '42',
+      name: 'Liaoning Pumps',
+      logoUrl: 'https://cloud.lslnii.com/company/logo.png',
+      legalRepresentative: 'Zhang',
+      registeredCapital: '5000万元人民币',
+      companyType: 'Limited company',
+      establishedAt: '2014-02-21',
+      featuredProducts: [
+        {
+          productId: '901',
+          companyId: '42',
+          name: 'Precision pump',
+          imageUrl: 'https://cloud.lslnii.com/product/pump.png',
+        },
+      ],
+      featuredProductCount: 4,
+    };
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'company.list',
+      data: { list: [company], pageNum: 1, pageSize: 20, pages: 1, total: 1 },
+    });
+
+    const page = await loadCompanyList(
+      createClient(request),
+      buildCompanyListQuery({}, { pageNum: 1, pageSize: 20 }),
+      new AbortController().signal
+    );
+
+    expect(page.list[0]).toEqual(company);
+  });
+
   it('fails closed when the company list response omits list', async () => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
       operation: 'company.list',
@@ -164,6 +198,7 @@ describe('company catalog response boundaries', () => {
 
   it.each([
     ['shortName', 7],
+    ['logoUrl', 7],
     ['industry', false],
     ['province', 7],
     ['city', false],
@@ -172,17 +207,52 @@ describe('company catalog response boundaries', () => {
     ['businessSummary', 7],
     ['updatedAt', false],
     ['legalRepresentative', 7],
+    ['registeredCapital', 5000],
     ['companyType', false],
     ['companyLevel', '3'],
     ['vip', 'true'],
     ['establishedAt', 7],
     ['collected', 1],
+    ['featuredProductCount', '3'],
   ])('rejects a company summary whose optional %s has the wrong type', async (field, invalidValue) => {
     const company: Record<string, unknown> = { companyId: '42', name: 'Liaoning Pumps' };
     company[field] = invalidValue;
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
       operation: 'company.list',
       data: { list: [company], pageNum: 1, pageSize: 20, pages: 1, total: 1 },
+    } as never);
+
+    await expectInvalidResponse(
+      loadCompanyList(
+        createClient(request),
+        buildCompanyListQuery({}, { pageNum: 1, pageSize: 20 }),
+        new AbortController().signal
+      )
+    );
+  });
+
+  it.each([
+    ['non-array products', { productId: '901', companyId: '42', name: 'Pump' }, 1],
+    [
+      'more than three products',
+      Array.from({ length: 4 }, (_, index) => ({
+        productId: String(index + 1),
+        companyId: '42',
+        name: `Product ${index + 1}`,
+      })),
+      4,
+    ],
+    ['count below returned products', [{ productId: '901', companyId: '42', name: 'Pump' }], 0],
+  ])('rejects %s in a featured-product preview', async (_label, featuredProducts, featuredProductCount) => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'company.list',
+      data: {
+        list: [{ companyId: '42', name: 'Liaoning Pumps', featuredProducts, featuredProductCount }],
+        pageNum: 1,
+        pageSize: 20,
+        pages: 1,
+        total: 1,
+      },
     } as never);
 
     await expectInvalidResponse(
@@ -491,19 +561,68 @@ describe('company route identifiers', () => {
   );
 });
 
+describe('company industry options', () => {
+  it('loads database-backed industries that meet the ten-company threshold', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'company.industries',
+      data: [
+        { industry: 'Equipment', companyCount: 23 },
+        { industry: 'Manufacturing', companyCount: 10 },
+      ],
+    });
+
+    await expect(loadCompanyIndustryOptions(createClient(request), new AbortController().signal)).resolves.toEqual([
+      { industry: 'Equipment', companyCount: 23 },
+      { industry: 'Manufacturing', companyCount: 10 },
+    ]);
+    expect(request).toHaveBeenCalledWith({ operation: 'company.industries', payload: {} });
+  });
+
+  it.each([
+    ['a count below the backend threshold', [{ industry: 'Equipment', companyCount: 9 }]],
+    [
+      'duplicate industry names',
+      [
+        { industry: 'Equipment', companyCount: 23 },
+        { industry: 'Equipment', companyCount: 12 },
+      ],
+    ],
+  ])('rejects %s', async (_label, data) => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'company.industries',
+      data,
+    } as EnterpriseResponse);
+
+    await expectInvalidResponse(loadCompanyIndustryOptions(createClient(request), new AbortController().signal));
+  });
+});
+
 describe('company image URLs', () => {
   it.each([
     ['https://cloud.lslnii.com/logo.png', 'https://cloud.lslnii.com/logo.png'],
     ['https://sjbang.lslnii.com/images/product.png', 'https://sjbang.lslnii.com/images/product.png'],
     ['https://www.lslnii.com/company/logo.png', 'https://www.lslnii.com/company/logo.png'],
+    ['http://cloud.lslnii.com/logo.png', 'https://cloud.lslnii.com/logo.png'],
+    ['upload/NFSImgFile/appl/product.png', 'https://img.lslnii.com/upload/NFSImgFile/appl/product.png'],
+    [
+      'http://www.gytaobao.cn:9328//upload/NFSImgFile/appl/product.png',
+      'https://www.lslnii.com/upload/NFSImgFile/appl/product.png',
+    ],
+    [
+      'http://www.gytaobao.cn:9428//img_file/product.png',
+      'https://www.lslnii.com/upload/NFSImgFile/appl/img_file/product.png',
+    ],
+    [
+      'http://sjbang.lslnii.com//upload/Ckeditor/Image/product.png',
+      'https://www.lslnii.com/upload/NFSImgFile/appl/img_file/Ckeditor/Image/product.png',
+    ],
     ['HTTPS://CLOUD.LSLNII.COM:443/logo.png', 'https://cloud.lslnii.com/logo.png'],
     ['//SJBANG.LSLNII.COM:443/images/product.png', 'https://sjbang.lslnii.com/images/product.png'],
-  ])('normalizes an exact trusted business HTTPS image source: %s', (value, expected) => {
+  ])('normalizes a trusted current or legacy business image source: %s', (value, expected) => {
     expect(parseSafeCompanyImageUrl(value)).toBe(expected);
   });
 
   it.each([
-    'http://cloud.lslnii.com/logo.png',
     '//cloud.lslnii.com:8443/logo.png',
     'https://user:password@cloud.lslnii.com/logo.png',
     'https://cloud.lslnii.com.evil.example/logo.png',

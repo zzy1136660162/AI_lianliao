@@ -22,6 +22,7 @@ import type { EnterpriseClient } from '@/renderer/services/enterprise/enterprise
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 import { parseSafeProductImageUrl, useProductDetail } from './productData';
+import ProductRichText from './ProductRichText';
 import styles from './product-catalog.module.css';
 
 export type ProductDetailPageProps = { client?: EnterpriseClient };
@@ -125,9 +126,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
             client={client}
             resourceType='PRODUCT'
             resourceId={product.productId}
+            resourceTitle={product.name}
+            toCompanyId={product.companyId}
+            toCompanyName={product.companyName}
             maskedPhone={product.phone}
           />
-          <p className={styles.permissionNote}>{t('enterprise.productDetail.contactPermissionNote')}</p>
         </DetailSectionCard>
       </StickyDetailSidebar>
     );
@@ -173,7 +176,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
             </dl>
           </DetailSectionCard>
           <DetailSectionCard title={t('enterprise.productDetail.sections.summary')}>
-            <p className={styles.plainText}>{product.summary || missing}</p>
+            <ProductRichText className={styles.richText} html={product.summary} fallback={missing} />
           </DetailSectionCard>
         </DetailColumns>
       </div>
@@ -187,7 +190,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
           {t('enterprise.productDetail.backToList')}
         </Button>
         <div>
-          <span className={styles.eyebrow}>{t('enterprise.productDetail.eyebrow')}</span>
+          {/*<span className={styles.eyebrow}>{t('enterprise.productDetail.eyebrow')}</span>*/}
           <h1 id='product-detail-title'>{t('enterprise.routes.productDetail.title')}</h1>
         </div>
       </header>

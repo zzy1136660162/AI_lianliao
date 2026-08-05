@@ -88,13 +88,25 @@ const page = (name: string, productId = '9', pageNum = 1, total = 1): Enterprise
   },
 });
 
-const createClient = (request: EnterpriseClient['request']): EnterpriseClient => ({
+const industryOptions: Extract<EnterpriseResponse, { operation: 'company.industries' }> = {
+  operation: 'company.industries',
+  data: [
+    { industry: 'Equipment', companyCount: 23 },
+    { industry: 'Manufacturing', companyCount: 10 },
+  ],
+};
+
+const createClient = (
+  request: EnterpriseClient['request'],
+  industryRequest: EnterpriseClient['request'] = vi.fn<EnterpriseClient['request']>().mockResolvedValue(industryOptions)
+): EnterpriseClient => ({
   createLoginSession: vi.fn(),
   pollLoginSession: vi.fn(),
   completeRegistration: vi.fn(),
   restoreSession: vi.fn(),
   clearSession: vi.fn(),
-  request,
+  request: ((input) =>
+    input.operation === 'company.industries' ? industryRequest(input) : request(input)) as EnterpriseClient['request'],
 });
 
 const LocationProbe = () => {
@@ -121,6 +133,14 @@ const replaceInput = async (user: ReturnType<typeof userEvent.setup>, placeholde
   await user.type(input, value);
 };
 
+const selectAreaOption = async (user: ReturnType<typeof userEvent.setup>, placeholder: string, optionLabel: string) => {
+  const select = screen.getByText(placeholder).closest('.ll-ant-select');
+  expect(select).not.toBeNull();
+  await user.click(select as HTMLElement);
+  const option = await screen.findByText(optionLabel);
+  fireEvent.click(option.closest('.ll-ant-select-item-option') as HTMLElement);
+};
+
 describe('product catalog interactions', () => {
   afterEach(() => {
     cleanup();
@@ -130,17 +150,22 @@ describe('product catalog interactions', () => {
 
   it('submits product filters at page one and renders a plain-text responsive card', async () => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(page('Industrial pump'));
+    const industryRequest = vi.fn<EnterpriseClient['request']>().mockResolvedValue(industryOptions);
     const user = userEvent.setup();
-    const { container } = renderList(createClient(request));
+    const { container } = renderList(createClient(request, industryRequest));
 
     expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
     expect(container.querySelector('.enterprise-product-list .ll-ant-pagination')).toBeInTheDocument();
     expect(container.querySelector('.enterprise-product-list [class*="arco-"]')).not.toBeInTheDocument();
     await replaceInput(user, 'enterprise.products.filters.keywordPlaceholder', ' pump ');
-    await replaceInput(user, 'enterprise.products.filters.industryPlaceholder', ' Equipment ');
-    await replaceInput(user, 'enterprise.products.filters.provincePlaceholder', ' Liaoning ');
-    await replaceInput(user, 'enterprise.products.filters.cityPlaceholder', ' Shenyang ');
-    await replaceInput(user, 'enterprise.products.filters.districtPlaceholder', ' Hunnan ');
+    await selectAreaOption(
+      user,
+      'enterprise.companies.filters.industryPlaceholder',
+      'enterprise.companies.filters.industryOption:Equipment,23'
+    );
+    expect(screen.queryByText('enterprise.products.filters.provinceLabel')).not.toBeInTheDocument();
+    await selectAreaOption(user, 'enterprise.products.filters.cityPlaceholder', '沈阳市');
+    await selectAreaOption(user, 'enterprise.products.filters.districtPlaceholder', '浑南区');
     await user.click(screen.getByRole('button', { name: 'enterprise.products.actions.search' }));
 
     await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
@@ -149,19 +174,37 @@ describe('product catalog interactions', () => {
       payload: {
         keyword: 'pump',
         industry: 'Equipment',
-        province: 'Liaoning',
-        city: 'Shenyang',
-        district: 'Hunnan',
+        city: '沈阳市',
+        district: '浑南区',
         pageNum: 1,
         pageSize: 20,
       },
     });
+    expect(industryRequest).toHaveBeenCalledWith({ operation: 'company.industries', payload: {} });
     expect(screen.getByText('Alpha Hydraulics')).toBeVisible();
-    expect(screen.getByText('Equipment')).toBeVisible();
+    const productCard = screen.getByRole('heading', { name: 'Industrial pump' }).closest('article');
+    expect(productCard).not.toBeNull();
+    expect(within(productCard as HTMLElement).getByText('Equipment')).toBeVisible();
     expect(screen.getByText('Liaoning / Shenyang / Hunnan')).toBeVisible();
-    expect(screen.getByText('<strong>High pressure</strong>')).toBeVisible();
-    expect(container.querySelector('strong strong')).toBeNull();
+    const listSummary = screen.getByText('High pressure');
+    expect(listSummary).toBeVisible();
+    expect(listSummary.tagName).toBe('P');
+    expect(container).not.toHaveTextContent('<strong>');
     expect(container).not.toHaveTextContent('009');
+  });
+
+  it('keeps the product catalog usable when industry options fail to load', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(page('Industrial pump'));
+    const industryRequest = vi
+      .fn<EnterpriseClient['request']>()
+      .mockRejectedValue(new Error('raw-industry-options-secret'));
+    const { container } = renderList(createClient(request, industryRequest));
+
+    expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
+    expect(screen.getByText('enterprise.companies.filters.industryPlaceholder')).toBeVisible();
+    expect(container).not.toHaveTextContent('raw-industry-options-secret');
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(industryRequest).toHaveBeenCalledTimes(1);
   });
 
   it('keeps old cards during pagination, clears quick view and ignores stale responses', async () => {
@@ -217,6 +260,7 @@ describe('product catalog interactions', () => {
     expect(within(quickView).queryByText(/enterprise\.products\.quickView\.index|0009/)).toBeNull();
     expect(within(quickView).getByText('enterprise.products.quickView.title')).toBeVisible();
     expect(within(quickView).getByText('enterprise.products.quickView.hint')).toBeVisible();
+    expect(within(quickView).getByText('High pressure').tagName).toBe('STRONG');
     expect(within(quickView).getByRole('button', { name: 'enterprise.products.quickView.action' })).toBeVisible();
 
     await user.click(within(quickView).getByRole('button', { name: 'enterprise.products.quickView.action' }));
@@ -325,7 +369,7 @@ describe('product detail', () => {
               allowed: true,
               errType: 0,
               message: '',
-              actionUrl: '',
+              action: 'NONE',
               phone: '13800000000',
             },
           }
@@ -340,7 +384,7 @@ describe('product detail', () => {
               companyIndustry: 'Machinery',
               phone: '1380000****',
               address: 'No. 8 Industry Road',
-              summary: '<script>window.stolen=true</script>High pressure',
+              summary: '<script>window.stolen=true</script><p><strong>High pressure</strong></p>',
             },
           }
     );
@@ -350,9 +394,11 @@ describe('product detail', () => {
     expect(screen.getByText('enterprise.products.fields.companyIndustry')).toBeVisible();
     expect(screen.getByText('Machinery')).toBeVisible();
     expect(screen.getByText('1380000****')).toBeVisible();
-    expect(screen.getByText('<script>window.stolen=true</script>High pressure')).toBeVisible();
+    expect(screen.getByText('High pressure').tagName).toBe('STRONG');
+    expect(container).not.toHaveTextContent('window.stolen');
     expect(container.querySelector('.ll-ant-card')).toBeInTheDocument();
     expect(container.querySelector('script')).toBeNull();
+    expect(screen.queryByText('enterprise.productDetail.contactPermissionNote')).toBeNull();
     expect(screen.getByRole('link', { name: 'Alpha Hydraulics' })).toHaveAttribute('href', '/enterprise/companies/42');
     expect(container.querySelector("a[href^='tel:']")).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: '获取联系方式' }));

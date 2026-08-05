@@ -16,7 +16,7 @@ import {
 import dayjs, { type Dayjs } from 'dayjs';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import type {
   EnterpriseDemandPublishField,
@@ -27,12 +27,12 @@ import type {
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
-
 import {
-  loadPublishDemandSchema,
-  loadPublishDemandTypes,
-  publishDemand,
-} from './publishDemandData';
+  getCurrentEnterprisePagePath,
+  recordEnterpriseBehavior,
+} from '@/renderer/services/enterprise/enterpriseBehaviorLog';
+
+import { loadPublishDemandSchema, loadPublishDemandTypes, publishDemand } from './publishDemandData';
 import DemandAiAssistantPanel from './assistant/DemandAiAssistantPanel';
 import { toManualPatch, toPublishFormPatch } from './assistant/demandAiFormAdapter';
 import { useDemandAiConversation } from './assistant/useDemandAiConversation';
@@ -49,12 +49,7 @@ const BASE_FIELD_KEYS = new Set(['title', 'summary', 'province', 'city', 'distri
 
 type FormValues = Record<string, string | string[] | number | Dayjs | undefined>;
 type DemandImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-const DEMAND_IMAGE_MIME_TYPES = new Set<DemandImageMimeType>([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-]);
+const DEMAND_IMAGE_MIME_TYPES = new Set<DemandImageMimeType>(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 const isDemandImageMimeType = (value: string): value is DemandImageMimeType =>
   DEMAND_IMAGE_MIME_TYPES.has(value as DemandImageMimeType);
@@ -112,12 +107,8 @@ const DemandImageControl: React.FC<DemandImageControlProps> = ({ client, maxCoun
         return true;
       }}
     >
-      <Button disabled={value.length >= maxCount}>
-        {t('enterprise.supplyDemand.publish.image.action')}
-      </Button>
-      <span className={styles.imageHint}>
-        {t('enterprise.supplyDemand.publish.image.hint', { count: maxCount })}
-      </span>
+      <Button disabled={value.length >= maxCount}>{t('enterprise.supplyDemand.publish.image.action')}</Button>
+      <span className={styles.imageHint}>{t('enterprise.supplyDemand.publish.image.hint', { count: maxCount })}</span>
     </Upload>
   );
 };
@@ -125,6 +116,7 @@ const DemandImageControl: React.FC<DemandImageControlProps> = ({ client, maxCoun
 const PublishDemandPage: React.FC<PublishDemandPageProps> = ({ client = enterpriseClient }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
   const [types, setTypes] = useState<EnterpriseDemandTypeOption[]>([]);
@@ -137,10 +129,11 @@ const PublishDemandPage: React.FC<PublishDemandPageProps> = ({ client = enterpri
   const [error, setError] = useState<string>();
   const aiConversation = useDemandAiConversation(client);
   const watchedValues = Form.useWatch([], form) ?? {};
+  const handoffSessionId = searchParams.get('aiSession') ?? undefined;
 
   useEffect(() => {
-    void aiConversation.resume();
-  }, [aiConversation.resume]);
+    void aiConversation.resume(handoffSessionId);
+  }, [aiConversation.resume, handoffSessionId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -214,8 +207,7 @@ const PublishDemandPage: React.FC<PublishDemandPageProps> = ({ client = enterpri
     const groups = new Map<string, EnterpriseDemandPublishField[]>();
     const ordered = [...schema.fields].sort(
       (left, right) =>
-        (left.groupOrder ?? 0) - (right.groupOrder ?? 0) ||
-        (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
+        (left.groupOrder ?? 0) - (right.groupOrder ?? 0) || (left.displayOrder ?? 0) - (right.displayOrder ?? 0)
     );
     for (const field of ordered) {
       if (!isPublishFieldVisible(field, watchedValues)) continue;
@@ -274,6 +266,23 @@ const PublishDemandPage: React.FC<PublishDemandPageProps> = ({ client = enterpri
       if (aiConversation.snapshot) {
         await aiConversation.markSubmitted(result.demandId);
       }
+      void recordEnterpriseBehavior(
+        {
+          eventType: 'DEMAND_PUBLISH',
+          moduleName: '链辽AI桌面端-供需对接',
+          title: `发布供需：${payload.title}`,
+          pagePath: getCurrentEnterprisePagePath(),
+          targetId: result.demandId,
+          params: {
+            typeId: result.typeId,
+            reviewStatus: result.reviewStatus,
+            variantCode: payload.variantCode ?? '',
+            city: payload.city ?? '',
+            district: payload.district ?? '',
+          },
+        },
+        client
+      );
       void message.success(t('enterprise.supplyDemand.publish.success'));
       navigate('/enterprise/supply-demand');
     } catch {
@@ -372,12 +381,7 @@ const PublishDemandPage: React.FC<PublishDemandPageProps> = ({ client = enterpri
           />
         );
       case 'IMAGE':
-        return (
-          <DemandImageControl
-            client={client}
-            maxCount={readPublishControlProps(field).maxCount ?? 6}
-          />
-        );
+        return <DemandImageControl client={client} maxCount={readPublishControlProps(field).maxCount ?? 6} />;
       default:
         return <Input maxLength={field.maxLength} placeholder={field.placeholder} />;
     }

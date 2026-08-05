@@ -9,13 +9,25 @@ import type {
   EnterpriseDemandPublishSchema,
   EnterpriseDemandSummary,
   EnterpriseDemandTypeOption,
+  EnterpriseIndustryOption,
   EnterpriseOperation,
   EnterpriseProductSummary,
+  EnterpriseProjectFilterOption,
   EnterpriseProjectSummary,
   EnterpriseResponse,
   EnterpriseUserContext,
 } from './contracts';
 import { enterpriseNormalizers } from './normalizers';
+import {
+  catalogPlanResponseSchema,
+  catalogRankResponseSchema,
+  enterpriseAssistantPlanResponseSchema,
+} from './catalog-assistant/schemas';
+import type {
+  CatalogAssistantPlan,
+  CatalogAssistantRankResult,
+  EnterpriseAssistantRoutePlan,
+} from './catalog-assistant/contracts';
 import { parseDemandContactAccess } from './demand-contact/schemas';
 import { parseUnifiedSearchResult, parseUnifiedSearchSuggestions } from './unified-search/schemas';
 import { parseEnterpriseContactAccess, parseEnterpriseProjectContactUnlock } from './contact-access/schemas';
@@ -24,6 +36,7 @@ import {
   enterpriseCompanyDetailEnvelopeRawSchema,
   enterpriseCompanyRawSchema,
   enterpriseDrillEnvelopeRawSchema,
+  enterpriseProjectFilterOptionsEnvelopeRawSchema,
   enterpriseLoginStatusSchema,
   enterpriseRequestSchema,
   userContextRawSchema,
@@ -157,7 +170,10 @@ const demandAiConversationResponse = z
     missingRequiredFields: z.array(z.string().min(1).max(100)).max(100),
     warnings: z.array(z.string().max(300)).max(10),
     completion: z.number().min(0).max(1),
-    submittedDemandId: z.string().regex(/^-?[1-9][0-9]{0,30}$/).nullish(),
+    submittedDemandId: z
+      .string()
+      .regex(/^-?[1-9][0-9]{0,30}$/)
+      .nullish(),
   })
   .passthrough();
 
@@ -188,6 +204,8 @@ const {
   normalizeDemandSummary,
   normalizeDemandTypeOption,
   normalizeDrillItem,
+  normalizeProjectFilterOption,
+  normalizeIndustryOptions,
   normalizePage,
   normalizeProduct,
   normalizeProjectDetail,
@@ -208,6 +226,10 @@ export const enterpriseUserContextSchema = userContextRawSchema.transform(normal
 
 const projectDrillResponseSchema = z
   .union([z.array(z.unknown()), enterpriseDrillEnvelopeRawSchema])
+  .transform((input) => (Array.isArray(input) ? input : input.list));
+
+const projectFilterOptionsResponseSchema = z
+  .union([z.array(z.unknown()), enterpriseProjectFilterOptionsEnvelopeRawSchema])
   .transform((input) => (Array.isArray(input) ? input : input.list));
 
 /**
@@ -242,6 +264,8 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
         const envelope = enterpriseCompanyDetailEnvelopeRawSchema.parse(input);
         return { operation, data: normalizeCompany(envelope.company ?? envelope, operation) };
       }
+      case 'company.industries':
+        return { operation, data: normalizeIndustryOptions(input) as EnterpriseIndustryOption[] };
       case 'product.list':
         return {
           operation,
@@ -249,10 +273,32 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
         };
       case 'product.detail':
         return { operation, data: normalizeProduct(input, operation) };
+      case 'catalogAssistant.plan':
+        return {
+          operation,
+          data: catalogPlanResponseSchema.parse(input) as CatalogAssistantPlan,
+        };
+      case 'catalogAssistant.rank':
+        return {
+          operation,
+          data: catalogRankResponseSchema.parse(input) as CatalogAssistantRankResult,
+        };
+      case 'enterpriseAssistant.plan':
+        return {
+          operation,
+          data: enterpriseAssistantPlanResponseSchema.parse(input) as EnterpriseAssistantRoutePlan,
+        };
       case 'project.dashboard':
         return { operation, data: normalizeDashboard(input) };
       case 'project.drill':
         return { operation, data: projectDrillResponseSchema.parse(input).map(normalizeDrillItem) };
+      case 'project.filterOptions':
+        return {
+          operation,
+          data: projectFilterOptionsResponseSchema
+            .parse(input)
+            .map((item): EnterpriseProjectFilterOption => normalizeProjectFilterOption(item)),
+        };
       case 'project.list':
         return {
           operation,

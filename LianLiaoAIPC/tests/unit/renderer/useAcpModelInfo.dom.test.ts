@@ -12,16 +12,18 @@ import type { IResponseMessage } from '@/common/adapter/ipcBridge';
 import type { AcpConfigOptionDto, AcpModelInfo } from '@/common/types/platform/acpTypes';
 import { useAcpModelInfo } from '@/renderer/hooks/agent/useAcpModelInfo';
 
-const { getConfigOptionsInvokeMock, setConfigOptionInvokeMock, responseStreamHandlers } = vi.hoisted(() => ({
-  getConfigOptionsInvokeMock: vi.fn(),
+const { ensureRuntimeInvokeMock, setConfigOptionInvokeMock, responseStreamHandlers } = vi.hoisted(() => ({
+  ensureRuntimeInvokeMock: vi.fn(),
   setConfigOptionInvokeMock: vi.fn(),
   responseStreamHandlers: [] as Array<(message: IResponseMessage) => void>,
 }));
 
 vi.mock('@/common', () => ({
   ipcBridge: {
+    conversation: {
+      ensureRuntime: { invoke: ensureRuntimeInvokeMock },
+    },
     acpConversation: {
-      getConfigOptions: { invoke: getConfigOptionsInvokeMock },
       setConfigOption: { invoke: setConfigOptionInvokeMock },
       responseStream: {
         on: vi.fn().mockImplementation((handler: (message: IResponseMessage) => void) => {
@@ -111,9 +113,9 @@ describe('useAcpModelInfo', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     responseStreamHandlers.length = 0;
-    getConfigOptionsInvokeMock.mockReset();
+    ensureRuntimeInvokeMock.mockReset();
     setConfigOptionInvokeMock.mockReset();
-    getConfigOptionsInvokeMock.mockResolvedValue({ config_options: buildConfigOptions() });
+    ensureRuntimeInvokeMock.mockResolvedValue({ config_options: buildConfigOptions() });
     setConfigOptionInvokeMock.mockResolvedValue({
       confirmation: 'observed',
       config_options: buildConfigOptions('opus-4'),
@@ -121,7 +123,7 @@ describe('useAcpModelInfo', () => {
   });
 
   it('derives model info from the model config option and ignores thought_level values', async () => {
-    getConfigOptionsInvokeMock.mockResolvedValue({
+    ensureRuntimeInvokeMock.mockResolvedValue({
       config_options: buildConfigOptions('opus-4'),
     });
 
@@ -139,7 +141,7 @@ describe('useAcpModelInfo', () => {
   });
 
   it('preserves model option descriptions from config options', async () => {
-    getConfigOptionsInvokeMock.mockResolvedValue({
+    ensureRuntimeInvokeMock.mockResolvedValue({
       config_options: [
         {
           id: 'model',
@@ -293,7 +295,7 @@ describe('useAcpModelInfo', () => {
 
   it('deduplicates initial config option loads across hook instances for the same conversation', async () => {
     const configOptionsDeferred = deferred<{ config_options: AcpConfigOptionDto[] }>();
-    getConfigOptionsInvokeMock.mockReturnValue(configOptionsDeferred.promise);
+    ensureRuntimeInvokeMock.mockReturnValue(configOptionsDeferred.promise);
     const wrapper = createSwrWrapper();
 
     const first = renderHook(
@@ -306,7 +308,7 @@ describe('useAcpModelInfo', () => {
     );
 
     await waitFor(() => {
-      expect(getConfigOptionsInvokeMock).toHaveBeenCalledTimes(1);
+      expect(ensureRuntimeInvokeMock).toHaveBeenCalledTimes(1);
     });
 
     await act(async () => {
@@ -321,7 +323,7 @@ describe('useAcpModelInfo', () => {
   });
 
   it('uses legacy acp_model_info stream only before config options are available', async () => {
-    getConfigOptionsInvokeMock.mockResolvedValue({ config_options: [] });
+    ensureRuntimeInvokeMock.mockResolvedValue({ config_options: [] });
 
     const { result } = renderUseAcpModelInfo({
       conversation_id: 'conv-1',

@@ -1,9 +1,16 @@
 {
   "brand": {
-    "eyebrow": "Liaoning industrial intelligence workspace",
-    "title": "Connect industrial insight. Find the next opportunity.",
-    "description": "Sign in with your enterprise identity to explore company profiles, products and projects under construction in one focused desktop workspace.",
-    "security": "Identity verification is completed in WeChat. The desktop app never asks for your password."
+    "logoAlt": "チェーン遼寧・産業クラウドシティ",
+    "eyebrow": "遼寧産業リソース連携プラットフォーム",
+    "title": "遼寧企業が受注・パートナー・成長機会をより早く見つける",
+    "description": "企業、製品、プロジェクト、需給リソースをつなぎ、すべてのスキャンを実際の産業機会へ導きます。",
+    "security": "WeChat QRログイン · 企業ID確認 · データは業務サービスにのみ使用",
+    "capabilities": {
+      "companyCode": "企業コード",
+      "keyProducts": "重点製品",
+      "projects": "建設中プロジェクト",
+      "demand": "需給マッチング"
+    }
   },
   "login": {
     "checkingTitle": "Checking your enterprise identity",
@@ -93,8 +100,8 @@
   },
   "navigation": {
     "dashboard": "Workbench",
-    "companies": "Companies",
-    "products": "Products",
+    "companies": "Enterprise code",
+    "products": "Featured products",
     "projects": "Projects",
     "supplyDemand": "需給マッチング",
     "favorites": "Favorites",
@@ -106,6 +113,7 @@
     "brand": "链上辽宁·产业云城",
     "brandMark": "EC",
     "brandCaption": "Liaoning industry desk",
+    "backToWorkbench": "鏈遼ワークベンチに戻る",
     "eyebrow": "Liaoning industrial blueprint",
     "unknownCompany": "Enterprise not linked",
     "unknownUser": "Current user",
@@ -126,13 +134,59 @@
       "hide": "Hide assistant panel"
     }
   },
+  "catalogAssistant": {
+    "title": "産業検索アシスタント",
+    "capability": "企業情報、重点製品、建設中プロジェクトを検索できます",
+    "exampleHint": "目的を入力するか、例から開始してください：",
+    "placeholder": "探している企業、製品、プロジェクトを入力",
+    "submit": "検索",
+    "stop": "停止",
+    "retry": "再試行",
+    "clear": "セッションをクリア",
+    "viewCompany": "企業情報を見る",
+    "viewProduct": "重点製品を見る",
+    "viewProject": "プロジェクト詳細を見る",
+    "projectInvestment": "投資額 {{value}} 万元",
+    "notProvided": "情報なし",
+    "currentRequest": "今回の要望",
+    "planning": "要望を理解しています",
+    "clarifying": "検索条件の追加が必要です",
+    "completed": "検索完了",
+    "searchingCompanyPage": "企業情報を検索中、{{page}}/{{maxPages}} ページ",
+    "searchingProductPage": "重点製品を検索中、{{page}}/{{maxPages}} ページ",
+    "searchingProjectPage": "建設中プロジェクトを検索中、{{page}}/{{maxPages}} ページ",
+    "candidateCount": "候補 {{count}} 件",
+    "ranking": "最適な結果を選択中",
+    "clarificationTitle": "条件を追加してください",
+    "fallbackSummary": "検索条件に基づく結果です",
+    "fallbackReason": "現在の検索条件に一致",
+    "noResults": "一致する結果がありません",
+    "broadenHint": "地域またはキーワード条件を減らしてください",
+    "planFailed": "検索要望を理解できませんでした。",
+    "searchFailed": "カタログサービスは一時的に利用できません。",
+    "cancelled": "検索を停止しました",
+    "navigation": {
+      "eyebrow": "業務意図を認識",
+      "demandTitle": "需給連携で入力を続ける",
+      "demandDescription": "需給情報を公開する意図を認識しました。確認すると AI 下書きを作成し、現在の説明を引き継ぎます。",
+      "stay": "ここに留まる",
+      "enterDemand": "需給公開を開く",
+      "handoffError": "需給下書きを初期化できませんでした。再試行してください。"
+    },
+    "examples": {
+      "company": "瀋陽の精密機械加工企業を探す",
+      "product": "瀋北新区のステンレス加工製品を探す",
+      "project": "瀋陽で機電設備を調達する建設中プロジェクトを探す",
+      "service": "包装印刷サービス企業を探す"
+    }
+  },
   "routes": {
     "dashboard": {
       "title": "Enterprise workbench",
       "description": "Search verified companies, products and live project procurement signals from one authenticated workbench."
     },
     "companies": {
-      "title": "Company directory",
+      "title": "Enterprise code",
       "description": "Search verified company records with industry, region and membership filters."
     },
     "companyDetail": {
@@ -140,8 +194,8 @@
       "description": "Review verified company information, contact visibility and related products."
     },
     "products": {
-      "title": "Product directory",
-      "description": "Browse the live enterprise product directory and open validated product records."
+      "title": "Featured products",
+      "description": "Browse verified featured products and open validated product records."
     },
     "productDetail": {
       "title": "Product profile",
@@ -355,7 +409,7 @@
     "quick": {
       "index": "03 / ACCESS",
       "title": "Verified catalog entrances",
-      "description": "Continue directly to the live company, product or project directories.",
+      "description": "Continue directly to enterprise code, featured products or the project radar.",
       "ariaLabel": "Enterprise catalog shortcuts"
     },
     "radar": {
@@ -369,19 +423,24 @@
   },
   "companies": {
     "eyebrow": "Industrial company index / Liaoning",
-    "description": "Filter the live company directory, preview a record in context, then open its verified profile.",
-    "loading": "Loading the company directory",
+    "description": "Filter verified enterprise code records, preview a company in context, then open its verified profile.",
+    "loading": "Loading enterprise code",
     "missing": "Not provided",
+    "registeredCapitalValue": "{{value}} × CNY 10,000",
     "resultCount": "{{count}} company records",
     "filters": {
       "keywordLabel": "Company name",
       "keywordPlaceholder": "Enter a company name",
       "industryLabel": "Industry",
-      "industryPlaceholder": "Enter an industry",
+      "industryPlaceholder": "業界を選択",
+      "industryOption": "{{industry}}（{{count}}社）",
       "provinceLabel": "Province",
       "provincePlaceholder": "Enter a province",
       "cityLabel": "City",
       "cityPlaceholder": "Enter a city",
+      "optionsLoading": "Loading database options",
+      "optionsError": "Options could not be loaded. Reselect the parent filter.",
+      "optionsEmpty": "No options available",
       "districtLabel": "District",
       "districtPlaceholder": "Enter a district",
       "memberLevelLabel": "Member level",
@@ -390,7 +449,7 @@
     "actions": {
       "search": "Search companies",
       "reset": "Reset filters",
-      "viewDetails": "View details",
+      "viewDetails": "もっと見る",
       "closeQuickView": "Close company preview"
     },
     "columns": {
@@ -425,14 +484,14 @@
       "description": "Reset one or more filters and search again."
     },
     "error": {
-      "title": "The company directory could not be loaded",
+      "title": "Enterprise code could not be loaded",
       "description": "The enterprise service did not return a valid company page. Try again."
     }
   },
   "companyDetail": {
     "eyebrow": "Verified company record",
     "profileEyebrow": "Company profile",
-    "backToList": "Back to company directory",
+    "backToList": "Back to enterprise code",
     "loading": "Loading the company profile",
     "logoAlt": "{{name}} logo",
     "logoUnavailable": "Company logo unavailable",
@@ -446,6 +505,7 @@
     },
     "fields": {
       "legalRepresentative": "Legal representative",
+      "registeredCapital": "Registered capital",
       "companyType": "Company type",
       "establishedAt": "Established",
       "unifiedSocialCreditCode": "Unified social credit code",
@@ -461,7 +521,7 @@
     "productsEmpty": "No products were returned for this company.",
     "invalid": {
       "title": "This company link is invalid",
-      "description": "Return to the company directory and choose a valid record."
+      "description": "Return to enterprise code and choose a valid record."
     },
     "error": {
       "title": "The company profile could not be loaded",
@@ -470,8 +530,8 @@
   },
   "products": {
     "eyebrow": "Industrial product index / Liaoning",
-    "description": "Search live enterprise products, preview industrial capability in context, then open the verified record.",
-    "loading": "Loading the product directory",
+    "description": "Search verified featured products, preview industrial capability in context, then open the full record.",
+    "loading": "Loading featured products",
     "missing": "Not provided",
     "resultCount": "{{count}} product records",
     "cardLabel": "Product {{name}}",
@@ -518,14 +578,14 @@
       "description": "Reset one or more filters and search again."
     },
     "error": {
-      "title": "The product directory could not be loaded",
+      "title": "Featured products could not be loaded",
       "description": "The enterprise service did not return a valid product page. Try again."
     }
   },
   "productDetail": {
     "eyebrow": "Verified product record",
     "profileEyebrow": "Product profile",
-    "backToList": "Back to product directory",
+    "backToList": "Back to featured products",
     "loading": "Loading the product profile",
     "contactPermissionNote": "The phone is masked at the trusted desktop boundary using the H5 policy. Dialing and access unlocking are not available.",
     "sections": {
@@ -535,7 +595,7 @@
     },
     "invalid": {
       "title": "This product link is invalid",
-      "description": "Return to the product directory and choose a valid record."
+      "description": "Return to featured products and choose a valid record."
     },
     "error": {
       "title": "The product profile could not be loaded",
@@ -568,7 +628,10 @@
       "minInvestmentLabel": "Minimum investment",
       "minInvestmentPlaceholder": "Minimum, ten-thousand yuan",
       "maxInvestmentLabel": "Maximum investment",
-      "maxInvestmentPlaceholder": "Maximum, ten-thousand yuan"
+      "maxInvestmentPlaceholder": "Maximum, ten-thousand yuan",
+      "optionsLoading": "Loading database options",
+      "optionsError": "Failed to load options. Please retry.",
+      "optionsEmpty": "No options available"
     },
     "actions": {
       "search": "Search projects",
@@ -595,6 +658,8 @@
       "eyebrow": "Live project signal / 01",
       "title": "Project opportunity overview",
       "updatedAt": "Data updated {{date}}",
+      "expand": "Expand overview",
+      "collapse": "Collapse overview",
       "metrics": {
         "projects": "Projects",
         "categoryL1": "Primary categories",

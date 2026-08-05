@@ -8,13 +8,23 @@ import { isElectronDesktop } from '@renderer/utils/platform';
 
 const SERVICE_WORKER_URL = './sw.js';
 const LOCALHOST_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+const ELECTRON_USER_AGENT_PATTERN = /\bElectron\/[\d.]+/i;
 
 function isPwaRegistrationSupported(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
     return false;
   }
 
-  if (isElectronDesktop() || !('serviceWorker' in navigator)) {
+  // The Electron user agent is available before preload globals. This prevents
+  // desktop development on localhost from being mistaken for the browser WebUI,
+  // which would install a CacheStorage-backed PWA worker inside Electron.
+  const isElectronRuntime = ELECTRON_USER_AGENT_PATTERN.test(navigator.userAgent);
+  if (
+    isElectronRuntime ||
+    typeof window.__isPackaged === 'boolean' ||
+    isElectronDesktop() ||
+    !('serviceWorker' in navigator)
+  ) {
     return false;
   }
 

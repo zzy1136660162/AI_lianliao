@@ -70,7 +70,7 @@ vi.mock('@office-ai/platform', () => ({
   },
 }));
 
-describe('ipcBridge team adapter', () => {
+describe('ipcBridge HTTP adapter', () => {
   beforeEach(() => {
     httpBridgeMocks.calls.length = 0;
   });
@@ -85,5 +85,18 @@ describe('ipcBridge team adapter', () => {
       path: '/api/teams/team-1/run-state',
       body: undefined,
     });
+  });
+
+  it('ensures a conversation runtime through the Core 0.1.48 route', async () => {
+    const { conversation } = await import('@/common/adapter/ipcBridge');
+
+    await conversation.ensureRuntime.invoke({ conversation_id: 'conv-1' });
+
+    expect(httpBridgeMocks.calls).toContainEqual({
+      method: 'POST',
+      path: '/api/conversations/conv-1/runtime/ensure',
+      body: undefined,
+    });
+    expect(httpBridgeMocks.calls.some((call) => call.path.endsWith('/warmup'))).toBe(false);
   });
 });

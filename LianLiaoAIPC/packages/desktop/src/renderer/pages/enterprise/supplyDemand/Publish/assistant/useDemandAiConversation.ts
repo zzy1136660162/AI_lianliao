@@ -207,16 +207,19 @@ export const useDemandAiConversation = (client: EnterpriseClient) => {
     [flushPatch]
   );
 
-  const resume = useCallback(async () => {
-    const generation = ++requestGeneration.current;
-    try {
-      const next = await resumeDemandAiConversation(client);
-      if (generation !== requestGeneration.current) return;
-      acceptSnapshot(next);
-    } catch {
-      // A missing resumable session is the normal first-visit state.
-    }
-  }, [acceptSnapshot, client]);
+  const resume = useCallback(
+    async (sessionId?: string) => {
+      const generation = ++requestGeneration.current;
+      try {
+        const next = await resumeDemandAiConversation(client, sessionId);
+        if (generation !== requestGeneration.current) return;
+        acceptSnapshot(next);
+      } catch {
+        // A missing resumable session is the normal first-visit state.
+      }
+    },
+    [acceptSnapshot, client]
+  );
 
   const retry = useCallback(async () => {
     await retryRef.current?.();

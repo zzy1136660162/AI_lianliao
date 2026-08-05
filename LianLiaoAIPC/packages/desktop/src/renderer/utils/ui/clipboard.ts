@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { createCopyProtectionError } from './copyProtection';
+
 /**
  * Copy text to clipboard with fallback for non-secure contexts (e.g. WebUI over HTTP).
  * Uses navigator.clipboard when available, otherwise falls back to document.execCommand('copy').
@@ -11,6 +13,9 @@
 export const copyText = async (text: string): Promise<void> => {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
     throw new Error('copyText requires a browser environment');
+  }
+  if (window.__isPackaged === true) {
+    throw createCopyProtectionError();
   }
 
   if (navigator.clipboard && window.isSecureContext) {

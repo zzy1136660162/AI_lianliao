@@ -440,6 +440,21 @@ describe('enterprise schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts only an empty payload for the fixed company industry operation', () => {
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'company.industries',
+        payload: {},
+      }).success
+    ).toBe(true);
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'company.industries',
+        payload: { url: 'https://evil.test/collect' },
+      }).success
+    ).toBe(false);
+  });
+
   it('accepts the product region filters supported by the enterprise product catalog', () => {
     expect(
       enterpriseRequestSchema.safeParse({
@@ -574,6 +589,24 @@ describe('enterprise schemas', () => {
         total: 41,
       },
     });
+  });
+
+  it('normalizes database-backed company industry aliases and enforces their threshold', () => {
+    expect(
+      parseEnterpriseResponse('company.industries', [
+        { INDUSTRY: 'Equipment', COMPANY_COUNT: '23' },
+        { industry: 'Manufacturing', companyCount: 10 },
+      ])
+    ).toEqual({
+      operation: 'company.industries',
+      data: [
+        { industry: 'Equipment', companyCount: 23 },
+        { industry: 'Manufacturing', companyCount: 10 },
+      ],
+    });
+    expect(() => parseEnterpriseResponse('company.industries', [{ INDUSTRY: 'Equipment', COMPANY_COUNT: 9 }])).toThrow(
+      /company\.industries.*companyCount/i
+    );
   });
 
   it('accepts zero for empty-page totals and page counts', () => {
@@ -749,6 +782,37 @@ describe('enterprise schemas', () => {
         phone: '138********',
         companyLevel: 3.1,
         vip: true,
+      },
+    });
+  });
+
+  it('uses the database product id when a legacy external product id is also present', () => {
+    const response = parseEnterpriseResponse('product.detail', {
+      id: 9007896,
+      productId: 'db2307029aedea88d301c187fff6f407',
+      productsName: 'Precision component',
+      companyId: 100608,
+    });
+
+    expect(response).toMatchObject({
+      data: {
+        productId: '9007896',
+      },
+    });
+  });
+
+  it('keeps legacy product details usable when the product name is missing', () => {
+    const response = parseEnterpriseResponse('product.detail', {
+      id: 407566,
+      companyId: 566,
+      companyName: '沈阳万维物业服务集团有限公司',
+    });
+
+    expect(response).toMatchObject({
+      data: {
+        productId: '407566',
+        name: '沈阳万维物业服务集团有限公司',
+        companyName: '沈阳万维物业服务集团有限公司',
       },
     });
   });
@@ -1081,6 +1145,25 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it('normalizes database-backed project filter options', () => {
+    expect(
+      parseEnterpriseResponse('project.filterOptions', {
+        list: [{ VALUE: 'Liaoning', LABEL: 'Liaoning', PROJECT_COUNT: 128 }],
+      })
+    ).toEqual({
+      operation: 'project.filterOptions',
+      data: [{ value: 'Liaoning', label: 'Liaoning', projectCount: 128 }],
+    });
+  });
+
+  it('rejects project filter options without a usable label', () => {
+    expect(() =>
+      parseEnterpriseResponse('project.filterOptions', {
+        list: [{ value: '', projectCount: 1 }],
+      })
+    ).toThrow(/project\.filterOptions.*label/i);
+  });
+
   it('accepts zero project and material counts in drill items', () => {
     expect(
       parseEnterpriseResponse('project.drill', [
@@ -1281,4 +1364,126 @@ describe('enterprise schemas', () => {
       ).toThrow(/project\.detail.*totalInvestment/i);
     }
   );
+
+  it('accepts catalog assistant requests with bounded context and negative string ids', () => {
+    const excludedIds = Array.from({ length: 50 }, (_, index) => `-${index + 1}`);
+    const planRequest = enterpriseRequestSchema.parse({
+      operation: 'catalogAssistant.plan',
+      payload: {
+        message: '再找一批沈阳的企业',
+        context: {
+          lastEntityType: 'COMPANY',
+          lastFilters: { city: '沈阳市' },
+          lastResultCount: 50,
+          excludedIds,
+        },
+      },
+    });
+    const rankRequest = enterpriseRequestSchema.parse({
+      operation: 'catalogAssistant.rank',
+      payload: {
+        message: '找沈阳企业',
+        plan: {
+          entityType: 'COMPANY',
+          filters: { city: '沈阳市' },
+          resultLimit: 50,
+          summary: '查询沈阳企业',
+        },
+        candidates: [{ id: '-8', name: '沈阳精密制造有限公司' }],
+      },
+    });
+
+    expect(planRequest.operation).toBe('catalogAssistant.plan');
+    expect(rankRequest).toMatchObject({
+      operation: 'catalogAssistant.rank',
+      payload: {
+        plan: { resultLimit: 50 },
+        candidates: [{ id: '-8' }],
+      },
+    });
+  });
+
+  it('normalizes null catalog assistant filters returned by cloud-api', () => {
+    expect(
+      parseEnterpriseResponse('catalogAssistant.plan', {
+        entityType: 'COMPANY',
+        filters: {
+          keyword: '精密机械加工',
+          industry: null,
+          city: '沈阳市',
+          district: null,
+        },
+        resultLimit: 3,
+        clarification: null,
+        summary: '在辽宁省沈阳市检索从事精密机械加工的企业。',
+      })
+    ).toEqual({
+      operation: 'catalogAssistant.plan',
+      data: {
+        entityType: 'COMPANY',
+        mode: 'NEW_SEARCH',
+        filters: {
+          keyword: '精密机械加工',
+          city: '沈阳市',
+        },
+        resultLimit: 3,
+        summary: '在辽宁省沈阳市检索从事精密机械加工的企业。',
+      },
+    });
+  });
+
+  it('rejects catalog assistant extra fields and more than one hundred candidates', () => {
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'catalogAssistant.plan',
+        payload: { message: '查询沈阳企业', openId: 'must-not-cross-model-boundary' },
+      }).success
+    ).toBe(false);
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'catalogAssistant.rank',
+        payload: {
+          message: '查询沈阳企业',
+          plan: {
+            entityType: 'COMPANY',
+            filters: {},
+            resultLimit: 3,
+            summary: '查询企业',
+          },
+          candidates: Array.from({ length: 101 }, (_, index) => ({
+            id: `${index + 1}`,
+            name: `企业 ${index + 1}`,
+          })),
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects invalid catalog assistant plan and rank responses', () => {
+    for (const resultLimit of [0, 51]) {
+      expect(() =>
+        parseEnterpriseResponse('catalogAssistant.plan', {
+          entityType: 'COMPANY',
+          filters: { keyword: '机械加工' },
+          resultLimit,
+          summary: '非法规划',
+        })
+      ).toThrow(/catalogAssistant\.plan/i);
+    }
+    expect(() =>
+      parseEnterpriseResponse('catalogAssistant.rank', {
+        summary: '非法排序',
+        items: Array.from({ length: 51 }, (_, index) => ({
+          id: `${index + 1}`,
+          reason: '匹配',
+        })),
+      })
+    ).toThrow(/catalogAssistant\.rank/i);
+    expect(() =>
+      parseEnterpriseResponse('catalogAssistant.rank', {
+        summary: '非法排序',
+        items: [{ id: ' ', reason: '匹配' }],
+      })
+    ).toThrow(/catalogAssistant\.rank/i);
+  });
 });

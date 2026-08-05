@@ -40,6 +40,30 @@ export type EnterpriseUserContext = {
   roleId?: string;
 };
 
+/** User actions persisted through the existing H5 `addgzhLogs`/J_CONTENT_LOGS pipeline. */
+export type EnterpriseBehaviorEventType = 'PAGE_VIEW' | 'CONTACT_ACQUIRE' | 'PHONE_DIAL' | 'DEMAND_PUBLISH';
+
+/**
+ * Renderer-owned business metadata for one behavior event.
+ *
+ * Login identity, client platform and operating-system fields are deliberately
+ * omitted here: the trusted main process adds them from the active session.
+ */
+export type EnterpriseBehaviorLogPayload = {
+  eventType: EnterpriseBehaviorEventType;
+  moduleName: string;
+  title: string;
+  pagePath: string;
+  targetId?: string;
+  toCompanyId?: string;
+  toCompanyName?: string;
+  params?: Record<string, string | number | boolean | null>;
+};
+
+export type EnterpriseBehaviorLogResult = {
+  recorded: true;
+};
+
 export type EnterpriseLoginSession = {
   loginKey: string;
   qrDataUrl: string;
@@ -65,6 +89,7 @@ export type EnterpriseCompanySummary = {
   companyId: string;
   name: string;
   shortName?: string;
+  logoUrl?: string;
   industry?: string;
   province?: string;
   city?: string;
@@ -73,11 +98,15 @@ export type EnterpriseCompanySummary = {
   businessSummary?: string;
   updatedAt?: string;
   legalRepresentative?: string;
+  /** H5 returns the complete display value, for example "5000万元人民币". */
+  registeredCapital?: string;
   companyType?: string;
   companyLevel?: number;
   vip?: boolean;
   establishedAt?: string;
   collected?: boolean;
+  featuredProducts?: EnterpriseProductSummary[];
+  featuredProductCount?: number;
 };
 
 export type EnterpriseCompanyDetail = EnterpriseCompanySummary & {
@@ -110,6 +139,11 @@ export type EnterpriseProductSummary = {
 };
 
 export type EnterpriseProductDetail = EnterpriseProductSummary;
+
+export type EnterpriseIndustryOption = {
+  industry: string;
+  companyCount: number;
+};
 
 export type EnterpriseDashboardDistributionItem = {
   label: string;
@@ -145,6 +179,20 @@ export type EnterpriseProjectDrillItem = {
   categoryL2Count?: number;
   materialShortNameCount?: number;
   materialNameCount?: number;
+  projectCount: number;
+};
+
+export type EnterpriseProjectFilterDimension =
+  | 'province'
+  | 'city'
+  | 'categoryL1'
+  | 'categoryL2'
+  | 'materialShortName'
+  | 'materialName';
+
+export type EnterpriseProjectFilterOption = {
+  value: string;
+  label: string;
   projectCount: number;
 };
 
@@ -396,6 +444,17 @@ export type ProjectDrillQuery = {
   minProjectCount?: number;
 };
 
+export type ProjectFilterOptionsQuery = {
+  dimension: EnterpriseProjectFilterDimension;
+  runId?: string;
+  province?: string;
+  city?: string;
+  categoryL1?: string;
+  categoryL2?: string;
+  materialShortName?: string;
+  limit?: number;
+};
+
 export type ProjectListQuery = {
   keyword?: string;
   runId?: string;
@@ -429,10 +488,33 @@ export type DemandListQuery = {
 export type EnterpriseRequest =
   | { operation: 'company.list'; payload: CompanyListQuery }
   | { operation: 'company.detail'; payload: { companyId: string } }
+  | { operation: 'company.industries'; payload: Record<string, never> }
   | { operation: 'product.list'; payload: ProductListQuery }
   | { operation: 'product.detail'; payload: { productId: string } }
+  | {
+      operation: 'catalogAssistant.plan';
+      payload: { message: string; context?: CatalogAssistantContext };
+    }
+  | {
+      operation: 'catalogAssistant.rank';
+      payload: {
+        message: string;
+        plan: CatalogAssistantPlan;
+        candidates: CatalogAssistantCandidate[];
+      };
+    }
+  | {
+      operation: 'enterpriseAssistant.plan';
+      payload: {
+        message: string;
+        currentModule: string;
+        hasCatalogScope: boolean;
+        recentSummary?: string;
+      };
+    }
   | { operation: 'project.dashboard'; payload: { runId?: string } }
   | { operation: 'project.drill'; payload: ProjectDrillQuery }
+  | { operation: 'project.filterOptions'; payload: ProjectFilterOptionsQuery }
   | { operation: 'project.list'; payload: ProjectListQuery }
   | { operation: 'project.detail'; payload: { hpInfoId: string } }
   | {
@@ -440,7 +522,7 @@ export type EnterpriseRequest =
       payload: {
         resourceType: EnterpriseContactResourceType;
         resourceId: string;
-        /** False performs the H5 project entitlement preflight without consuming phone quota. */
+        /** False performs the project entitlement preflight without consuming phone quota or returning a phone. */
         consumeQuota?: boolean;
       };
     }
@@ -507,16 +589,22 @@ export type EnterpriseRequest =
         bytes: number[];
       };
     }
+  | { operation: 'behavior.log'; payload: EnterpriseBehaviorLogPayload }
   | { operation: 'unified.suggest'; payload: { keyword: string } }
   | { operation: 'unified.search'; payload: UnifiedSearchQuery };
 
 export type EnterpriseResponse =
   | { operation: 'company.list'; data: EnterprisePage<EnterpriseCompanySummary> }
   | { operation: 'company.detail'; data: EnterpriseCompanyDetail }
+  | { operation: 'company.industries'; data: EnterpriseIndustryOption[] }
   | { operation: 'product.list'; data: EnterprisePage<EnterpriseProductSummary> }
   | { operation: 'product.detail'; data: EnterpriseProductDetail }
+  | { operation: 'catalogAssistant.plan'; data: CatalogAssistantPlan }
+  | { operation: 'catalogAssistant.rank'; data: CatalogAssistantRankResult }
+  | { operation: 'enterpriseAssistant.plan'; data: EnterpriseAssistantRoutePlan }
   | { operation: 'project.dashboard'; data: EnterpriseProjectDashboard }
   | { operation: 'project.drill'; data: EnterpriseProjectDrillItem[] }
+  | { operation: 'project.filterOptions'; data: EnterpriseProjectFilterOption[] }
   | { operation: 'project.list'; data: EnterprisePage<EnterpriseProjectSummary> }
   | { operation: 'project.detail'; data: EnterpriseProjectDetail }
   | { operation: 'contact.acquire'; data: EnterpriseContactAccess }
@@ -538,6 +626,7 @@ export type EnterpriseResponse =
   | { operation: 'demand.aiConversation.complete'; data: DemandAiConversationSnapshot }
   | { operation: 'demand.publish'; data: EnterpriseDemandPublishResult }
   | { operation: 'demand.uploadImage'; data: EnterpriseDemandImage }
+  | { operation: 'behavior.log'; data: EnterpriseBehaviorLogResult }
   | { operation: 'unified.suggest'; data: string[] }
   | { operation: 'unified.search'; data: UnifiedSearchResult };
 
@@ -549,3 +638,10 @@ import type {
   EnterpriseProjectContactUnlock,
 } from './contact-access/contracts';
 import type { UnifiedSearchQuery, UnifiedSearchResult } from './unified-search/contracts';
+import type {
+  CatalogAssistantCandidate,
+  CatalogAssistantContext,
+  CatalogAssistantPlan,
+  CatalogAssistantRankResult,
+  EnterpriseAssistantRoutePlan,
+} from './catalog-assistant/contracts';

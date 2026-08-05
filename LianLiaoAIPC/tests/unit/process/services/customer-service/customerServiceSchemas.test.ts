@@ -132,4 +132,17 @@ describe('customer-service schemas', () => {
 
     expect(customerServiceServerEnvelopeSchema.safeParse(event).success).toBe(false);
   });
+
+  it('accepts the connection identifier returned by a heartbeat pong', () => {
+    const event = {
+      event: 'pong',
+      eventId: 'heartbeat-event-1',
+      requestId: '11111111-1111-4111-8111-111111111111',
+      conversationId: null,
+      serverTime: 1_700_000_000_000,
+      payload: { connectionId: 'customer-connection-1' },
+    };
+
+    expect(customerServiceServerEnvelopeSchema.safeParse(event).success).toBe(true);
+  });
 });

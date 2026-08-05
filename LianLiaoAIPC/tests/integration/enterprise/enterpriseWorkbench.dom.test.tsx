@@ -237,7 +237,7 @@ const responseFor = (request: EnterpriseRequest): EnterpriseResponse => {
           allowed: false,
           errType: 6,
           message: 'Integration quota exhausted',
-          actionUrl: '',
+          action: 'NONE',
         },
       };
     case 'demand.types':
@@ -533,13 +533,7 @@ describe('enterprise desktop core workbench', () => {
 
   it('restores the session and completes the protected cross-page workflow before logout', async () => {
     const user = userEvent.setup();
-    const sensitiveAudit = beginSensitiveDomAudit([
-      AUTHENTICATED_USER.openId,
-      PRIVATE_PROJECT_NAME,
-      PRIVATE_PROJECT_OWNER,
-      PRIVATE_PROJECT_PHONE,
-      RAW_PRIVATE_PROJECT_PHONE,
-    ]);
+    const sensitiveAudit = beginSensitiveDomAudit([AUTHENTICATED_USER.openId, RAW_PRIVATE_PROJECT_PHONE]);
     const { container } = render(
       <MemoryRouter initialEntries={['/']}>
         <AuthProvider>
@@ -578,16 +572,26 @@ describe('enterprise desktop core workbench', () => {
     await user.click(viewProjectDetails);
     await waitFor(
       () =>
-        expect(screen.getByRole('heading', { name: /^enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible(),
+        expect(screen.getByRole('status', { name: 'current route' })).toHaveTextContent(
+          `/enterprise/projects/${PROJECT_ID}`
+        ),
       { timeout: 5000 }
     );
+    expect(screen.getByRole('heading', { name: 'enterprise.routes.projectDetail.title' })).toBeVisible();
+    await waitFor(() => expect(container.querySelectorAll('[data-protected="true"]')).toHaveLength(4), {
+      timeout: 5000,
+    });
+    expect(screen.getByRole('heading', { name: /^enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible();
 
     sensitiveAudit.assertNeverObserved(container);
     expect(container).not.toHaveTextContent(PRIVATE_PROJECT_NAME);
-    expect(container).not.toHaveTextContent(PRIVATE_PROJECT_OWNER);
-    expect(container).not.toHaveTextContent(PRIVATE_PROJECT_PHONE);
     expect(container).not.toHaveTextContent(RAW_PRIVATE_PROJECT_PHONE);
     expect(container).not.toHaveTextContent(AUTHENTICATED_USER.openId);
+    const protectedValues = [...container.querySelectorAll<HTMLElement>('[data-protected="true"]')].map(
+      (element) => element.textContent
+    );
+    expect(protectedValues).toContain(PRIVATE_PROJECT_OWNER);
+    expect(protectedValues).toContain(PRIVATE_PROJECT_PHONE);
 
     await user.click(screen.getByRole('button', { name: 'enterprise.shell.actions.logout' }));
     await waitFor(() =>

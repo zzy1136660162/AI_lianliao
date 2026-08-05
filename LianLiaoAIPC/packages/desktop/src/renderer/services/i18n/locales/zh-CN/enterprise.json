@@ -1,9 +1,16 @@
 {
   "brand": {
-    "eyebrow": "辽宁产业智能工作台",
-    "title": "连接产业信息，发现增长机会",
-    "description": "使用企业身份登录，在一个专注的桌面工作台中查看企业档案、产品信息与在建项目。",
-    "security": "身份验证在微信中完成，桌面端不会要求你输入密码。"
+    "logoAlt": "链上辽宁·产业云城",
+    "eyebrow": "辽宁产业资源连接平台",
+    "title": "让辽宁企业，更快找到订单、伙伴与增长机会",
+    "description": "连接企业、产品、项目与供需资源，让每一次扫码都通向真实产业机会。",
+    "security": "微信扫码登录 · 企业身份识别 · 数据仅用于业务服务",
+    "capabilities": {
+      "companyCode": "企业码",
+      "keyProducts": "重点产品",
+      "projects": "在建项目",
+      "demand": "供需对接"
+    }
   },
   "login": {
     "checkingTitle": "正在检查企业身份",
@@ -93,8 +100,8 @@
   },
   "navigation": {
     "dashboard": "工作台",
-    "companies": "企业库",
-    "products": "产品库",
+    "companies": "企业码",
+    "products": "重点产品",
     "projects": "在建项目",
     "supplyDemand": "供需对接",
     "favorites": "我的收藏",
@@ -103,9 +110,10 @@
     "customerService": "客服接待"
   },
   "shell": {
-    "brand": "链上辽宁·产业云城",
+    "brand": "链上辽宁",
     "brandMark": "企",
     "brandCaption": "辽宁产业工作台",
+    "backToWorkbench": "返回链辽工作台",
     "eyebrow": "辽宁产业蓝图",
     "unknownCompany": "暂未关联企业",
     "unknownUser": "当前用户",
@@ -126,13 +134,59 @@
       "hide": "收起助手面板"
     }
   },
+  "catalogAssistant": {
+    "title": "产业检索助手",
+    "capability": "可查询企业码、重点产品和在建项目",
+    "exampleHint": "可以直接描述目标，也可以从示例开始：",
+    "placeholder": "描述您想查找的企业、产品或项目",
+    "submit": "开始检索",
+    "stop": "停止检索",
+    "retry": "重试",
+    "clear": "清空会话",
+    "viewCompany": "查看企业码",
+    "viewProduct": "查看重点产品",
+    "viewProject": "查看项目详情",
+    "projectInvestment": "投资 {{value}} 万元",
+    "notProvided": "暂未提供",
+    "currentRequest": "本次需求",
+    "planning": "正在理解需求",
+    "clarifying": "需要补充检索条件",
+    "completed": "检索完成",
+    "searchingCompanyPage": "正在检索企业码，第 {{page}}/{{maxPages}} 页",
+    "searchingProductPage": "正在检索重点产品，第 {{page}}/{{maxPages}} 页",
+    "searchingProjectPage": "正在检索在建项目，第 {{page}}/{{maxPages}} 页",
+    "candidateCount": "已收集 {{count}} 条候选",
+    "ranking": "正在筛选最匹配结果",
+    "clarificationTitle": "请补充说明",
+    "fallbackSummary": "已按检索条件返回结果",
+    "fallbackReason": "符合当前检索条件",
+    "noResults": "暂未找到符合条件的结果",
+    "broadenHint": "可以尝试减少地区或关键词限制",
+    "planFailed": "暂时无法理解检索需求，请重试",
+    "searchFailed": "目录服务暂时不可用，请稍后重试",
+    "cancelled": "已停止本次检索",
+    "navigation": {
+      "eyebrow": "业务意图识别",
+      "demandTitle": "进入供需对接继续完善",
+      "demandDescription": "已识别到您准备发布供需信息。确认后将创建 AI 草稿，并携带当前描述进入供需发布页面。",
+      "stay": "暂不跳转",
+      "enterDemand": "进入供需发布",
+      "handoffError": "供需草稿初始化失败，请重试"
+    },
+    "examples": {
+      "company": "找沈阳做精密机械加工的企业",
+      "product": "查沈北新区的不锈钢加工产品",
+      "project": "找沈阳近期采购机电设备的在建项目",
+      "service": "找能够提供包装印刷服务的企业"
+    }
+  },
   "routes": {
     "dashboard": {
       "title": "企业工作台",
       "description": "在同一企业身份工作台中检索可信企业、产品与实时项目采购信号。"
     },
     "companies": {
-      "title": "企业库",
+      "title": "企业码",
       "description": "按行业、地区与会员等级检索经过校验的企业记录。"
     },
     "companyDetail": {
@@ -140,8 +194,8 @@
       "description": "查看企业档案、联系方式权限状态与关联产品。"
     },
     "products": {
-      "title": "产品库",
-      "description": "浏览已接入的真实企业产品库，并打开经过校验的产品档案。"
+      "title": "重点产品",
+      "description": "浏览经过校验的重点产品，并打开完整产品档案。"
     },
     "productDetail": {
       "title": "产品详情",
@@ -355,7 +409,7 @@
     "quick": {
       "index": "03 / 快捷入口",
       "title": "可信数据入口",
-      "description": "直接进入真实企业库、产品库或在建项目雷达。",
+      "description": "直接进入企业码、重点产品或在建项目雷达。",
       "ariaLabel": "企业工作台快捷入口"
     },
     "radar": {
@@ -370,18 +424,23 @@
   "companies": {
     "eyebrow": "辽宁产业企业索引",
     "description": "筛选真实企业数据，在当前工作区快速预览，并进入经过校验的完整档案。",
-    "loading": "正在加载企业库",
+    "loading": "正在加载企业码",
     "missing": "暂未提供",
+    "registeredCapitalValue": "{{value}} 万元",
     "resultCount": "共 {{count}} 家企业",
     "filters": {
       "keywordLabel": "企业名称",
       "keywordPlaceholder": "请输入企业名称",
       "industryLabel": "所属行业",
-      "industryPlaceholder": "请输入行业",
+      "industryPlaceholder": "请选择行业",
+      "industryOption": "{{industry}}（{{count}} 家）",
       "provinceLabel": "省份",
       "provincePlaceholder": "请输入省份",
       "cityLabel": "城市",
       "cityPlaceholder": "请输入城市",
+      "optionsLoading": "正在加载数据库选项",
+      "optionsError": "选项加载失败，请重新选择上级条件",
+      "optionsEmpty": "暂无可选数据",
       "districtLabel": "区县",
       "districtPlaceholder": "请输入区县",
       "memberLevelLabel": "会员等级",
@@ -390,7 +449,7 @@
     "actions": {
       "search": "查询企业",
       "reset": "重置筛选",
-      "viewDetails": "查看详情",
+      "viewDetails": "查看更多",
       "closeQuickView": "关闭企业预览"
     },
     "columns": {
@@ -425,14 +484,14 @@
       "description": "请减少筛选条件或重置后重新查询。"
     },
     "error": {
-      "title": "暂时无法加载企业库",
+      "title": "暂时无法加载企业码",
       "description": "企业服务未返回有效的企业列表，请重试。"
     }
   },
   "companyDetail": {
     "eyebrow": "已校验企业档案",
     "profileEyebrow": "企业档案",
-    "backToList": "返回企业库",
+    "backToList": "返回企业码",
     "loading": "正在加载企业详情",
     "logoAlt": "{{name}} 企业标识",
     "logoUnavailable": "企业标识暂不可用",
@@ -446,6 +505,7 @@
     },
     "fields": {
       "legalRepresentative": "法定代表人",
+      "registeredCapital": "注册资本",
       "companyType": "企业类型",
       "establishedAt": "成立时间",
       "unifiedSocialCreditCode": "统一社会信用代码",
@@ -461,7 +521,7 @@
     "productsEmpty": "该企业暂未返回产品数据。",
     "invalid": {
       "title": "企业链接无效",
-      "description": "请返回企业库并选择有效的企业记录。"
+      "description": "请返回企业码并选择有效的企业记录。"
     },
     "error": {
       "title": "暂时无法加载企业详情",
@@ -471,7 +531,7 @@
   "products": {
     "eyebrow": "辽宁产业产品索引",
     "description": "从真实企业产品数据中检索产业能力，在当前工作区快速预览并进入完整产品档案。",
-    "loading": "正在加载产品库",
+    "loading": "正在加载重点产品",
     "missing": "暂未提供",
     "resultCount": "共 {{count}} 个产品",
     "cardLabel": "产品 {{name}}",
@@ -518,7 +578,7 @@
       "description": "请减少筛选条件或重置后重新查询。"
     },
     "error": {
-      "title": "暂时无法加载产品库",
+      "title": "暂时无法加载重点产品",
       "description": "企业服务未返回有效的产品列表，请重试。"
     }
   },
@@ -548,7 +608,10 @@
       "minInvestmentLabel": "最低投资额",
       "minInvestmentPlaceholder": "最低万元",
       "maxInvestmentLabel": "最高投资额",
-      "maxInvestmentPlaceholder": "最高万元"
+      "maxInvestmentPlaceholder": "最高万元",
+      "optionsLoading": "正在加载数据库选项",
+      "optionsError": "选项加载失败，请重试",
+      "optionsEmpty": "暂无可选项"
     },
     "actions": {
       "search": "查询项目",
@@ -575,6 +638,8 @@
       "eyebrow": "实时项目信号 / 01",
       "title": "项目机会总览",
       "updatedAt": "数据更新于 {{date}}",
+      "expand": "展开总览",
+      "collapse": "收起总览",
       "metrics": {
         "projects": "在建项目",
         "categoryL1": "一级品类",
@@ -866,7 +931,7 @@
   "productDetail": {
     "eyebrow": "已校验产品档案",
     "profileEyebrow": "产品档案",
-    "backToList": "返回产品库",
+    "backToList": "返回重点产品",
     "loading": "正在加载产品详情",
     "contactPermissionNote": "联系电话已在桌面端可信边界按 H5 规则脱敏；本页面不提供拨号或权限解锁。",
     "sections": {
@@ -876,7 +941,7 @@
     },
     "invalid": {
       "title": "产品链接无效",
-      "description": "请返回产品库并选择有效的产品记录。"
+      "description": "请返回重点产品并选择有效的产品记录。"
     },
     "error": {
       "title": "暂时无法加载产品详情",

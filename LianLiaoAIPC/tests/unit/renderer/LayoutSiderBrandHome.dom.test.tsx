@@ -126,7 +126,7 @@ import { LayoutContext } from '@renderer/hooks/context/LayoutContext';
 const renderLayout = () => render(<Layout sider={<div>sider</div>} />);
 
 const BACK_KEY = 'common.back';
-const ENTERPRISE_KEY = 'enterprise.shell.brand';
+const ENTERPRISE_KEY = 'enterprise.shell.backToWorkbench';
 
 type RenderSiderOptions = {
   collapsed?: boolean;
@@ -295,7 +295,7 @@ describe('AI sider enterprise workspace entry', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders outside session history immediately above the footer and opens the enterprise dashboard', async () => {
+  it('renders inside the shared footer outside session history and opens the enterprise dashboard', async () => {
     const { container } = await renderSider();
 
     const entry = screen.getByRole('button', { name: ENTERPRISE_KEY });
@@ -303,12 +303,23 @@ describe('AI sider enterprise workspace entry', () => {
     const footer = container.querySelector('.sider-footer');
     const history = screen.getByTestId('conversation-history');
 
-    expect(entryRegion?.nextElementSibling).toBe(footer);
+    expect(footer).toContainElement(entryRegion);
     expect(history).not.toContainElement(entry);
 
     fireEvent.click(entry);
 
     expect(navigate).toHaveBeenCalledWith('/enterprise/dashboard');
+  });
+
+  it('keeps workspace and settings footer actions horizontally and vertically centered', async () => {
+    await renderSider();
+
+    const workspaceAction = screen.getByRole('button', { name: ENTERPRISE_KEY });
+    const settingsAction = screen.getByRole('button', { name: 'common.settings' });
+
+    for (const action of [workspaceAction, settingsAction]) {
+      expect(action).toHaveClass('!flex', '!items-center');
+    }
   });
 
   it('cleans transient UI state and closes the mobile sider after activation', async () => {

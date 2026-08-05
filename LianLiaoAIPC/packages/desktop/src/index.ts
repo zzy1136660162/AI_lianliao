@@ -24,7 +24,9 @@ import { initializeProcess } from './process';
 import { startBackendOrExit } from './process/startup/backendStartup';
 import { assertStartupArchitectureCompatible } from './process/startup/architectureCompatibility';
 import { classifyBackendStartupFailure } from './process/startup/backendStartupFailure';
+import { installMainCopyProtection } from './process/startup/copyProtection';
 import { installQuitCleanup } from './process/startup/quitCleanup';
+import { clearRendererOriginWebStorage, createRendererCrashRecoveryGate } from './process/startup/rendererRecovery';
 import { ProcessConfig } from './process/utils/initStorage';
 import type { BackendStartupFailureInfo } from './common/types/platform/electron';
 import { registerWindowMaximizeListeners } from '@process/bridge';
@@ -217,9 +219,14 @@ let backendStartupFailureInfo: BackendStartupFailureInfo | null = null;
 let rendererInitialLanguage: string | null = null;
 let backendMigrationsScheduled = false;
 let ensureAdminUserPromise: Promise<void> | null = null;
+let desktopManagedAiSyncScheduled = false;
 
 ipcMain.on('get-backend-port', (event) => {
   event.returnValue = backendManager.port;
+});
+
+ipcMain.on('get-is-packaged', (event) => {
+  event.returnValue = app.isPackaged;
 });
 
 ipcMain.on('get-initial-language', (event) => {
@@ -233,6 +240,8 @@ ipcMain.on('get-backend-startup-failed', (event) => {
 ipcMain.on('get-backend-startup-failure', (event) => {
   event.returnValue = backendStartupFailureInfo;
 });
+
+installMainCopyProtection(app, app.isPackaged);
 
 function markBackendStartupFailed(error: unknown): void {
   backendStartupFailed = true;
@@ -280,6 +289,23 @@ const scheduleBackendMigrations = (): void => {
   })();
 };
 
+/**
+ * Synchronizes the cloud-owned default model only after AionCore is reachable.
+ * Failure is non-blocking; opening the AI workspace performs one more retry.
+ */
+const scheduleDesktopManagedAiModelSync = (): void => {
+  if (desktopManagedAiSyncScheduled || !backendStartedOk) return;
+  desktopManagedAiSyncScheduled = true;
+  void import('./process/services/enterprise/desktopManagedAiModelService')
+    .then(({ getDefaultDesktopManagedAiModelService }) => getDefaultDesktopManagedAiModelService().sync())
+    .then((result) => {
+      console.info('[desktop-managed-ai] startup synchronization finished', { state: result.state });
+    })
+    .catch(() => {
+      console.warn('[desktop-managed-ai] startup synchronization could not be scheduled');
+    });
+};
+
 function exposeBackendPort(backendPort: number): void {
   // Expose the backend port to main-process callers of httpBridge (e.g. the
   // one-shot assistant migration hook below). Must land BEFORE any
@@ -313,6 +339,7 @@ function markBackendReady(backendPort: number, source: string): void {
   (globalThis as typeof globalThis & { __backendStartupFailed?: boolean }).__backendStartupFailed = false;
   void ensureAdminUserOnce(backendPort);
   scheduleBackendMigrations();
+  scheduleDesktopManagedAiModelSync();
 }
 
 function resolveDebugBackendStartupFailure(): BackendStartupFailureInfo | null {
@@ -461,6 +488,11 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   // Load the renderer: dev server URL in development, built HTML file in production
   const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
   const fallbackFile = path.join(__dirname, '../renderer/index.html');
+  const rendererCrashRecovery = createRendererCrashRecoveryGate();
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    rendererCrashRecovery.markRendererLoaded();
+  });
 
   if (!app.isPackaged && rendererUrl) {
     console.log(`[AionUi] Loading renderer URL: ${rendererUrl}`);
@@ -484,11 +516,20 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   mainWindow.webContents.on('render-process-gone', (_event, details) => {
     console.error('[AionUi] render-process-gone:', details);
 
-    // Reload the renderer to recover from the crash.
-    // The isDestroyed() guard in adapter/main.ts prevents further sends
-    // to the dead webContents while the reload is in progress.
-    if (!mainWindow.isDestroyed()) {
-      console.log('[AionUi] Attempting to recover from renderer crash by reloading...');
+    if (mainWindow.isDestroyed()) {
+      return;
+    }
+
+    if (!rendererCrashRecovery.tryBeginRecovery()) {
+      console.error('[AionUi] Suppressing repeated renderer recovery until a stable load is observed.');
+      return;
+    }
+
+    // Clear only the dev renderer's PWA storage before one bounded reload. This
+    // repairs CacheStorage corruption without touching login or application data.
+    void (async () => {
+      await clearRendererOriginWebStorage(session.defaultSession, rendererUrl);
+      console.log('[AionUi] Attempting one renderer crash recovery reload...');
 
       if (!app.isPackaged && rendererUrl) {
         mainWindow.loadURL(rendererUrl).catch((error) => {
@@ -499,7 +540,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
           console.error('[AionUi] Recovery loadFile failed:', error.message || error);
         });
       }
-    }
+    })();
   });
 
   mainWindow.webContents.on('unresponsive', () => {
@@ -507,6 +548,7 @@ const createWindow = ({ showOnReady = true }: { showOnReady?: boolean } = {}): v
   });
 
   mainWindow.on('closed', () => {
+    rendererCrashRecovery.dispose();
     console.log('[AionUi] Main window closed');
   });
 
@@ -800,6 +842,9 @@ const handleAppReady = async (): Promise<void> => {
     // close-to-tray preference, which controls only the window close action.
     const showMainWindowOnReady = !wasLaunchedAtLogin();
 
+    // The desktop renderer never needs the browser PWA cache. Remove a worker
+    // left by older dev builds before BrowserWindow can access CacheStorage.
+    await clearRendererOriginWebStorage(session.defaultSession, process.env['ELECTRON_RENDERER_URL']);
     createWindow({ showOnReady: showMainWindowOnReady });
     appReadyDone = true;
     mark('createWindow');

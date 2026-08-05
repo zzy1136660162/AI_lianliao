@@ -23,6 +23,7 @@ import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClien
 
 import { parseSafeCompanyImageUrl, useCompanyDetail } from './companyData';
 import styles from './company-catalog.module.css';
+import { stripHtmlTags } from '@renderer/utils/common.ts';
 
 export type CompanyDetailPageProps = {
   client?: EnterpriseClient;
@@ -85,7 +86,7 @@ const CompanyProductCard: React.FC<{ product: EnterpriseProductSummary }> = ({ p
         )}
       </div>
       <strong>{product.name}</strong>
-      <p>{product.summary || t('enterprise.companies.missing')}</p>
+      <p dangerouslySetInnerHTML={{ __html: stripHtmlTags(product.summary || t('enterprise.companies.missing')) }}></p>
     </Link>
   );
 };
@@ -152,6 +153,9 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
             client={client}
             resourceType='COMPANY'
             resourceId={company.companyId}
+            resourceTitle={company.name}
+            toCompanyId={company.companyId}
+            toCompanyName={company.name}
             maskedPhone={company.phone}
           />
           <p className={styles.permissionNote}>{t('enterprise.companyDetail.contactPermissionNote')}</p>
@@ -211,7 +215,10 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
             <p className={styles.plainText}>{company.businessSummary || missing}</p>
           </DetailSectionCard>
           <DetailSectionCard title={t('enterprise.companyDetail.sections.description')}>
-            <p className={styles.plainText}>{company.description || missing}</p>
+            <p
+              className={styles.plainText}
+              dangerouslySetInnerHTML={{ __html: stripHtmlTags(company.description || missing) }}
+            ></p>
           </DetailSectionCard>
           <DetailSectionCard title={t('enterprise.companyDetail.sections.products')}>
             {products.list.length ? (

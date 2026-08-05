@@ -6,6 +6,11 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
+// Keep this preload self-contained. Electron's sandbox cannot require Rollup's
+// shared local chunks, so importing the main runtime helper breaks every preload.
+const isPackaged = ipcRenderer.sendSync('get-is-packaged') as unknown;
+contextBridge.exposeInMainWorld('__isPackaged', isPackaged === true);
+
 contextBridge.exposeInMainWorld('petAPI', {
   onStateChange: (cb: (state: string) => void) => {
     ipcRenderer.on('pet:state-changed', (_e, state: string) => cb(state));

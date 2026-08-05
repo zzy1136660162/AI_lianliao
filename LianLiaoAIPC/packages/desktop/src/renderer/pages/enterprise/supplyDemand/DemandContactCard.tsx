@@ -7,6 +7,10 @@ import type { DemandContactAccess } from '@/common/enterprise/demand-contact/con
 import { buildMembershipUpgradeUrl } from '@/common/enterprise/demand-contact/constants';
 import { useOptionalEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import {
+  getCurrentEnterprisePagePath,
+  recordEnterpriseBehavior,
+} from '@/renderer/services/enterprise/enterpriseBehaviorLog';
 
 import { acquireDemandContact, loadDemandContactStatus } from './demandContactData';
 import styles from './supply-demand.module.css';
@@ -15,11 +19,12 @@ type DemandContactCardProps = {
   client: Pick<EnterpriseClient, 'request'>;
   typeId: number;
   demandId: string;
+  demandTitle?: string;
 };
 
 const hiddenContactRows = ['发布企业', '联系人', '联系电话', '详细地址'] as const;
 
-const DemandContactCard: React.FC<DemandContactCardProps> = ({ client, typeId, demandId }) => {
+const DemandContactCard: React.FC<DemandContactCardProps> = ({ client, typeId, demandId, demandTitle }) => {
   const enterpriseAuth = useOptionalEnterpriseAuth();
   const [access, setAccess] = useState<DemandContactAccess | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,8 +63,37 @@ const DemandContactCard: React.FC<DemandContactCardProps> = ({ client, typeId, d
     setAcquiring(true);
     setFailed(false);
     try {
-      setAccess(await acquireDemandContact(client, typeId, demandId));
+      const next = await acquireDemandContact(client, typeId, demandId);
+      setAccess(next);
+      void recordEnterpriseBehavior(
+        {
+          eventType: 'CONTACT_ACQUIRE',
+          moduleName: '链辽AI桌面端-供需对接',
+          title: `获取${demandTitle || demandId}联系方式`,
+          pagePath: getCurrentEnterprisePagePath(),
+          targetId: demandId,
+          ...(next.contact?.companyName ? { toCompanyName: next.contact.companyName } : {}),
+          params: {
+            typeId,
+            state: next.state,
+            canAcquire: next.canAcquire,
+            ...(typeof next.remainingQuota === 'number' ? { remainingQuota: next.remainingQuota } : {}),
+          },
+        },
+        client
+      );
     } catch {
+      void recordEnterpriseBehavior(
+        {
+          eventType: 'CONTACT_ACQUIRE',
+          moduleName: '链辽AI桌面端-供需对接',
+          title: `获取${demandTitle || demandId}联系方式`,
+          pagePath: getCurrentEnterprisePagePath(),
+          targetId: demandId,
+          params: { typeId, outcome: 'FAILED' },
+        },
+        client
+      );
       setFailed(true);
     } finally {
       setAcquiring(false);
@@ -144,9 +178,9 @@ const DemandContactCard: React.FC<DemandContactCardProps> = ({ client, typeId, d
               ) : null}
               {access?.state === 'DEMAND_CLOSED' ? <span>该需求已结束，暂不支持获取联系方式。</span> : null}
               {access?.state === 'UNAVAILABLE' ? <span>该需求不存在或暂不可查看。</span> : null}
-              {typeof access?.remainingQuota === 'number' ? (
+              {/*  {typeof access?.remainingQuota === 'number' ? (
                 <span className={styles.quotaHint}>当前剩余获取次数：{access.remainingQuota}</span>
-              ) : null}
+              ) : null}*/}
             </div>
           </>
         )}

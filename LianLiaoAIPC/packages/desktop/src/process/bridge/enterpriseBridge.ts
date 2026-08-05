@@ -20,6 +20,11 @@ import {
   DESKTOP_VERSION_IPC_CHANNELS,
   DESKTOP_VERSION_IPC_ERROR_MESSAGES,
 } from '@/common/enterprise/desktop-version/constants';
+import {
+  DESKTOP_MANAGED_AI_SYNC_CHANNEL,
+  type DesktopManagedAiSyncResult,
+  unavailableDesktopManagedAiSyncResult,
+} from '@/common/enterprise/managed-ai-model/contracts';
 import type {
   CustomerServiceCloseRequest,
   CustomerServiceConnectionSnapshot,
@@ -85,6 +90,7 @@ import {
   desktopVersionDownloadResultSchema,
   desktopVersionOpenDownloadedResultSchema,
 } from '@/common/enterprise/desktop-version/schemas';
+import { desktopManagedAiSyncResultSchema } from '@/common/enterprise/managed-ai-model/schemas';
 import type {
   EnterpriseIpcErrorCode,
   EnterpriseIpcResult,
@@ -98,6 +104,10 @@ import { isEnterpriseEntityId } from '@/common/enterprise/entityId';
 import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import { enterpriseRequestSchema } from '@/common/enterprise/schemas';
 import { EnterpriseApiClient, EnterpriseApiError } from '@process/services/enterprise/enterpriseApiClient';
+import {
+  getDefaultDesktopManagedAiModelService,
+  type DesktopManagedAiModelService,
+} from '@process/services/enterprise/desktopManagedAiModelService';
 import i18n from '@process/services/i18n';
 import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
 import { enterpriseSessionEvents } from '@process/services/enterprise/enterpriseSessionEvents';
@@ -256,6 +266,19 @@ export type DesktopVersionBridgeGateway = {
 export type DesktopVersionBridgeDependencies = {
   gateway?: DesktopVersionBridgeGateway;
   ipcMain?: DesktopVersionIpcMain;
+  senderGuard?: (event: unknown) => boolean;
+};
+
+type DesktopManagedAiModelIpcHandler = (event: unknown, ...args: unknown[]) => Promise<DesktopManagedAiSyncResult>;
+
+export type DesktopManagedAiModelIpcMain = {
+  handle: (channel: string, handler: DesktopManagedAiModelIpcHandler) => void;
+  removeHandler: (channel: string) => void;
+};
+
+export type DesktopManagedAiModelBridgeDependencies = {
+  service?: Pick<DesktopManagedAiModelService, 'sync'>;
+  ipcMain?: DesktopManagedAiModelIpcMain;
   senderGuard?: (event: unknown) => boolean;
 };
 
@@ -637,15 +660,18 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     return clearPromise;
   };
 
-  const refreshPersistedContext = (): Promise<EnterpriseUserContext | null> => {
+  const refreshPersistedContext = (forceRemoteRefresh = false): Promise<EnterpriseUserContext | null> => {
     assertCurrentLifecycle();
-    if (activeContext) return Promise.resolve(activeContext);
+    if (activeContext && !forceRemoteRefresh) return Promise.resolve(activeContext);
     if (automaticHydrationBlocked) return Promise.resolve(null);
     if (hydrationPromise) return hydrationPromise;
 
     const generationAtStart = sessionGeneration;
+    const activeOpenId = activeContext?.openId ?? null;
     const hydration = (async (): Promise<EnterpriseUserContext | null> => {
-      const openId = await runSessionMutation('read', () => sessionStore.loadOpenId());
+      // An explicit restore is also the membership refresh operation. Reuse only
+      // the persisted identity, never the old membership fields in activeContext.
+      const openId = activeOpenId ?? (await runSessionMutation('read', () => sessionStore.loadOpenId()));
       assertCurrentLifecycle();
       if (sessionGeneration !== generationAtStart) throw bridgeError('MISSING_CONTEXT');
       if (openId === null) return null;
@@ -765,7 +791,7 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE,
       wrapHandler('SESSION_RESTORE_FAILED', async () => {
-        const context = await refreshPersistedContext();
+        const context = await refreshPersistedContext(true);
         assertCurrentLifecycle();
         return context;
       }),
@@ -1329,4 +1355,28 @@ export function initDesktopVersionBridge(dependencies: DesktopVersionBridgeDepen
 
   for (const [channel] of handlers) ipcMain.removeHandler(channel);
   for (const [channel, handler] of handlers) ipcMain.handle(channel, handler);
+}
+
+/**
+ * Exposes only a renderer-safe synchronization status. The cloud configuration
+ * and provider credentials stay in the main process and local AionCore.
+ */
+export function initDesktopManagedAiModelBridge(dependencies: DesktopManagedAiModelBridgeDependencies = {}): void {
+  const service = dependencies.service ?? getDefaultDesktopManagedAiModelService();
+  const ipcMain = dependencies.ipcMain ?? (electronIpcMain as unknown as DesktopManagedAiModelIpcMain);
+  const senderGuard =
+    dependencies.senderGuard ?? ((event: unknown) => isTrustedEnterpriseSender(event as IpcMainInvokeEvent));
+
+  const handler: DesktopManagedAiModelIpcHandler = async (event, ...args) => {
+    if (!senderGuard(event) || args.length !== 0) return unavailableDesktopManagedAiSyncResult();
+    try {
+      const parsed = desktopManagedAiSyncResultSchema.safeParse(await service.sync());
+      return parsed.success ? parsed.data : unavailableDesktopManagedAiSyncResult();
+    } catch {
+      return unavailableDesktopManagedAiSyncResult();
+    }
+  };
+
+  ipcMain.removeHandler(DESKTOP_MANAGED_AI_SYNC_CHANNEL);
+  ipcMain.handle(DESKTOP_MANAGED_AI_SYNC_CHANNEL, handler);
 }

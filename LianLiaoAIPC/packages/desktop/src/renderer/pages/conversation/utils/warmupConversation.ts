@@ -1,4 +1,5 @@
 import { ipcBridge } from '@/common';
+import type { EnsureConversationRuntimeResponse } from '@/common/types/platform/acpTypes';
 
 export type WarmupConversationPhase = 'idle' | 'preparing' | 'ready' | 'error';
 
@@ -13,7 +14,7 @@ const IDLE_STATUS: WarmupConversationStatus = {
   attempt: 0,
 };
 
-const warmupByConversation = new Map<string, Promise<void>>();
+const warmupByConversation = new Map<string, Promise<EnsureConversationRuntimeResponse>>();
 const statusByConversation = new Map<string, WarmupConversationStatus>();
 const listenersByConversation = new Map<string, Set<() => void>>();
 
@@ -50,29 +51,30 @@ export function subscribeWarmupConversation(conversation_id: string, listener: (
   };
 }
 
-export function warmupConversation(conversation_id: string): Promise<void> {
+export function warmupConversation(conversation_id: string): Promise<EnsureConversationRuntimeResponse> {
   const existing = warmupByConversation.get(conversation_id);
   if (existing) {
     return existing;
   }
 
   const previous = getWarmupConversationStatus(conversation_id);
-  if (previous.phase === 'ready') {
-    return Promise.resolve();
-  }
   const nextAttempt = previous.attempt + 1;
   setWarmupStatus(conversation_id, {
     phase: 'preparing',
     attempt: nextAttempt,
   });
 
-  const promise = ipcBridge.conversation.warmup
+  // Core 0.1.48 folds runtime preparation and config-option loading into one
+  // idempotent endpoint. Keep only concurrent-call deduplication: later calls
+  // intentionally refresh the snapshot after model/mode changes.
+  const promise = ipcBridge.conversation.ensureRuntime
     .invoke({ conversation_id })
-    .then(() => {
+    .then((response) => {
       setWarmupStatus(conversation_id, {
         phase: 'ready',
         attempt: nextAttempt,
       });
+      return response;
     })
     .catch((error: unknown) => {
       const errorMessage = error instanceof Error ? error.message : String(error);

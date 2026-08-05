@@ -70,7 +70,7 @@ const AionrsHeaderModelSelector: React.FC<{ conversation_id: string; initialMode
   const modelSelection = useAionrsModelSelection({ initialModel, onSelectModel });
   const prepareRuntimeConfig = useCallback(async () => {
     await teamPermission?.warmupSession();
-    await warmupConversation(conversation_id);
+    return warmupConversation(conversation_id);
   }, [conversation_id, teamPermission]);
   const runtimeConfig = useAcpConfigOptions({
     conversation_id,

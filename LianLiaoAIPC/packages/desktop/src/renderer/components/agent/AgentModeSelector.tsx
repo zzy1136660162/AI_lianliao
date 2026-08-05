@@ -5,6 +5,7 @@
  */
 
 import { classifyConfigSetError, useAcpConfigOptions } from '@/renderer/hooks/agent/useAcpConfigOptions';
+import type { PrepareConversationRuntime } from '@/common/types/platform/acpTypes';
 import type { AgentModeOption } from '@/renderer/utils/model/agentTypes';
 import { useLayoutContext } from '@/renderer/hooks/context/LayoutContext';
 import { AgentLogoIcon } from './AgentBadge';
@@ -60,7 +61,7 @@ export interface AgentModeSelectorProps {
   /** Dynamic modes from capabilities (overrides static list when non-empty) */
   dynamicModes?: AgentModeOption[];
   /** Optional runtime preparation before reading active-session mode. */
-  beforeRuntimeSync?: () => Promise<void>;
+  beforeRuntimeSync?: PrepareConversationRuntime;
 }
 
 /**

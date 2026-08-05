@@ -1,9 +1,16 @@
 {
   "brand": {
-    "eyebrow": "Liaoning industrial intelligence workspace",
-    "title": "Connect industrial insight. Find the next opportunity.",
-    "description": "Sign in with your enterprise identity to explore company profiles, products and projects under construction in one focused desktop workspace.",
-    "security": "Identity verification is completed in WeChat. The desktop app never asks for your password."
+    "logoAlt": "Chain Liaoning · Промислове хмарне місто",
+    "eyebrow": "Платформа промислових ресурсів Ляоніну",
+    "title": "Допомагаємо підприємствам Ляоніну швидше знаходити замовлення, партнерів і можливості зростання",
+    "description": "Поєднуємо підприємства, продукти, проєкти, попит і пропозицію, щоб кожне сканування вело до реальної промислової можливості.",
+    "security": "Вхід за QR WeChat · Перевірка підприємства · Дані лише для бізнес-сервісів",
+    "capabilities": {
+      "companyCode": "Код підприємства",
+      "keyProducts": "Ключові продукти",
+      "projects": "Поточні проєкти",
+      "demand": "Узгодження попиту та пропозиції"
+    }
   },
   "login": {
     "checkingTitle": "Checking your enterprise identity",
@@ -93,8 +100,8 @@
   },
   "navigation": {
     "dashboard": "Workbench",
-    "companies": "Companies",
-    "products": "Products",
+    "companies": "Enterprise code",
+    "products": "Featured products",
     "projects": "Projects",
     "supplyDemand": "Узгодження попиту й пропозиції",
     "favorites": "Favorites",
@@ -106,6 +113,7 @@
     "brand": "链上辽宁·产业云城",
     "brandMark": "EC",
     "brandCaption": "Liaoning industry desk",
+    "backToWorkbench": "Повернутися до робочої області LianLiao",
     "eyebrow": "Liaoning industrial blueprint",
     "unknownCompany": "Enterprise not linked",
     "unknownUser": "Current user",
@@ -126,13 +134,59 @@
       "hide": "Hide assistant panel"
     }
   },
+  "catalogAssistant": {
+    "title": "Помічник промислового пошуку",
+    "capability": "Пошук компаній, ключових продуктів і будівельних проєктів",
+    "exampleHint": "Опишіть мету або виберіть приклад:",
+    "placeholder": "Опишіть потрібну компанію, продукт або проєкт",
+    "submit": "Знайти",
+    "stop": "Зупинити",
+    "retry": "Повторити",
+    "clear": "Очистити сеанс",
+    "viewCompany": "Відкрити профіль компанії",
+    "viewProduct": "Відкрити ключовий продукт",
+    "viewProject": "Відкрити відомості про проєкт",
+    "projectInvestment": "Інвестиції {{value}} × 10 000 юанів",
+    "notProvided": "Немає даних",
+    "currentRequest": "Поточний запит",
+    "planning": "Аналіз запиту",
+    "clarifying": "Потрібні додаткові умови",
+    "completed": "Пошук завершено",
+    "searchingCompanyPage": "Пошук компаній, сторінка {{page}}/{{maxPages}}",
+    "searchingProductPage": "Пошук продуктів, сторінка {{page}}/{{maxPages}}",
+    "searchingProjectPage": "Пошук будівельних проєктів, сторінка {{page}}/{{maxPages}}",
+    "candidateCount": "Зібрано кандидатів: {{count}}",
+    "ranking": "Вибір найкращих збігів",
+    "clarificationTitle": "Уточніть запит",
+    "fallbackSummary": "Результати за умовами пошуку",
+    "fallbackReason": "Відповідає поточним умовам",
+    "noResults": "Відповідних результатів немає",
+    "broadenHint": "Зменште обмеження регіону або ключових слів",
+    "planFailed": "Не вдалося зрозуміти пошуковий запит.",
+    "searchFailed": "Каталог тимчасово недоступний.",
+    "cancelled": "Пошук зупинено",
+    "navigation": {
+      "eyebrow": "Визначено бізнес-намір",
+      "demandTitle": "Продовжити в розділі попиту та пропозиції",
+      "demandDescription": "Схоже, ви хочете опублікувати запит. Після підтвердження буде створено ШІ-чернетку з поточним описом.",
+      "stay": "Залишитися тут",
+      "enterDemand": "Відкрити публікацію",
+      "handoffError": "Не вдалося створити чернетку запиту. Спробуйте ще раз."
+    },
+    "examples": {
+      "company": "Знайти підприємства точної обробки в Шеньяні",
+      "product": "Знайти вироби з нержавіючої сталі в Шеньбеї",
+      "project": "Знайти проєкти в Шеньяні, що закуповують електромеханічне обладнання",
+      "service": "Знайти компанії пакування та друку"
+    }
+  },
   "routes": {
     "dashboard": {
       "title": "Enterprise workbench",
       "description": "Search verified companies, products and live project procurement signals from one authenticated workbench."
     },
     "companies": {
-      "title": "Company directory",
+      "title": "Enterprise code",
       "description": "Search verified company records with industry, region and membership filters."
     },
     "companyDetail": {
@@ -140,8 +194,8 @@
       "description": "Review verified company information, contact visibility and related products."
     },
     "products": {
-      "title": "Product directory",
-      "description": "Browse the live enterprise product directory and open validated product records."
+      "title": "Featured products",
+      "description": "Browse verified featured products and open validated product records."
     },
     "productDetail": {
       "title": "Product profile",
@@ -355,7 +409,7 @@
     "quick": {
       "index": "03 / ACCESS",
       "title": "Verified catalog entrances",
-      "description": "Continue directly to the live company, product or project directories.",
+      "description": "Continue directly to enterprise code, featured products or the project radar.",
       "ariaLabel": "Enterprise catalog shortcuts"
     },
     "radar": {
@@ -369,19 +423,24 @@
   },
   "companies": {
     "eyebrow": "Industrial company index / Liaoning",
-    "description": "Filter the live company directory, preview a record in context, then open its verified profile.",
-    "loading": "Loading the company directory",
+    "description": "Filter verified enterprise code records, preview a company in context, then open its verified profile.",
+    "loading": "Loading enterprise code",
     "missing": "Not provided",
+    "registeredCapitalValue": "{{value}} × CNY 10,000",
     "resultCount": "{{count}} company records",
     "filters": {
       "keywordLabel": "Company name",
       "keywordPlaceholder": "Enter a company name",
       "industryLabel": "Industry",
-      "industryPlaceholder": "Enter an industry",
+      "industryPlaceholder": "Виберіть галузь",
+      "industryOption": "{{industry}} (компаній: {{count}})",
       "provinceLabel": "Province",
       "provincePlaceholder": "Enter a province",
       "cityLabel": "City",
       "cityPlaceholder": "Enter a city",
+      "optionsLoading": "Loading database options",
+      "optionsError": "Options could not be loaded. Reselect the parent filter.",
+      "optionsEmpty": "No options available",
       "districtLabel": "District",
       "districtPlaceholder": "Enter a district",
       "memberLevelLabel": "Member level",
@@ -390,7 +449,7 @@
     "actions": {
       "search": "Search companies",
       "reset": "Reset filters",
-      "viewDetails": "View details",
+      "viewDetails": "Показати більше",
       "closeQuickView": "Close company preview"
     },
     "columns": {
@@ -425,14 +484,14 @@
       "description": "Reset one or more filters and search again."
     },
     "error": {
-      "title": "The company directory could not be loaded",
+      "title": "Enterprise code could not be loaded",
       "description": "The enterprise service did not return a valid company page. Try again."
     }
   },
   "companyDetail": {
     "eyebrow": "Verified company record",
     "profileEyebrow": "Company profile",
-    "backToList": "Back to company directory",
+    "backToList": "Back to enterprise code",
     "loading": "Loading the company profile",
     "logoAlt": "{{name}} logo",
     "logoUnavailable": "Company logo unavailable",
@@ -446,6 +505,7 @@
     },
     "fields": {
       "legalRepresentative": "Legal representative",
+      "registeredCapital": "Registered capital",
       "companyType": "Company type",
       "establishedAt": "Established",
       "unifiedSocialCreditCode": "Unified social credit code",
@@ -461,7 +521,7 @@
     "productsEmpty": "No products were returned for this company.",
     "invalid": {
       "title": "This company link is invalid",
-      "description": "Return to the company directory and choose a valid record."
+      "description": "Return to enterprise code and choose a valid record."
     },
     "error": {
       "title": "The company profile could not be loaded",
@@ -470,8 +530,8 @@
   },
   "products": {
     "eyebrow": "Industrial product index / Liaoning",
-    "description": "Search live enterprise products, preview industrial capability in context, then open the verified record.",
-    "loading": "Loading the product directory",
+    "description": "Search verified featured products, preview industrial capability in context, then open the full record.",
+    "loading": "Loading featured products",
     "missing": "Not provided",
     "resultCount": "{{count}} product records",
     "cardLabel": "Product {{name}}",
@@ -518,14 +578,14 @@
       "description": "Reset one or more filters and search again."
     },
     "error": {
-      "title": "The product directory could not be loaded",
+      "title": "Featured products could not be loaded",
       "description": "The enterprise service did not return a valid product page. Try again."
     }
   },
   "productDetail": {
     "eyebrow": "Verified product record",
     "profileEyebrow": "Product profile",
-    "backToList": "Back to product directory",
+    "backToList": "Back to featured products",
     "loading": "Loading the product profile",
     "contactPermissionNote": "The phone is masked at the trusted desktop boundary using the H5 policy. Dialing and access unlocking are not available.",
     "sections": {
@@ -535,7 +595,7 @@
     },
     "invalid": {
       "title": "This product link is invalid",
-      "description": "Return to the product directory and choose a valid record."
+      "description": "Return to featured products and choose a valid record."
     },
     "error": {
       "title": "The product profile could not be loaded",
@@ -568,7 +628,10 @@
       "minInvestmentLabel": "Minimum investment",
       "minInvestmentPlaceholder": "Minimum, ten-thousand yuan",
       "maxInvestmentLabel": "Maximum investment",
-      "maxInvestmentPlaceholder": "Maximum, ten-thousand yuan"
+      "maxInvestmentPlaceholder": "Maximum, ten-thousand yuan",
+      "optionsLoading": "Loading database options",
+      "optionsError": "Failed to load options. Please retry.",
+      "optionsEmpty": "No options available"
     },
     "actions": {
       "search": "Search projects",
@@ -595,6 +658,8 @@
       "eyebrow": "Live project signal / 01",
       "title": "Project opportunity overview",
       "updatedAt": "Data updated {{date}}",
+      "expand": "Expand overview",
+      "collapse": "Collapse overview",
       "metrics": {
         "projects": "Projects",
         "categoryL1": "Primary categories",

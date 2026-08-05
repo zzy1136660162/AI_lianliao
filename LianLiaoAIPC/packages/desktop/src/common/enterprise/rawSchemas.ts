@@ -1,6 +1,15 @@
 import { z } from 'zod';
 
-import { ENTERPRISE_LOGIN_STATUSES, ENTERPRISE_PROJECT_DRILL_LEVELS } from './constants';
+import {
+  ENTERPRISE_LOGIN_STATUSES,
+  ENTERPRISE_PROJECT_DRILL_LEVELS,
+  ENTERPRISE_PROJECT_FILTER_DIMENSIONS,
+} from './constants';
+import {
+  catalogPlanPayloadSchema,
+  catalogRankPayloadSchema,
+  enterpriseAssistantPlanPayloadSchema,
+} from './catalog-assistant/schemas';
 import { UNIFIED_RESOURCE_TYPES } from './unified-search/contracts';
 import { ENTERPRISE_CONTACT_RESOURCE_TYPES } from './contact-access/contracts';
 import { isEnterpriseEntityId } from './entityId';
@@ -192,8 +201,26 @@ export const enterpriseCompanyRawSchema = passthroughRawSchema({
     'PHONE',
   ] as const,
   identifiers: ['id', 'ID', 'companyId', 'COMPANY_ID'] as const,
-  numbers: ['comLevel', 'COM_LEVEL', 'companyLevel', 'COMPANY_LEVEL'] as const,
+  numbers: [
+    'comLevel',
+    'COM_LEVEL',
+    'companyLevel',
+    'COMPANY_LEVEL',
+    'resCost',
+    'RES_COST',
+    'registeredCapital',
+    'REGISTERED_CAPITAL',
+    'featuredProductCount',
+    'FEATURED_PRODUCT_COUNT',
+  ] as const,
   booleans: ['vip', 'VIP', 'payVip', 'PAY_VIP', 'isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
+});
+
+export const enterpriseIndustryOptionRawSchema = passthroughRawSchema({
+  text: ['industry', 'INDUSTRY'] as const,
+  identifiers: [] as const,
+  numbers: ['companyCount', 'COMPANY_COUNT'] as const,
+  booleans: [] as const,
 });
 
 export const enterpriseCompanyDetailEnvelopeRawSchema = guardedObject(
@@ -204,12 +231,16 @@ export const enterpriseProductRawSchema = passthroughRawSchema({
   text: [
     'productsName',
     'PRODUCTS_NAME',
+    'displayProductName',
+    'DISPLAY_PRODUCT_NAME',
     'productName',
     'PRODUCT_NAME',
     'name',
     'NAME',
     'companyName',
     'COMPANY_NAME',
+    'detailCompanyName',
+    'DETAIL_COMPANY_NAME',
     'tempPic',
     'TEMP_PIC',
     'imageUrl',
@@ -255,7 +286,16 @@ export const enterpriseProductRawSchema = passthroughRawSchema({
     'phone',
     'PHONE',
   ] as const,
-  identifiers: ['id', 'ID', 'productId', 'PRODUCT_ID', 'companyId', 'COMPANY_ID'] as const,
+  identifiers: [
+    'id',
+    'ID',
+    'detailProductId',
+    'DETAIL_PRODUCT_ID',
+    'productId',
+    'PRODUCT_ID',
+    'companyId',
+    'COMPANY_ID',
+  ] as const,
   numbers: ['comLevel', 'COM_LEVEL', 'companyLevel', 'COMPANY_LEVEL'] as const,
   booleans: ['vip', 'VIP', 'payVip', 'PAY_VIP', 'isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
 });
@@ -563,6 +603,18 @@ export const enterpriseDrillEnvelopeRawSchema = guardedObject(z.object({ list: z
   'list',
 ]);
 
+export const enterpriseProjectFilterOptionRawSchema = passthroughRawSchema({
+  text: ['value', 'VALUE', 'label', 'LABEL'] as const,
+  identifiers: [] as const,
+  numbers: ['projectCount', 'PROJECT_COUNT'] as const,
+  booleans: [] as const,
+});
+
+export const enterpriseProjectFilterOptionsEnvelopeRawSchema = guardedObject(
+  z.object({ list: z.array(z.unknown()) }).passthrough(),
+  ['list']
+);
+
 export const userContextRawSchema = passthroughRawSchema({
   text: ['userName', 'USER_NAME', 'companyName', 'COMPANY_NAME'] as const,
   identifiers: [
@@ -645,6 +697,22 @@ const projectDrillQuerySchema = guardedObject(
   ['level']
 );
 
+const projectFilterOptionsQuerySchema = guardedObject(
+  z
+    .object({
+      dimension: z.enum(ENTERPRISE_PROJECT_FILTER_DIMENSIONS),
+      runId: projectShortTextSchema.optional(),
+      province: projectShortTextSchema.optional(),
+      city: projectShortTextSchema.optional(),
+      categoryL1: projectLongTextSchema.optional(),
+      categoryL2: projectLongTextSchema.optional(),
+      materialShortName: projectLongTextSchema.optional(),
+      limit: positiveIntegerSchema.refine((value) => value <= 1000, 'Limit is too large').optional(),
+    })
+    .strict(),
+  ['dimension']
+);
+
 const projectListQuerySchema = guardedObject(
   z
     .object({
@@ -714,6 +782,7 @@ const demandDetailPayloadSchema = guardedObject(
   ['demandId', 'typeId']
 );
 const demandTypesPayloadSchema = guardedObject(z.object({}).strict());
+const companyIndustriesPayloadSchema = guardedObject(z.object({}).strict());
 const demandContactPayloadSchema = demandDetailPayloadSchema;
 const demandPublishSchemaPayloadSchema = guardedObject(
   z
@@ -839,6 +908,29 @@ const demandUploadImagePayloadSchema = guardedObject(
     .strict(),
   ['fileName', 'mimeType', 'bytes']
 );
+const enterpriseBehaviorLogPayloadSchema = guardedObject(
+  z
+    .object({
+      eventType: z.enum(['PAGE_VIEW', 'CONTACT_ACQUIRE', 'PHONE_DIAL', 'DEMAND_PUBLISH']),
+      moduleName: z.string().trim().min(1).max(100),
+      title: z.string().trim().min(1).max(300),
+      pagePath: z
+        .string()
+        .trim()
+        .min(1)
+        .max(500)
+        .refine((value) => value.startsWith('/enterprise/'), 'Behavior path must stay in the enterprise workspace'),
+      targetId: z.string().trim().min(1).max(100).optional(),
+      toCompanyId: z.string().trim().min(1).max(100).optional(),
+      toCompanyName: z.string().trim().min(1).max(300).optional(),
+      params: z
+        .record(z.string().trim().min(1).max(100), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+        .refine((value) => Object.keys(value).length <= 50)
+        .optional(),
+    })
+    .strict(),
+  ['eventType', 'moduleName', 'title', 'pagePath']
+);
 const unifiedSuggestPayloadSchema = guardedObject(z.object({ keyword: z.string().trim().min(2).max(100) }).strict(), [
   'keyword',
 ]);
@@ -864,6 +956,7 @@ const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
       payload: companyDetailPayloadSchema,
     })
     .strict(),
+  z.object({ operation: z.literal('company.industries'), payload: companyIndustriesPayloadSchema }).strict(),
   z.object({ operation: z.literal('product.list'), payload: productListQuerySchema }).strict(),
   z
     .object({
@@ -873,11 +966,30 @@ const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
     .strict(),
   z
     .object({
+      operation: z.literal('catalogAssistant.plan'),
+      payload: guardedObject(catalogPlanPayloadSchema, ['message']),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('catalogAssistant.rank'),
+      payload: guardedObject(catalogRankPayloadSchema, ['message', 'plan', 'candidates']),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('enterpriseAssistant.plan'),
+      payload: guardedObject(enterpriseAssistantPlanPayloadSchema, ['message', 'currentModule', 'hasCatalogScope']),
+    })
+    .strict(),
+  z
+    .object({
       operation: z.literal('project.dashboard'),
       payload: projectDashboardPayloadSchema,
     })
     .strict(),
   z.object({ operation: z.literal('project.drill'), payload: projectDrillQuerySchema }).strict(),
+  z.object({ operation: z.literal('project.filterOptions'), payload: projectFilterOptionsQuerySchema }).strict(),
   z.object({ operation: z.literal('project.list'), payload: projectListQuerySchema }).strict(),
   z
     .object({
@@ -939,6 +1051,7 @@ const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
     .strict(),
   z.object({ operation: z.literal('demand.publish'), payload: demandPublishPayloadSchema }).strict(),
   z.object({ operation: z.literal('demand.uploadImage'), payload: demandUploadImagePayloadSchema }).strict(),
+  z.object({ operation: z.literal('behavior.log'), payload: enterpriseBehaviorLogPayloadSchema }).strict(),
   z.object({ operation: z.literal('unified.suggest'), payload: unifiedSuggestPayloadSchema }).strict(),
   z.object({ operation: z.literal('unified.search'), payload: unifiedSearchPayloadSchema }).strict(),
 ]);

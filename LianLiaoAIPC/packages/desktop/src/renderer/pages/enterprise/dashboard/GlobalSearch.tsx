@@ -250,7 +250,6 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
           <span>{t('enterprise.dashboard.search.eyebrow')}</span>
           <h2 id='enterprise-global-search-title'>{t('enterprise.dashboard.search.title')}</h2>
         </div>
-        <p>{t('enterprise.dashboard.search.description')}</p>
       </div>
       <div className={styles.searchControl}>
         <AutoComplete

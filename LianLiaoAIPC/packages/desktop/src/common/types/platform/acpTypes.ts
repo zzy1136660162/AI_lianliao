@@ -211,9 +211,19 @@ export type AcpConfigOptionDto = {
   options: AcpConfigSelectOptionDto[];
 };
 
-export type GetConfigOptionsResponse = {
+/**
+ * Snapshot returned by Core when a conversation runtime is created or reused.
+ * Core 0.1.48 removed the separate warmup/config-options read routes, so the
+ * desktop must treat this response as the single source of runtime state and
+ * selectable model/mode options.
+ */
+export type EnsureConversationRuntimeResponse = {
+  recovered: boolean;
   config_options: AcpConfigOptionDto[];
+  runtime: import('../../config/storage').TConversationRuntimeSummary;
 };
+
+export type PrepareConversationRuntime = () => Promise<EnsureConversationRuntimeResponse>;
 
 export type SetConfigOptionRequest = {
   value: string;

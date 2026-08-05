@@ -158,6 +158,29 @@ describe('CustomerConsultationPage', () => {
     await waitFor(() => expect(client.markRead).toHaveBeenCalledWith({ conversationId: '-8', messageId: '-21' }));
   });
 
+  it('marks an optimistic message failed when the server rejects its send request', async () => {
+    const client = createClient();
+    render(<CustomerConsultationPage client={client} />);
+    await screen.findByTestId('customer-consultation-timeline');
+
+    const input = screen.getByPlaceholderText('enterprise.consultation.composer.placeholder');
+    await userEvent.type(input, 'send-failure-regression');
+    await userEvent.click(screen.getByRole('button', { name: 'enterprise.consultation.composer.send' }));
+    await screen.findByText('send-failure-regression');
+
+    client.emit({
+      event: 'error',
+      eventId: 'send-failure-event',
+      requestId: '33333333-3333-4333-8333-333333333333',
+      conversationId: '-8',
+      serverTime: 1_700_000_000_050,
+      payload: { code: 'INTERNAL_ERROR', message: 'service unavailable' },
+    });
+
+    expect(await screen.findByText('enterprise.consultation.delivery.failed')).toBeVisible();
+    expect(screen.getByText('enterprise.consultation.actions.retryMessage')).toBeVisible();
+  });
+
   it('keeps the main-process connection alive after leaving the consultation route', async () => {
     const client = createClient();
     const { unmount } = render(<CustomerConsultationPage client={client} />);

@@ -20,7 +20,7 @@ import {
 import { DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL } from '@/common/enterprise/desktop-notification/constants';
 import type { DesktopNotificationAction } from '@/common/enterprise/desktop-notification/contracts';
 import { DESKTOP_PRODUCT_NAME } from '@/common/platform/productIdentity';
-import i18n from '@process/services/i18n';
+import i18n, { i18nReady } from '@process/services/i18n';
 
 let tray: TrayInstance | null = null;
 let closeToTrayEnabled = false;
@@ -136,6 +136,9 @@ const getRealtimeServiceUnread = (): { count: number; labelKey: string } => {
   return { count, labelKey: 'enterprise.customerService.title' };
 };
 
+/** Chain Liaoning's native tray remains Simplified Chinese even when AI workspace content uses another locale. */
+const getTrayTranslator = () => i18n.getFixedT('zh-CN');
+
 export const setTrayMainWindow = (win: BrowserWindow, createWindow?: () => void): void => {
   mainWindowRef = win;
   if (createWindow) {
@@ -172,12 +175,15 @@ const getTrayIcon = (): Electron.NativeImage => {
  * Build tray context menu (async to support dynamic content).
  */
 const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
+  await i18nReady;
+  const t = getTrayTranslator();
+
   const getRecentConversations = async (): Promise<Array<{ id: string; title: string }>> => {
     try {
       const result = await ipcBridge.database.getUserConversations.invoke({ limit: 5 });
       return (result.items || []).slice(0, 5).map((conv) => ({
         id: conv.id,
-        title: conv.name || i18n.t('common.tray.untitled'),
+        title: conv.name || t('common.tray.untitled'),
       }));
     } catch {
       return [];
@@ -200,16 +206,16 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
 
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: i18n.t('common.tray.showWindow'),
+      label: t('common.tray.showWindow'),
       click: showAndFocusMainWindow,
     },
     {
-      label: i18n.t('common.tray.closeToTray'),
+      label: t('common.tray.closeToTray'),
       click: hideToTray,
     },
     { type: 'separator' },
     {
-      label: i18n.t('common.tray.newChat'),
+      label: t('common.tray.newChat'),
       click: () => {
         showAndFocusMainWindow();
         mainWindowRef?.webContents.send('tray:navigate-to-guid');
@@ -220,7 +226,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   if (recentConversations.length > 0) {
     template.push({ type: 'separator' });
     template.push({
-      label: i18n.t('common.tray.recentChats'),
+      label: t('common.tray.recentChats'),
       enabled: false,
     });
     for (const conv of recentConversations) {
@@ -240,15 +246,15 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   template.push({ type: 'separator' });
   const realtimeUnread = getRealtimeServiceUnread();
   template.push({
-    label: `${i18n.t(realtimeUnread.labelKey)}: ${realtimeUnread.count}`,
+    label: `${t(realtimeUnread.labelKey)}: ${realtimeUnread.count}`,
     enabled: false,
   });
   template.push({
-    label: `${i18n.t('common.tray.runningTasks')}: ${runningTasksCount}`,
+    label: `${t('common.tray.runningTasks')}: ${runningTasksCount}`,
     enabled: false,
   });
   template.push({
-    label: i18n.t('common.tray.pauseAll'),
+    label: t('common.tray.pauseAll'),
     click: () => {
       showAndFocusMainWindow();
       mainWindowRef?.webContents.send('tray:pause-all-tasks');
@@ -257,10 +263,10 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
 
   template.push({ type: 'separator' });
   template.push({
-    label: `🐾 ${i18n.t('pet.desktopPet')}`,
+    label: `🐾 ${t('pet.desktopPet')}`,
     submenu: [
       {
-        label: i18n.t('pet.showHide'),
+        label: t('pet.showHide'),
         click: async () => {
           try {
             const petManager = await import('../pet/petManager');
@@ -273,7 +279,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
       },
       { type: 'separator' as const },
       {
-        label: i18n.t('pet.sizeSmall', { px: 200 }),
+        label: t('pet.sizeSmall', { px: 200 }),
         click: async () => {
           try {
             const { resizePetWindow } = await import('../pet/petManager');
@@ -284,7 +290,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
         },
       },
       {
-        label: i18n.t('pet.sizeMedium', { px: 280 }),
+        label: t('pet.sizeMedium', { px: 280 }),
         click: async () => {
           try {
             const { resizePetWindow } = await import('../pet/petManager');
@@ -295,7 +301,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
         },
       },
       {
-        label: i18n.t('pet.sizeLarge', { px: 360 }),
+        label: t('pet.sizeLarge', { px: 360 }),
         click: async () => {
           try {
             const { resizePetWindow } = await import('../pet/petManager');
@@ -309,7 +315,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   });
   template.push({ type: 'separator' });
   template.push({
-    label: i18n.t('common.tray.checkUpdate'),
+    label: t('common.tray.checkUpdate'),
     click: () => {
       showAndFocusMainWindow();
       mainWindowRef?.webContents.send(DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL, { route: '/enterprise/version-update' });
@@ -317,14 +323,14 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   });
   template.push({ type: 'separator' });
   template.push({
-    label: i18n.t('common.tray.about'),
+    label: t('common.tray.about'),
     click: () => {
       showAndFocusMainWindow();
       mainWindowRef?.webContents.send('tray:open-about');
     },
   });
   template.push({
-    label: i18n.t('common.tray.restart'),
+    label: t('common.tray.restart'),
     click: () => {
       isQuitting = true;
       app.relaunch();
@@ -333,7 +339,7 @@ const buildTrayContextMenu = async (): Promise<Electron.Menu> => {
   });
   template.push({ type: 'separator' });
   template.push({
-    label: i18n.t('common.tray.quit'),
+    label: t('common.tray.quit'),
     click: () => {
       isQuitting = true;
       app.quit();
@@ -386,8 +392,9 @@ const rebuildTrayMenu = (): void => {
 
 const updateTrayPresentation = (): void => {
   if (!tray) return;
+  const t = getTrayTranslator();
   const realtimeUnread = getRealtimeServiceUnread();
-  const unreadLabel = `${i18n.t(realtimeUnread.labelKey)}: ${realtimeUnread.count}`;
+  const unreadLabel = `${t(realtimeUnread.labelKey)}: ${realtimeUnread.count}`;
   tray.setToolTip(realtimeUnread.count > 0 ? `${DESKTOP_PRODUCT_NAME} · ${unreadLabel}` : DESKTOP_PRODUCT_NAME);
   if (process.platform === 'darwin') tray.setTitle(realtimeUnread.count > 0 ? String(realtimeUnread.count) : '');
 };

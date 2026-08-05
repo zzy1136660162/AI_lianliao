@@ -5,6 +5,9 @@
  */
 
 import { applyTheme } from '@/renderer/utils/theme/applyTheme';
+import { installCurrentRendererCopyProtection } from '../utils/ui/copyProtection';
+
+installCurrentRendererCopyProtection();
 
 interface IConfirmation<Option = any> {
   title?: string;

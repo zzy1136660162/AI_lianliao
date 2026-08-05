@@ -7,6 +7,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { Theme } from '@/common/theme/types';
 
+// Keep this preload self-contained. Electron's sandbox cannot require Rollup's
+// shared local chunks, so importing the main runtime helper breaks every preload.
+const isPackaged = ipcRenderer.sendSync('get-is-packaged') as unknown;
+contextBridge.exposeInMainWorld('__isPackaged', isPackaged === true);
+
 contextBridge.exposeInMainWorld('petConfirmAPI', {
   onConfirmationAdd: (callback: (data: any) => void) => {
     ipcRenderer.on('pet:confirm-add', (_event, data) => callback(data));

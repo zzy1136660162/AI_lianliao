@@ -1,9 +1,16 @@
 {
   "brand": {
-    "eyebrow": "Liaoning industrial intelligence workspace",
-    "title": "Connect industrial insight. Find the next opportunity.",
-    "description": "Sign in with your enterprise identity to explore company profiles, products and projects under construction in one focused desktop workspace.",
-    "security": "Identity verification is completed in WeChat. The desktop app never asks for your password."
+    "logoAlt": "Chain Liaoning · Endüstri Bulut Şehri",
+    "eyebrow": "Liaoning endüstriyel kaynak bağlantı platformu",
+    "title": "Liaoning işletmelerinin siparişleri, ortakları ve büyüme fırsatlarını daha hızlı bulmasını sağlayın",
+    "description": "İşletmeleri, ürünleri, projeleri ve arz-talep kaynaklarını bağlayarak her taramayı gerçek bir endüstriyel fırsata dönüştürün.",
+    "security": "WeChat QR girişi · İşletme kimliği doğrulama · Veriler yalnızca iş hizmetleri için kullanılır",
+    "capabilities": {
+      "companyCode": "İşletme kodu",
+      "keyProducts": "Öne çıkan ürünler",
+      "projects": "Devam eden projeler",
+      "demand": "Arz-talep eşleştirme"
+    }
   },
   "login": {
     "checkingTitle": "Checking your enterprise identity",
@@ -93,8 +100,8 @@
   },
   "navigation": {
     "dashboard": "Workbench",
-    "companies": "Companies",
-    "products": "Products",
+    "companies": "Enterprise code",
+    "products": "Featured products",
     "projects": "Projects",
     "supplyDemand": "Arz ve talep eşleştirme",
     "favorites": "Favorites",
@@ -106,6 +113,7 @@
     "brand": "链上辽宁·产业云城",
     "brandMark": "EC",
     "brandCaption": "Liaoning industry desk",
+    "backToWorkbench": "LianLiao çalışma alanına dön",
     "eyebrow": "Liaoning industrial blueprint",
     "unknownCompany": "Enterprise not linked",
     "unknownUser": "Current user",
@@ -126,13 +134,59 @@
       "hide": "Hide assistant panel"
     }
   },
+  "catalogAssistant": {
+    "title": "Endüstri arama yardımcısı",
+    "capability": "Şirketleri, öne çıkan ürünleri ve inşaat projelerini arayın",
+    "exampleHint": "Hedefinizi açıklayın veya bir örnek seçin:",
+    "placeholder": "Aradığınız şirketi, ürünü veya projeyi açıklayın",
+    "submit": "Ara",
+    "stop": "Durdur",
+    "retry": "Yeniden dene",
+    "clear": "Oturumu temizle",
+    "viewCompany": "Şirket profilini aç",
+    "viewProduct": "Öne çıkan ürünü aç",
+    "viewProject": "Proje ayrıntılarını aç",
+    "projectInvestment": "{{value}} × 10.000 RMB yatırım",
+    "notProvided": "Bilgi yok",
+    "currentRequest": "Geçerli istek",
+    "planning": "İstek anlaşılıyor",
+    "clarifying": "Ek arama koşulları gerekli",
+    "completed": "Arama tamamlandı",
+    "searchingCompanyPage": "Şirketler aranıyor, sayfa {{page}}/{{maxPages}}",
+    "searchingProductPage": "Ürünler aranıyor, sayfa {{page}}/{{maxPages}}",
+    "searchingProjectPage": "İnşaat projeleri aranıyor, sayfa {{page}}/{{maxPages}}",
+    "candidateCount": "{{count}} aday toplandı",
+    "ranking": "En iyi eşleşmeler seçiliyor",
+    "clarificationTitle": "Lütfen ayrıntı verin",
+    "fallbackSummary": "Arama koşullarına göre sonuçlar",
+    "fallbackReason": "Geçerli arama koşullarıyla eşleşiyor",
+    "noResults": "Eşleşen sonuç bulunamadı",
+    "broadenHint": "Konum veya anahtar kelime kısıtlarını azaltın",
+    "planFailed": "Arama isteği anlaşılamadı.",
+    "searchFailed": "Katalog hizmeti geçici olarak kullanılamıyor.",
+    "cancelled": "Arama durduruldu",
+    "navigation": {
+      "eyebrow": "İş niyeti algılandı",
+      "demandTitle": "Arz ve talep bölümünde devam edin",
+      "demandDescription": "Bir talep yayımlamak istediğiniz anlaşıldı. Onaydan sonra bu açıklamayla bir yapay zekâ taslağı oluşturulur.",
+      "stay": "Burada kal",
+      "enterDemand": "Talep yayımlamayı aç",
+      "handoffError": "Talep taslağı başlatılamadı. Lütfen yeniden deneyin."
+    },
+    "examples": {
+      "company": "Shenyang'da hassas işleme şirketleri bul",
+      "product": "Shenbei'de paslanmaz çelik ürünleri bul",
+      "project": "Shenyang'da elektromekanik ekipman satın alan projeleri bul",
+      "service": "Ambalaj ve baskı şirketleri bul"
+    }
+  },
   "routes": {
     "dashboard": {
       "title": "Enterprise workbench",
       "description": "Search verified companies, products and live project procurement signals from one authenticated workbench."
     },
     "companies": {
-      "title": "Company directory",
+      "title": "Enterprise code",
       "description": "Search verified company records with industry, region and membership filters."
     },
     "companyDetail": {
@@ -140,8 +194,8 @@
       "description": "Review verified company information, contact visibility and related products."
     },
     "products": {
-      "title": "Product directory",
-      "description": "Browse the live enterprise product directory and open validated product records."
+      "title": "Featured products",
+      "description": "Browse verified featured products and open validated product records."
     },
     "productDetail": {
       "title": "Product profile",
@@ -355,7 +409,7 @@
     "quick": {
       "index": "03 / ACCESS",
       "title": "Verified catalog entrances",
-      "description": "Continue directly to the live company, product or project directories.",
+      "description": "Continue directly to enterprise code, featured products or the project radar.",
       "ariaLabel": "Enterprise catalog shortcuts"
     },
     "radar": {
@@ -369,19 +423,24 @@
   },
   "companies": {
     "eyebrow": "Industrial company index / Liaoning",
-    "description": "Filter the live company directory, preview a record in context, then open its verified profile.",
-    "loading": "Loading the company directory",
+    "description": "Filter verified enterprise code records, preview a company in context, then open its verified profile.",
+    "loading": "Loading enterprise code",
     "missing": "Not provided",
+    "registeredCapitalValue": "{{value}} × CNY 10,000",
     "resultCount": "{{count}} company records",
     "filters": {
       "keywordLabel": "Company name",
       "keywordPlaceholder": "Enter a company name",
       "industryLabel": "Industry",
-      "industryPlaceholder": "Enter an industry",
+      "industryPlaceholder": "Sektör seçin",
+      "industryOption": "{{industry}} ({{count}} şirket)",
       "provinceLabel": "Province",
       "provincePlaceholder": "Enter a province",
       "cityLabel": "City",
       "cityPlaceholder": "Enter a city",
+      "optionsLoading": "Loading database options",
+      "optionsError": "Options could not be loaded. Reselect the parent filter.",
+      "optionsEmpty": "No options available",
       "districtLabel": "District",
       "districtPlaceholder": "Enter a district",
       "memberLevelLabel": "Member level",
@@ -390,7 +449,7 @@
     "actions": {
       "search": "Search companies",
       "reset": "Reset filters",
-      "viewDetails": "View details",
+      "viewDetails": "Daha fazla",
       "closeQuickView": "Close company preview"
     },
     "columns": {
@@ -425,14 +484,14 @@
       "description": "Reset one or more filters and search again."
     },
     "error": {
-      "title": "The company directory could not be loaded",
+      "title": "Enterprise code could not be loaded",
       "description": "The enterprise service did not return a valid company page. Try again."
     }
   },
   "companyDetail": {
     "eyebrow": "Verified company record",
     "profileEyebrow": "Company profile",
-    "backToList": "Back to company directory",
+    "backToList": "Back to enterprise code",
     "loading": "Loading the company profile",
     "logoAlt": "{{name}} logo",
     "logoUnavailable": "Company logo unavailable",
@@ -446,6 +505,7 @@
     },
     "fields": {
       "legalRepresentative": "Legal representative",
+      "registeredCapital": "Registered capital",
       "companyType": "Company type",
       "establishedAt": "Established",
       "unifiedSocialCreditCode": "Unified social credit code",
@@ -461,7 +521,7 @@
     "productsEmpty": "No products were returned for this company.",
     "invalid": {
       "title": "This company link is invalid",
-      "description": "Return to the company directory and choose a valid record."
+      "description": "Return to enterprise code and choose a valid record."
     },
     "error": {
       "title": "The company profile could not be loaded",
@@ -470,8 +530,8 @@
   },
   "products": {
     "eyebrow": "Industrial product index / Liaoning",
-    "description": "Search live enterprise products, preview industrial capability in context, then open the verified record.",
-    "loading": "Loading the product directory",
+    "description": "Search verified featured products, preview industrial capability in context, then open the full record.",
+    "loading": "Loading featured products",
     "missing": "Not provided",
     "resultCount": "{{count}} product records",
     "cardLabel": "Product {{name}}",
@@ -518,14 +578,14 @@
       "description": "Reset one or more filters and search again."
     },
     "error": {
-      "title": "The product directory could not be loaded",
+      "title": "Featured products could not be loaded",
       "description": "The enterprise service did not return a valid product page. Try again."
     }
   },
   "productDetail": {
     "eyebrow": "Verified product record",
     "profileEyebrow": "Product profile",
-    "backToList": "Back to product directory",
+    "backToList": "Back to featured products",
     "loading": "Loading the product profile",
     "contactPermissionNote": "The phone is masked at the trusted desktop boundary using the H5 policy. Dialing and access unlocking are not available.",
     "sections": {
@@ -535,7 +595,7 @@
     },
     "invalid": {
       "title": "This product link is invalid",
-      "description": "Return to the product directory and choose a valid record."
+      "description": "Return to featured products and choose a valid record."
     },
     "error": {
       "title": "The product profile could not be loaded",
@@ -568,7 +628,10 @@
       "minInvestmentLabel": "Minimum investment",
       "minInvestmentPlaceholder": "Minimum, ten-thousand yuan",
       "maxInvestmentLabel": "Maximum investment",
-      "maxInvestmentPlaceholder": "Maximum, ten-thousand yuan"
+      "maxInvestmentPlaceholder": "Maximum, ten-thousand yuan",
+      "optionsLoading": "Loading database options",
+      "optionsError": "Failed to load options. Please retry.",
+      "optionsEmpty": "No options available"
     },
     "actions": {
       "search": "Search projects",
@@ -595,6 +658,8 @@
       "eyebrow": "Live project signal / 01",
       "title": "Project opportunity overview",
       "updatedAt": "Data updated {{date}}",
+      "expand": "Expand overview",
+      "collapse": "Collapse overview",
       "metrics": {
         "projects": "Projects",
         "categoryL1": "Primary categories",

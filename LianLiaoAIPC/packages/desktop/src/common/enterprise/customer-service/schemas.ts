@@ -378,7 +378,14 @@ export const customerServiceServerEnvelopeSchema = z.discriminatedUnion('event',
       })
       .strict()
   ),
-  serverEnvelope('pong', z.object({}).strict()),
+  serverEnvelope(
+    'pong',
+    z
+      .object({
+        connectionId: z.string().min(1).max(128),
+      })
+      .strict()
+  ),
   serverEnvelope(
     'error',
     z

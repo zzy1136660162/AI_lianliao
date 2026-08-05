@@ -47,8 +47,8 @@ describe('enterprise catalog visual contract', () => {
     expect(productCardHoverRule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-hover\)/);
   });
 
-  it('styles the company catalog only through the scoped Ant Design prefix', () => {
-    expect(companyCss).toContain('.ll-ant-table');
+  it('keeps the company catalog on its dense card layout without legacy Arco selectors', () => {
+    expect(companyCss).toContain('.catalogRow');
     expect(companyCss).not.toMatch(/\.arco-/);
   });
 

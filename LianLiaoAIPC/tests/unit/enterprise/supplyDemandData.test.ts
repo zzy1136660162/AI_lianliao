@@ -195,10 +195,10 @@ describe('supply-demand publish metadata', () => {
 
   it('uses the dictionary-configured separator when serializing multiple H5 option values', () => {
     expect(
-      serializePublishFieldValue(
-        { ...conditionalField, inputType: 'MULTISELECT', valueSeparator: '、' },
-        ['纸制品', '木制品']
-      )
+      serializePublishFieldValue({ ...conditionalField, inputType: 'MULTISELECT', valueSeparator: '、' }, [
+        '纸制品',
+        '木制品',
+      ])
     ).toBe('纸制品、木制品');
   });
 

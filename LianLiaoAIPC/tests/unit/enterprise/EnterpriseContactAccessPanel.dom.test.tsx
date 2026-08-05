@@ -7,7 +7,7 @@ import type { EnterpriseResponse } from '@/common/enterprise/contracts';
 import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
 import EnterpriseContactAccessPanel from '@/renderer/pages/enterprise/contact/EnterpriseContactAccessPanel';
 import { buildTelephoneUrl } from '@/renderer/pages/enterprise/contact/contactActions';
-import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import { EnterpriseRendererError, type EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 const createClient = (request: EnterpriseClient['request']): Pick<EnterpriseClient, 'request'> => ({ request });
 
@@ -30,7 +30,7 @@ describe('EnterpriseContactAccessPanel', () => {
         allowed: true,
         errType: 0,
         message: '',
-        actionUrl: '',
+        action: 'NONE',
         phone: '13800000000',
       },
     } satisfies Extract<EnterpriseResponse, { operation: 'contact.acquire' }>);
@@ -67,7 +67,7 @@ describe('EnterpriseContactAccessPanel', () => {
         allowed: false,
         errType: 5,
         message: '请升级会员后查看',
-        actionUrl: '',
+        action: 'UPGRADE',
       },
     } satisfies Extract<EnterpriseResponse, { operation: 'contact.acquire' }>);
     const user = userEvent.setup();
@@ -88,5 +88,25 @@ describe('EnterpriseContactAccessPanel', () => {
     expect(screen.getAllByText('请升级会员后查看')).toHaveLength(2);
     expect(screen.getByText('支付完成后可在本页面刷新会员权限，无需重新登录。')).toBeInTheDocument();
     await waitFor(() => expect(document.querySelector('svg')).not.toBeNull());
+  });
+
+  it('reports an unavailable cloud contact route as a service failure instead of a permission denial', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockRejectedValue(new EnterpriseRendererError('HTTP'));
+    const user = userEvent.setup();
+
+    render(
+      <EnterpriseAntdProvider>
+        <EnterpriseContactAccessPanel
+          client={createClient(request)}
+          resourceType='PRODUCT'
+          resourceId='521634568053'
+          maskedPhone='185********'
+        />
+      </EnterpriseAntdProvider>
+    );
+
+    await user.click(screen.getByRole('button', { name: '获取联系方式' }));
+    expect(await screen.findByText('联系方式服务暂不可用，请稍后重试。')).toBeVisible();
+    expect(screen.queryByText('联系方式权限校验失败，请稍后重试。')).toBeNull();
   });
 });

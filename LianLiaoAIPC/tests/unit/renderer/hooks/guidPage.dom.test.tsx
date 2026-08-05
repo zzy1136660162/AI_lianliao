@@ -327,14 +327,10 @@ describe('GuidPage', () => {
     expect(screen.queryByLabelText('common.back')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Assistant Details')).not.toBeInTheDocument();
     expect(screen.getByText('conversation.welcome.title')).toBeInTheDocument();
-    expect(screen.getByTestId('assistant-selection-area')).toBeInTheDocument();
-    const latestAssistantSelectionAreaProps = capturedAssistantSelectionAreaProps.at(-1);
+    expect(screen.queryByTestId('assistant-selection-area')).not.toBeInTheDocument();
     const latestGuidActionRowProps = capturedGuidActionRowProps.at(-1);
     const latestGuidInputCardProps = capturedGuidInputCardProps.at(-1);
 
-    expect(capturedAssistantSelectionAreaProps.length).toBeGreaterThan(0);
-    expect(latestAssistantSelectionAreaProps).not.toHaveProperty('is_presetAgent');
-    expect(latestAssistantSelectionAreaProps).not.toHaveProperty('selectedAgentInfo');
     expect(capturedGuidActionRowProps.length).toBeGreaterThan(0);
     expect(latestGuidActionRowProps).not.toHaveProperty('hidePresetTag');
     expect(latestGuidActionRowProps).not.toHaveProperty('is_presetAgent');

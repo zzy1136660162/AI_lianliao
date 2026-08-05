@@ -3,8 +3,16 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const css = readFileSync(resolve('packages/desktop/src/renderer/pages/enterprise/layout/enterprise-shell.css'), 'utf8');
+const windowChromeCss = readFileSync(
+  resolve('packages/desktop/src/renderer/pages/enterprise/layout/enterprise-window-chrome.css'),
+  'utf8'
+);
 const projectCss = readFileSync(
   resolve('packages/desktop/src/renderer/pages/enterprise/projects/project-workspace.module.css'),
+  'utf8'
+);
+const catalogAssistantCss = readFileSync(
+  resolve('packages/desktop/src/renderer/pages/enterprise/layout/catalog/assistant/catalog-ai-assistant.module.css'),
   'utf8'
 );
 const compactStart = css.indexOf('@media (max-width: 780px)');
@@ -12,6 +20,24 @@ const compactEnd = css.indexOf('@media (prefers-reduced-motion: reduce)');
 const compactCss = css.slice(compactStart, compactEnd);
 
 describe('enterprise desktop shell CSS contract', () => {
+  it('uses stable semantic cursors instead of Chromium auto cursor inference', () => {
+    const shellRule = css.match(/\.enterprise-shell\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const windowChromeRule = windowChromeCss.match(/\.enterprise-window-chrome\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const pointerRule =
+      css.match(
+        /\.enterprise-shell\s+:where\(a\[href\],\s*button:not\(:disabled\),\s*\[role='button'\]:not\(\[aria-disabled='true'\]\),\s*\[role='link'\]\)\s*\{([^}]*)\}/s
+      )?.[1] ?? '';
+    const textRule =
+      css.match(
+        /\.enterprise-shell\s+:where\(\s*input:not\(\[type\]\),[\s\S]*?\[contenteditable='true'\]\s*\)\s*\{([^}]*)\}/s
+      )?.[1] ?? '';
+
+    expect(shellRule).toMatch(/cursor:\s*default/);
+    expect(windowChromeRule).toMatch(/cursor:\s*default/);
+    expect(pointerRule).toMatch(/cursor:\s*pointer/);
+    expect(textRule).toMatch(/cursor:\s*text/);
+  });
+
   it('keeps project loading, empty, and error cards at the full workspace width', () => {
     const stateRule =
       projectCss.match(/\.workspace\s*>\s*:global\(\.enterprise-page-state\)[^{]*\{([^}]*)\}/s)?.[1] ?? '';
@@ -38,10 +64,14 @@ describe('enterprise desktop shell CSS contract', () => {
 
   it('keeps navigation and assistant content independently scrollable in short windows', () => {
     const navigationRule = css.match(/\.enterprise-sider__navigation\s*\{([^}]*)\}/s)?.[1] ?? '';
-    const assistantRule = css.match(/\.enterprise-assistant\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const assistantShellRule = css.match(/\.enterprise-assistant\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const assistantPlaceholderRule = css.match(/\.enterprise-assistant__placeholder\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const catalogAssistantContentRule = catalogAssistantCss.match(/\.content\s*\{([^}]*)\}/s)?.[1] ?? '';
 
     expect(navigationRule).toMatch(/overflow-y:\s*auto/);
-    expect(assistantRule).toMatch(/overflow-y:\s*auto/);
+    expect(assistantShellRule).toMatch(/overflow:\s*hidden/);
+    expect(assistantPlaceholderRule).toMatch(/overflow-y:\s*auto/);
+    expect(catalogAssistantContentRule).toMatch(/overflow-y:\s*auto/);
   });
 
   it('presents navigation groups as separated card surfaces', () => {

@@ -13,6 +13,7 @@
  */
 
 import { ipcBridge } from '@/common';
+import { normalizeLanguageCode } from '@/common/config/i18n';
 import { getPlatformServices } from '@/common/platform';
 import { ProcessConfig } from '@process/utils/initStorage';
 import { changeLanguage } from '@process/services/i18n';
@@ -25,6 +26,20 @@ let _keepAwakeBlockerId: number | null = null;
 
 type LanguageChangeListener = () => void;
 let _languageChangeListener: LanguageChangeListener | null = null;
+
+export type LanguageSyncRuntime = {
+  persist: (language: string) => Promise<unknown>;
+  broadcast: (language: string) => void;
+  switchLanguage: (language: string) => Promise<void>;
+  refreshTray: () => void;
+};
+
+const languageSyncRuntime: LanguageSyncRuntime = {
+  persist: (language) => ProcessConfig.set('language', language),
+  broadcast: (language) => ipcBridge.systemSettings.languageChanged.emit({ language }),
+  switchLanguage: changeLanguage,
+  refreshTray: () => _languageChangeListener?.(),
+};
 
 const CLOSE_TO_TRAY_DEFAULT_FLAG = 'system.closeToTrayDefaultV1Applied' as const;
 
@@ -89,6 +104,21 @@ export function onLanguageChanged(listener: LanguageChangeListener): void {
   _languageChangeListener = listener;
 }
 
+/**
+ * Keeps the main-process language and tray menu aligned with the renderer.
+ * The tray refresh runs only after i18next has applied the normalized locale.
+ */
+export async function syncMainProcessLanguage(
+  language: string,
+  runtime: LanguageSyncRuntime = languageSyncRuntime
+): Promise<void> {
+  const normalizedLanguage = normalizeLanguageCode(language);
+  await runtime.persist(normalizedLanguage);
+  runtime.broadcast(normalizedLanguage);
+  await runtime.switchLanguage(normalizedLanguage);
+  runtime.refreshTray();
+}
+
 export function initSystemSettingsBridge(): void {
   ipcBridge.systemSettings.getCloseToTray.provider(async () => readCloseToTraySetting());
 
@@ -113,15 +143,7 @@ export function initSystemSettingsBridge(): void {
   // 语言变更通知，同步主进程 i18n 并通知托盘重建
   // Language change notification, sync main process i18n and notify tray rebuild
   ipcBridge.systemSettings.changeLanguage.provider(async ({ language }) => {
-    // Broadcast to all renderers FIRST (desktop + WebUI) for real-time sync.
-    // This must happen before the potentially slow main-process i18n switch.
-    ipcBridge.systemSettings.languageChanged.emit({ language });
-    _languageChangeListener?.();
-
-    // Update main process i18n (non-blocking – don't let a hang here block the provider)
-    changeLanguage(language).catch((error) => {
-      console.error('[SystemSettings] Main process changeLanguage failed:', error);
-    });
+    await syncMainProcessLanguage(language);
   });
 
   // Restore keep-awake state on startup

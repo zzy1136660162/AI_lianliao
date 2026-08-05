@@ -1,3 +1,7 @@
+import { installCurrentRendererCopyProtection } from '../utils/ui/copyProtection';
+
+installCurrentRendererCopyProtection();
+
 const DRAG_THRESHOLD = 3;
 const CLICK_WINDOW = 400;
 const STARTUP_DELAY = 500;

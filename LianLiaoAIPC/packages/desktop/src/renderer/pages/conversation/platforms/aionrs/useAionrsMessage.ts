@@ -56,6 +56,11 @@ export const useAionrsMessage = (
   // Only reset waitingResponse when finish arrives after content (not after tool calls)
   const hasContentInTurnRef = useRef(false);
 
+  // A terminal event is authoritative for the current turn. Some transports can
+  // deliver persisted content or tool snapshots after finish; those messages may
+  // still update the transcript, but must not reopen the processing indicator.
+  const turnFinishedRef = useRef(false);
+
   useEffect(() => {
     onConfigChangedRef.current = onConfigChanged;
   }, [onConfigChanged]);
@@ -65,6 +70,9 @@ export const useAionrsMessage = (
   useEffect(() => {
     streamRunningRef.current = streamRunning;
   }, [streamRunning]);
+  useEffect(() => {
+    waitingResponseRef.current = waitingResponse;
+  }, [waitingResponse]);
 
   // Throttle thought updates to reduce render frequency
   const thoughtThrottleRef = useRef<{
@@ -184,6 +192,7 @@ export const useAionrsMessage = (
       }
 
       if (isErrorTipMessage(message)) {
+        turnFinishedRef.current = true;
         setStreamRunning(false);
         streamRunningRef.current = false;
         setWaitingResponse(false);
@@ -227,14 +236,17 @@ export const useAionrsMessage = (
 
       switch (message.type) {
         case 'thought':
-          // Auto-recover streamRunning if thought arrives after finish
-          if (!streamRunningRef.current) {
+          if (!streamRunningRef.current && !turnFinishedRef.current) {
             setStreamRunning(true);
             streamRunningRef.current = true;
           }
           throttledSetThought(message.data as ThoughtData);
           break;
         case 'start':
+          turnFinishedRef.current = false;
+          hasContentInTurnRef.current = false;
+          setHasActiveTools(false);
+          hasActiveToolsRef.current = false;
           setStreamRunning(true);
           streamRunningRef.current = true;
           // Don't reset waitingResponse here - let tool completion flow handle it
@@ -242,6 +254,7 @@ export const useAionrsMessage = (
         case 'finish':
           {
             logStreamTerminalObserved(conversation_id, message.turn_id, 'aionrs', message.type);
+            turnFinishedRef.current = true;
             // aionrs stream_end carries usage in data field
             const usageData = message.data as TokenUsage | undefined;
             if (usageData && typeof usageData === 'object' && 'input_tokens' in usageData) {
@@ -258,8 +271,13 @@ export const useAionrsMessage = (
               });
             }
             setStreamRunning(false);
+            streamRunningRef.current = false;
             setWaitingResponse(false);
+            waitingResponseRef.current = false;
+            setHasActiveTools(false);
+            hasActiveToolsRef.current = false;
             setThought({ subject: '', description: '' });
+            hasContentInTurnRef.current = false;
             if (message.msg_id) {
               void processCompletedAssistantMessage(message.msg_id);
             }
@@ -267,10 +285,14 @@ export const useAionrsMessage = (
           break;
         case 'tool_group':
           {
+            if (turnFinishedRef.current) {
+              mergeLiveMessage(transformMessage(message));
+              break;
+            }
+
             // Mark that current turn has content output
             hasContentInTurnRef.current = true;
 
-            // Auto-recover streamRunning if tool_group arrives after finish
             if (!streamRunningRef.current) {
               setStreamRunning(true);
               streamRunningRef.current = true;
@@ -318,7 +340,7 @@ export const useAionrsMessage = (
           break;
         case 'permission':
         case 'acp_permission':
-          if (!streamRunningRef.current) {
+          if (!streamRunningRef.current && !turnFinishedRef.current) {
             setStreamRunning(true);
             streamRunningRef.current = true;
           }
@@ -333,11 +355,15 @@ export const useAionrsMessage = (
         default: {
           if (message.type === 'error') {
             logStreamTerminalObserved(conversation_id, message.turn_id, 'aionrs', message.type);
+            turnFinishedRef.current = true;
             setStreamRunning(false);
             streamRunningRef.current = false;
             setWaitingResponse(false);
             waitingResponseRef.current = false;
+            setHasActiveTools(false);
+            hasActiveToolsRef.current = false;
             setThought({ subject: '', description: '' });
+            hasContentInTurnRef.current = false;
             onError?.(message as IResponseMessage);
           } else {
             // Mark that current turn has content output (exclude error type)
@@ -347,8 +373,7 @@ export const useAionrsMessage = (
               setWaitingResponse(false);
               waitingResponseRef.current = false;
             }
-            // Auto-recover streamRunning if content arrives after finish
-            if (!streamRunningRef.current) {
+            if (!streamRunningRef.current && !turnFinishedRef.current) {
               setStreamRunning(true);
               streamRunningRef.current = true;
             }
@@ -368,6 +393,7 @@ export const useAionrsMessage = (
     setThought({ subject: '', description: '' });
     setTokenUsage(null);
     hasContentInTurnRef.current = false;
+    turnFinishedRef.current = true;
     setHasHydratedRunningState(false);
 
     // Check actual conversation status from backend before resetting all running states
@@ -388,6 +414,7 @@ export const useAionrsMessage = (
         return;
       }
       const isRunning = isConversationProcessing(res);
+      turnFinishedRef.current = !isRunning;
       setStreamRunning(isRunning);
       streamRunningRef.current = isRunning;
       // Reset tool states - they will be restored by incoming messages if still active
@@ -411,6 +438,7 @@ export const useAionrsMessage = (
   }, [conversation_id]);
 
   const resetState = useCallback(() => {
+    turnFinishedRef.current = true;
     setWaitingResponse(false);
     waitingResponseRef.current = false;
     setStreamRunning(false);

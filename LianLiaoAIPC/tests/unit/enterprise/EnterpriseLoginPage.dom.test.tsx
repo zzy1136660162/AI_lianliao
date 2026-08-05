@@ -9,6 +9,15 @@ import EnterpriseLoginPage, { ENTERPRISE_ERROR_I18N_KEYS } from '@/renderer/page
 import EnterpriseRegistrationPanel from '@/renderer/pages/enterprise/login/EnterpriseRegistrationPanel';
 
 const translations: Record<string, string> = {
+  'enterprise.brand.logoAlt': '链上辽宁·产业云城',
+  'enterprise.brand.eyebrow': '辽宁产业资源连接平台',
+  'enterprise.brand.title': '让辽宁企业，更快找到订单、伙伴与增长机会',
+  'enterprise.brand.description': '连接企业、产品、项目与供需资源，让每一次扫码都通向真实产业机会。',
+  'enterprise.brand.security': '微信扫码登录 · 企业身份识别 · 数据仅用于业务服务',
+  'enterprise.brand.capabilities.companyCode': '企业码',
+  'enterprise.brand.capabilities.keyProducts': '重点产品',
+  'enterprise.brand.capabilities.projects': '在建项目',
+  'enterprise.brand.capabilities.demand': '供需对接',
   'enterprise.login.qrAlt': '企业码微信登录二维码',
   'enterprise.login.scanTitle': '请使用微信扫码登录',
   'enterprise.login.autoChecking': '正在自动检测登录状态',
@@ -81,6 +90,23 @@ describe('EnterpriseLoginPage', () => {
     expect(screen.getByTestId('shared-window-controls')).toBeVisible();
   });
 
+  it('presents the Chain Liaoning brand and industrial capabilities before sign-in', () => {
+    render(<EnterpriseLoginPage />);
+
+    const logo = screen.getByRole('img', { name: translations['enterprise.brand.logoAlt'] });
+    expect(logo.getAttribute('src')).toContain('lianliao-logo');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(translations['enterprise.brand.title']);
+    expect(screen.getByText(translations['enterprise.brand.description'])).toBeVisible();
+    expect(
+      [
+        'enterprise.brand.capabilities.companyCode',
+        'enterprise.brand.capabilities.keyProducts',
+        'enterprise.brand.capabilities.projects',
+        'enterprise.brand.capabilities.demand',
+      ].map((key) => screen.getByText(translations[key]))
+    ).toHaveLength(4);
+  });
+
   it('renders the main-process QR image, accessible countdown, and automatic status', () => {
     auth = makeAuth({
       status: 'waiting',
@@ -129,7 +155,7 @@ describe('EnterpriseLoginPage', () => {
     });
     render(<EnterpriseLoginPage />);
 
-    fireEvent.error(screen.getByRole('img'));
+    fireEvent.error(screen.getByRole('img', { name: translations['enterprise.login.qrAlt'] }));
     expect(screen.getByText(translations['enterprise.login.imageError'])).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: translations['enterprise.actions.retry'] }));
     expect(startLogin).toHaveBeenCalledTimes(1);

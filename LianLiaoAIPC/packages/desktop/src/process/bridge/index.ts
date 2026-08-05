@@ -16,11 +16,13 @@ import {
   initCustomerConsultationBridge,
   initCustomerServiceBridge,
   initDesktopNotificationBridge,
+  initDesktopManagedAiModelBridge,
   initDesktopVersionBridge,
   initEnterpriseBridge,
   type CustomerConsultationBridgeDependencies,
   type CustomerServiceBridgeDependencies,
   type DesktopNotificationBridgeDependencies,
+  type DesktopManagedAiModelBridgeDependencies,
   type DesktopVersionBridgeDependencies,
   type EnterpriseBridgeDependencies,
 } from './enterpriseBridge';
@@ -29,6 +31,7 @@ export type BridgeDependencies = {
   customerConsultation?: CustomerConsultationBridgeDependencies;
   customerService?: CustomerServiceBridgeDependencies;
   desktopNotification?: DesktopNotificationBridgeDependencies;
+  desktopManagedAiModel?: DesktopManagedAiModelBridgeDependencies;
   desktopVersion?: DesktopVersionBridgeDependencies;
   enterprise?: EnterpriseBridgeDependencies;
 };
@@ -46,6 +49,7 @@ export function initAllBridges(deps: BridgeDependencies = {}): void {
   initCustomerServiceBridge(deps.customerService);
   initCustomerConsultationBridge(deps.customerConsultation);
   initDesktopNotificationBridge(deps.desktopNotification);
+  initDesktopManagedAiModelBridge(deps.desktopManagedAiModel);
   initDesktopVersionBridge(deps.desktopVersion);
 }
 
@@ -61,6 +65,7 @@ export {
   initCustomerConsultationBridge,
   initCustomerServiceBridge,
   initDesktopNotificationBridge,
+  initDesktopManagedAiModelBridge,
   initDesktopVersionBridge,
   initEnterpriseBridge,
 };

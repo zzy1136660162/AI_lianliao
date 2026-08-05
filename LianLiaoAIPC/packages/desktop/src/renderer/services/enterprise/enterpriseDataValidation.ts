@@ -9,7 +9,36 @@ export type EnterpriseDataFieldRule = readonly [
   nonEmpty?: true,
 ];
 
-const ENTERPRISE_IMAGE_HOSTS = new Set(['cloud.lslnii.com', 'sjbang.lslnii.com', 'www.lslnii.com']);
+const ENTERPRISE_IMAGE_HOSTS = new Set(['cloud.lslnii.com', 'img.lslnii.com', 'sjbang.lslnii.com', 'www.lslnii.com']);
+
+const LEGACY_ENTERPRISE_IMAGE_REWRITES: ReadonlyArray<readonly [RegExp, string]> = [
+  [/^http:\/\/www\.gytaobao\.cn:9328\/\/upload\/NFSImgFile\/appl\//i, 'https://www.lslnii.com/upload/NFSImgFile/appl/'],
+  [/^http:\/\/www\.gytaobao\.cn:9328\/upload\/NFSImgFile\/appl\//i, 'https://www.lslnii.com/upload/NFSImgFile/appl/'],
+  [/^http:\/\/www\.gytaobao\.cn:9428\/\/img_file\//i, 'https://www.lslnii.com/upload/NFSImgFile/appl/img_file/'],
+  [/^http:\/\/video\.gytaobao\.cn\/upload\/NFSImgFile\/appl/i, 'https://www.lslnii.com/upload/NFSImgFile/appl'],
+  [
+    /^http:\/\/sjbang\.lslnii\.com\/\/upload\/Ckeditor\/Image/i,
+    'https://www.lslnii.com/upload/NFSImgFile/appl/img_file/Ckeditor/Image',
+  ],
+  [/^http:\/\/sjbang\.lslnii\.com\/\/img_file/i, 'https://www.lslnii.com/upload/NFSImgFile/appl/img_file'],
+];
+
+const rewriteLegacyEnterpriseImageUrl = (value: string): string | null => {
+  let candidate = value;
+  for (const [pattern, replacement] of LEGACY_ENTERPRISE_IMAGE_REWRITES) {
+    if (pattern.test(candidate)) return candidate.replace(pattern, replacement);
+  }
+
+  if (candidate.startsWith('//')) return `https:${candidate}`;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(candidate)) {
+    try {
+      return new URL(candidate, 'https://img.lslnii.com/').toString();
+    } catch {
+      return null;
+    }
+  }
+  return candidate;
+};
 
 const isNonNegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -85,6 +114,9 @@ const parsePlainDataArray = <T>(value: unknown, parseItem: (item: unknown) => T 
   }
 };
 
+/** Parses a plain JSON array with descriptor checks for nested enterprise summaries. */
+export const parsePlainEnterpriseDataArray = parsePlainDataArray;
+
 export const parseEnterprisePage = <T>(
   value: unknown,
   parseItem: (item: unknown) => T | null,
@@ -131,9 +163,14 @@ export const isNumericEnterpriseId = (value: string | undefined): value is strin
 export const parseSafeEnterpriseImageUrl = (value: string | undefined): string | null => {
   const trimmedValue = value?.trim();
   if (!trimmedValue) return null;
+  const rewrittenValue = rewriteLegacyEnterpriseImageUrl(trimmedValue);
+  if (!rewrittenValue) return null;
 
   try {
-    const parsedUrl = new URL(trimmedValue.startsWith('//') ? `https:${trimmedValue}` : trimmedValue);
+    const parsedUrl = new URL(rewrittenValue);
+    if (parsedUrl.protocol === 'http:' && ENTERPRISE_IMAGE_HOSTS.has(parsedUrl.hostname)) {
+      parsedUrl.protocol = 'https:';
+    }
     if (
       parsedUrl.protocol !== 'https:' ||
       parsedUrl.port !== '' ||

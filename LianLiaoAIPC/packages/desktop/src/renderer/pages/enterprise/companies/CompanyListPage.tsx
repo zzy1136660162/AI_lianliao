@@ -1,10 +1,14 @@
 import { Refresh, Search } from '@icon-park/react';
-import { Button, Form, Input, Select, Table, type TableColumnsType } from 'antd';
+import { Button, Form, Input, Select } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 
-import type { CompanyListQuery, EnterpriseCompanySummary } from '@/common/enterprise/contracts';
+import type {
+  CompanyListQuery,
+  EnterpriseCompanySummary,
+  EnterpriseProductSummary,
+} from '@/common/enterprise/contracts';
 import {
   CatalogFilterCard,
   CatalogPagination,
@@ -16,14 +20,16 @@ import {
   readCatalogReturnState,
   restoreEnterpriseCatalogScroll,
 } from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
+import LiaoningAreaFields, {
+  normalizeLiaoningAreaValue,
+} from '@/renderer/pages/enterprise/layout/catalog/LiaoningAreaFields';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
-import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
-import CompanyQuickView from './CompanyQuickView';
-import { COMPANY_LEVEL_FILTERS, COMPANY_VIP_FILTER_VALUE, type CompanyFilters, useCompanyCatalog } from './companyData';
+import CompanyCatalogRow from './CompanyCatalogRow';
+import { type CompanyFilters, useCompanyCatalog, useCompanyIndustryOptions } from './companyData';
 import styles from './company-catalog.module.css';
 
 export type CompanyListPageProps = {
@@ -31,15 +37,20 @@ export type CompanyListPageProps = {
 };
 
 const companyDetailPath = (companyId: string): string => `/enterprise/companies/${encodeURIComponent(companyId)}`;
+const productDetailPath = (productId: string): string => `/enterprise/products/${encodeURIComponent(productId)}`;
 
-const companyFiltersFromQuery = (query: CompanyListQuery): CompanyFilters => ({
+type CompanySearchFilters = Pick<CompanyFilters, 'keyword' | 'industry' | 'city' | 'district'>;
+
+const companyFiltersFromQuery = (query: CompanyListQuery): CompanySearchFilters => ({
   keyword: query.keyword,
   industry: query.industry,
-  province: query.province,
-  city: query.city,
-  district: query.district,
-  companyLevel: query.companyLevel,
-  vip: query.vip,
+  ...normalizeLiaoningAreaValue(query.city, query.district),
+});
+
+const normalizeCompanyListQuery = (query: CompanyListQuery): CompanyListQuery => ({
+  pageNum: query.pageNum,
+  pageSize: query.pageSize,
+  ...companyFiltersFromQuery(query),
 });
 
 const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseClient }) => {
@@ -47,15 +58,28 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
   const location = useLocation();
   const navigate = useNavigate();
   const restoredReturn = useMemo(() => readCatalogReturnState(location.state, 'companies'), [location.state]);
-  const initialQueryRef = useRef<CompanyListQuery>(restoredReturn?.query ?? { pageNum: 1, pageSize: 20 });
+  const initialQueryRef = useRef<CompanyListQuery>(
+    normalizeCompanyListQuery(restoredReturn?.query ?? { pageNum: 1, pageSize: 20 })
+  );
   const catalog = useCompanyCatalog(client, initialQueryRef.current);
-  const [draftFilters, setDraftFilters] = useState<CompanyFilters>(() =>
+  const industryOptions = useCompanyIndustryOptions(client);
+  const [draftFilters, setDraftFilters] = useState<CompanySearchFilters>(() =>
     companyFiltersFromQuery(initialQueryRef.current)
   );
   const [selectedCompany, setSelectedCompany] = useState<EnterpriseCompanySummary | null>(null);
   const restoredRef = useRef(false);
   const { targetRef, scrollToTarget } = useEnterprisePaginationScroll<HTMLDivElement>();
-  const missing = t('enterprise.companies.missing');
+  const industrySelectOptions = useMemo(() => {
+    const options = industryOptions.data.map(({ industry, companyCount }) => ({
+      value: industry,
+      label: t('enterprise.companies.filters.industryOption', { industry, count: companyCount }),
+    }));
+    const selectedIndustry = draftFilters.industry;
+    if (selectedIndustry && !options.some((option) => option.value === selectedIndustry)) {
+      options.unshift({ value: selectedIndustry, label: selectedIndustry });
+    }
+    return options;
+  }, [draftFilters.industry, industryOptions.data, t]);
 
   useEffect(() => {
     if (!catalog.data || restoredRef.current) return;
@@ -78,67 +102,12 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
     });
   };
 
-  const columns = useMemo<TableColumnsType<EnterpriseCompanySummary>>(
-    () => [
-      {
-        title: t('enterprise.companies.columns.name'),
-        dataIndex: 'name',
-        width: 210,
-        render: (_value, company) => (
-          <div className={styles.companyNameCell}>
-            <strong>{company.name}</strong>
-            <span>{company.shortName || missing}</span>
-          </div>
-        ),
-      },
-      {
-        title: t('enterprise.companies.columns.industry'),
-        dataIndex: 'industry',
-        width: 150,
-        render: (value) => value || missing,
-      },
-      {
-        title: t('enterprise.companies.columns.region'),
-        width: 180,
-        render: (_value, company) =>
-          [company.province, company.city, company.district].filter(Boolean).join(' / ') || missing,
-      },
-      {
-        title: t('enterprise.companies.columns.memberLevel'),
-        dataIndex: 'companyLevel',
-        width: 120,
-        render: (value) => <CompanyMembershipBadge level={typeof value === 'number' ? value : undefined} compact />,
-      },
-      {
-        title: t('enterprise.companies.columns.businessSummary'),
-        dataIndex: 'businessSummary',
-        width: 240,
-        ellipsis: true,
-        render: (value) => value || missing,
-      },
-      {
-        title: t('enterprise.companies.columns.actions'),
-        width: 116,
-        fixed: 'right',
-        render: (_value, company) => (
-          <Button
-            type='text'
-            size='small'
-            onClick={(event) => {
-              event.stopPropagation();
-              viewDetails(company);
-            }}
-          >
-            {t('enterprise.companies.actions.viewDetails')}
-          </Button>
-        ),
-      },
-    ],
-    [missing, t]
-  );
+  const viewProduct = (product: EnterpriseProductSummary) => {
+    navigate(productDetailPath(product.productId));
+  };
 
   const resetFilters = () => {
-    const emptyFilters: CompanyFilters = {};
+    const emptyFilters: CompanySearchFilters = {};
     setDraftFilters(emptyFilters);
     setSelectedCompany(null);
     catalog.applyFilters(emptyFilters);
@@ -182,32 +151,28 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
     }
 
     return (
-      <div className={selectedCompany ? styles.catalogGridWithPreview : styles.catalogGrid}>
-        <div ref={targetRef} className={styles.tablePanel}>
-          <Table<EnterpriseCompanySummary>
-            rowKey='companyId'
-            columns={columns}
-            dataSource={catalog.data.list}
-            pagination={false}
-            loading={catalog.isLoading && catalog.isRetainingData}
-            scroll={{ x: 1016 }}
-            rowClassName={(company) => (company.companyId === selectedCompany?.companyId ? styles.selectedRow : '')}
-            onRow={(company) => ({
-              tabIndex: 0,
-              'aria-selected': company.companyId === selectedCompany?.companyId,
-              onClick: () => setSelectedCompany(company),
-              onDoubleClick: () => viewDetails(company),
-              onKeyDown: (event: React.KeyboardEvent<HTMLTableRowElement>) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  viewDetails(company);
-                } else if (event.key === ' ') {
-                  event.preventDefault();
-                  setSelectedCompany(company);
-                }
-              },
-            })}
-          />
+      <div className={styles.catalogGrid}>
+        <div ref={targetRef} className={styles.catalogListPanel}>
+          <div
+            className={[
+              styles.catalogList,
+              catalog.isLoading && catalog.isRetainingData ? styles.catalogListLoading : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            aria-busy={catalog.isLoading && catalog.isRetainingData}
+          >
+            {catalog.data.list.map((company) => (
+              <CompanyCatalogRow
+                key={company.companyId}
+                company={company}
+                selected={company.companyId === selectedCompany?.companyId}
+                onSelect={setSelectedCompany}
+                onViewDetails={viewDetails}
+                onViewProduct={viewProduct}
+              />
+            ))}
+          </div>
           <CatalogPagination
             current={catalog.query.pageNum}
             pageSize={catalog.query.pageSize}
@@ -216,13 +181,6 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             onChange={changePage}
           />
         </div>
-        {selectedCompany ? (
-          <CompanyQuickView
-            company={selectedCompany}
-            onClose={() => setSelectedCompany(null)}
-            onViewDetails={viewDetails}
-          />
-        ) : null}
       </div>
     );
   };
@@ -239,67 +197,26 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
           />
         </Form.Item>
         <Form.Item label={t('enterprise.companies.filters.industryLabel')}>
-          <Input
+          <Select
             value={draftFilters.industry}
             allowClear
+            showSearch
+            loading={industryOptions.isLoading}
+            optionFilterProp='label'
+            options={industrySelectOptions}
             placeholder={t('enterprise.companies.filters.industryPlaceholder')}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, industry: event.target.value }))}
+            onChange={(industry) => setDraftFilters((current) => ({ ...current, industry }))}
           />
         </Form.Item>
-        <Form.Item label={t('enterprise.companies.filters.provinceLabel')}>
-          <Input
-            value={draftFilters.province}
-            allowClear
-            placeholder={t('enterprise.companies.filters.provincePlaceholder')}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, province: event.target.value }))}
-          />
-        </Form.Item>
-        <Form.Item label={t('enterprise.companies.filters.cityLabel')}>
-          <Input
-            value={draftFilters.city}
-            allowClear
-            placeholder={t('enterprise.companies.filters.cityPlaceholder')}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, city: event.target.value }))}
-          />
-        </Form.Item>
-        <Form.Item label={t('enterprise.companies.filters.districtLabel')}>
-          <Input
-            value={draftFilters.district}
-            allowClear
-            placeholder={t('enterprise.companies.filters.districtPlaceholder')}
-            onChange={(event) => setDraftFilters((current) => ({ ...current, district: event.target.value }))}
-          />
-        </Form.Item>
-        <Form.Item label={t('enterprise.companies.filters.memberLevelLabel')}>
-          <Select
-            value={draftFilters.vip ? COMPANY_VIP_FILTER_VALUE : draftFilters.companyLevel}
-            allowClear
-            virtual={false}
-            placeholder={t('enterprise.companies.filters.memberLevelPlaceholder')}
-            options={[
-              {
-                value: COMPANY_VIP_FILTER_VALUE,
-                label: (
-                  <span className={styles.memberFilterOption}>
-                    <CompanyMembershipBadge level={1.2} compact />
-                    <span>{t('enterprise.companies.memberLevel.vipAggregate')}</span>
-                  </span>
-                ),
-              },
-              ...COMPANY_LEVEL_FILTERS.map((level) => ({
-                value: level,
-                label: <CompanyMembershipBadge level={level} compact />,
-              })),
-            ]}
-            onChange={(membership) =>
-              setDraftFilters((current) => ({
-                ...current,
-                vip: membership === COMPANY_VIP_FILTER_VALUE ? true : undefined,
-                companyLevel: typeof membership === 'number' ? membership : undefined,
-              }))
-            }
-          />
-        </Form.Item>
+        <LiaoningAreaFields
+          city={draftFilters.city}
+          district={draftFilters.district}
+          cityLabel={t('enterprise.companies.filters.cityLabel')}
+          cityPlaceholder={t('enterprise.companies.filters.cityPlaceholder')}
+          districtLabel={t('enterprise.companies.filters.districtLabel')}
+          districtPlaceholder={t('enterprise.companies.filters.districtPlaceholder')}
+          onChange={(area) => setDraftFilters((current) => ({ ...current, ...area }))}
+        />
         <div className={styles.filterActions}>
           <Button htmlType='submit' type='primary' icon={<Search />}>
             {t('enterprise.companies.actions.search')}

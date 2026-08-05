@@ -1,5 +1,5 @@
 import { ArrowRight, Refresh, Search } from '@icon-park/react';
-import { Button, Form, Input, Tag } from 'antd';
+import { Button, Form, Input, Select, Tag } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -16,24 +16,35 @@ import {
   readCatalogReturnState,
   restoreEnterpriseCatalogScroll,
 } from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
+import LiaoningAreaFields, {
+  normalizeLiaoningAreaValue,
+} from '@/renderer/pages/enterprise/layout/catalog/LiaoningAreaFields';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import { useEnterprisePaginationScroll } from '@/renderer/pages/enterprise/layout/useEnterprisePaginationScroll';
 import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
+import { useCompanyIndustryOptions } from '@/renderer/pages/enterprise/companies/companyData';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 import { parseSafeProductImageUrl, type ProductFilters, useProductCatalog } from './productData';
+import { toPlainProductText } from './productDescription';
 import ProductQuickView from './ProductQuickView';
 import styles from './product-catalog.module.css';
 
 export type ProductListPageProps = { client?: EnterpriseClient };
 
-const productFiltersFromQuery = (query: ProductListQuery): ProductFilters => ({
+type ProductSearchFilters = Pick<ProductFilters, 'keyword' | 'industry' | 'city' | 'district'>;
+
+const productFiltersFromQuery = (query: ProductListQuery): ProductSearchFilters => ({
   keyword: query.keyword,
   industry: query.industry,
-  province: query.province,
-  city: query.city,
-  district: query.district,
+  ...normalizeLiaoningAreaValue(query.city, query.district),
+});
+
+const normalizeProductListQuery = (query: ProductListQuery): ProductListQuery => ({
+  pageNum: query.pageNum,
+  pageSize: query.pageSize,
+  ...productFiltersFromQuery(query),
 });
 
 const ProductImage: React.FC<{ product: EnterpriseProductSummary }> = ({ product }) => {
@@ -65,6 +76,7 @@ const ProductCard: React.FC<{
   const missing = t('enterprise.products.missing');
   const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
   const displayIndustry = product.industry || product.companyIndustry;
+  const summary = toPlainProductText(product.summary) || missing;
   return (
     <article
       className={[styles.productCard, selected ? styles.selectedCard : ''].filter(Boolean).join(' ')}
@@ -85,7 +97,7 @@ const ProductCard: React.FC<{
           {displayIndustry ? <Tag>{displayIndustry}</Tag> : null}
           <Tag>{region}</Tag>
         </div>
-        <p>{product.summary || missing}</p>
+        <p>{summary}</p>
         <div className={styles.cardActions}>
           <Button type='text' size='small' onClick={() => onSelect(product)}>
             {t('enterprise.products.actions.quickPreview')}
@@ -104,14 +116,28 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
   const location = useLocation();
   const navigate = useNavigate();
   const restoredReturn = useMemo(() => readCatalogReturnState(location.state, 'products'), [location.state]);
-  const initialQueryRef = useRef<ProductListQuery>(restoredReturn?.query ?? { pageNum: 1, pageSize: 20 });
+  const initialQueryRef = useRef<ProductListQuery>(
+    normalizeProductListQuery(restoredReturn?.query ?? { pageNum: 1, pageSize: 20 })
+  );
   const catalog = useProductCatalog(client, initialQueryRef.current);
-  const [draftFilters, setDraftFilters] = useState<ProductFilters>(() =>
+  const industryOptions = useCompanyIndustryOptions(client);
+  const [draftFilters, setDraftFilters] = useState<ProductSearchFilters>(() =>
     productFiltersFromQuery(initialQueryRef.current)
   );
   const [selectedProduct, setSelectedProduct] = useState<EnterpriseProductSummary | null>(null);
   const restoredRef = useRef(false);
   const { targetRef, scrollToTarget } = useEnterprisePaginationScroll<HTMLDivElement>();
+  const industrySelectOptions = useMemo(() => {
+    const options = industryOptions.data.map(({ industry, companyCount }) => ({
+      value: industry,
+      label: t('enterprise.companies.filters.industryOption', { industry, count: companyCount }),
+    }));
+    const selectedIndustry = draftFilters.industry;
+    if (selectedIndustry && !options.some((option) => option.value === selectedIndustry)) {
+      options.unshift({ value: selectedIndustry, label: selectedIndustry });
+    }
+    return options;
+  }, [draftFilters.industry, industryOptions.data, t]);
 
   useEffect(() => {
     if (!catalog.data || restoredRef.current) return;
@@ -210,16 +236,35 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
   const filters = (
     <CatalogFilterCard>
       <Form className={styles.filterForm} layout='vertical' onFinish={submitFilters}>
-        {(['keyword', 'industry', 'province', 'city', 'district'] as const).map((field) => (
-          <Form.Item key={field} label={t(`enterprise.products.filters.${field}Label`)}>
-            <Input
-              value={draftFilters[field]}
-              allowClear
-              placeholder={t(`enterprise.products.filters.${field}Placeholder`)}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, [field]: event.target.value }))}
-            />
-          </Form.Item>
-        ))}
+        <Form.Item label={t('enterprise.products.filters.keywordLabel')}>
+          <Input
+            value={draftFilters.keyword}
+            allowClear
+            placeholder={t('enterprise.products.filters.keywordPlaceholder')}
+            onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
+          />
+        </Form.Item>
+        <Form.Item label={t('enterprise.products.filters.industryLabel')}>
+          <Select
+            value={draftFilters.industry}
+            allowClear
+            showSearch
+            loading={industryOptions.isLoading}
+            optionFilterProp='label'
+            options={industrySelectOptions}
+            placeholder={t('enterprise.companies.filters.industryPlaceholder')}
+            onChange={(industry) => setDraftFilters((current) => ({ ...current, industry }))}
+          />
+        </Form.Item>
+        <LiaoningAreaFields
+          city={draftFilters.city}
+          district={draftFilters.district}
+          cityLabel={t('enterprise.products.filters.cityLabel')}
+          cityPlaceholder={t('enterprise.products.filters.cityPlaceholder')}
+          districtLabel={t('enterprise.products.filters.districtLabel')}
+          districtPlaceholder={t('enterprise.products.filters.districtPlaceholder')}
+          onChange={(area) => setDraftFilters((current) => ({ ...current, ...area }))}
+        />
         <div className={styles.filterActions}>
           <Button htmlType='submit' type='primary' icon={<Search />}>
             {t('enterprise.products.actions.search')}

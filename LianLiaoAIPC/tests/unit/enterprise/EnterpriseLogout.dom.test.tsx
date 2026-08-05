@@ -1,4 +1,6 @@
 import React from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,6 +65,15 @@ describe('enterprise sider integration', () => {
       'href',
       '/enterprise/supply-demand'
     );
+  });
+
+  it('aligns the logout action with the other footer navigation items', () => {
+    const styles = readFileSync(
+      resolve(process.cwd(), 'packages/desktop/src/renderer/pages/enterprise/layout/enterprise-shell.css'),
+      'utf8'
+    );
+
+    expect(styles).toMatch(/\.enterprise-sider__utility--button\s*\{[^}]*justify-content:\s*flex-start;/s);
   });
 
   it('keeps the real authenticated provider and sider in the workbench after clear failure', async () => {

@@ -184,6 +184,7 @@ describe('product detail boundary', () => {
 describe('product image policy', () => {
   it.each([
     ['https://cloud.lslnii.com/a.png', 'https://cloud.lslnii.com/a.png'],
+    ['http://cloud.lslnii.com/a.png', 'https://cloud.lslnii.com/a.png'],
     ['//sjbang.lslnii.com/a.png', 'https://sjbang.lslnii.com/a.png'],
     [' https://www.lslnii.com/a.png ', 'https://www.lslnii.com/a.png'],
   ])('accepts the exact trusted HTTPS hosts: %s', (value, expected) => {
@@ -191,7 +192,6 @@ describe('product image policy', () => {
   });
 
   it.each([
-    'http://cloud.lslnii.com/a.png',
     'https://evil.lslnii.com/a.png',
     'https://cloud.lslnii.com:444/a.png',
     'https://user@cloud.lslnii.com/a.png',

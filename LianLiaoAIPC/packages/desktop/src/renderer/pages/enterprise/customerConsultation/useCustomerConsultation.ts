@@ -18,6 +18,7 @@ import {
 } from './customerConsultationReducer';
 
 const PAGE_SIZE = 50;
+const SEND_ACK_TIMEOUT_MS = 15_000;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 
@@ -38,10 +39,25 @@ export const useCustomerConsultation = (injectedClient?: CustomerConsultationCli
   const viewingLatestRef = useRef(true);
   const initializationRef = useRef<Promise<void> | null>(null);
   const latestSyncsRef = useRef(new Map<string, { trailingRequested: boolean; promise: Promise<void> }>());
+  const pendingSendTimeoutsRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  const clearPendingSendTimeout = useCallback((clientMessageId: string): void => {
+    const timeout = pendingSendTimeoutsRef.current.get(clientMessageId);
+    if (timeout) clearTimeout(timeout);
+    pendingSendTimeoutsRef.current.delete(clientMessageId);
+  }, []);
+
+  const failAllPendingSends = useCallback((): void => {
+    const clientMessageIds = [...pendingSendTimeoutsRef.current.keys()];
+    for (const clientMessageId of clientMessageIds) {
+      clearPendingSendTimeout(clientMessageId);
+      if (mountedRef.current) dispatch({ type: 'message.failed', clientMessageId });
+    }
+  }, [clearPendingSendTimeout]);
 
   const markLatestStaffMessageRead = useCallback(
     async (
@@ -156,6 +172,7 @@ export const useCustomerConsultation = (injectedClient?: CustomerConsultationCli
       dispatch({ type: 'event.received', event, viewingLatest: viewingLatestRef.current });
       if (event.event === 'connection.ready') {
         dispatch({ type: 'connection.changed', state: 'CONNECTED' });
+        setErrorKey(null);
         void synchronizeLatestHistory();
       }
       if (event.event === 'connection.state') {
@@ -164,7 +181,13 @@ export const useCustomerConsultation = (injectedClient?: CustomerConsultationCli
           state: (event.payload as { state: CustomerServiceConnectionSnapshot['state'] }).state,
         });
       }
-      if (event.event === 'error') dispatch({ type: 'connection.changed', state: 'RECONNECTING' });
+      if (event.event === 'message.ack') {
+        clearPendingSendTimeout((event.payload as { clientMessageId: string }).clientMessageId);
+      }
+      if (event.event === 'error') failAllPendingSends();
+      if (event.event === 'message.created') {
+        clearPendingSendTimeout((event.payload as CustomerServiceMessage).clientMessageId);
+      }
       if (event.event === 'message.created' && viewingLatestRef.current && canAcknowledgeVisibleMessages()) {
         const message = event.payload as CustomerServiceMessage;
         if (message.senderType === 'STAFF') {
@@ -178,11 +201,13 @@ export const useCustomerConsultation = (injectedClient?: CustomerConsultationCli
     return () => {
       mountedRef.current = false;
       unsubscribe();
+      for (const timeout of pendingSendTimeoutsRef.current.values()) clearTimeout(timeout);
+      pendingSendTimeoutsRef.current.clear();
       // Do not disconnect the main-process gateway on route changes: it owns
       // background reply notifications while the user works elsewhere. The
       // enterprise-session cleared event performs the credential/socket cleanup.
     };
-  }, [client, initialize, synchronizeLatestHistory]);
+  }, [clearPendingSendTimeout, client, failAllPendingSends, initialize, synchronizeLatestHistory]);
 
   useEffect(() => {
     const acknowledgeWhenVisible = (): void => {
@@ -237,6 +262,14 @@ export const useCustomerConsultation = (injectedClient?: CustomerConsultationCli
         image,
         localCreatedAt: Date.now(),
       });
+      clearPendingSendTimeout(clientMessageId);
+      pendingSendTimeoutsRef.current.set(
+        clientMessageId,
+        setTimeout(() => {
+          pendingSendTimeoutsRef.current.delete(clientMessageId);
+          if (mountedRef.current) dispatch({ type: 'message.failed', clientMessageId });
+        }, SEND_ACK_TIMEOUT_MS)
+      );
       try {
         await client.sendMessage(
           messageType === 'TEXT'
@@ -250,11 +283,12 @@ export const useCustomerConsultation = (injectedClient?: CustomerConsultationCli
         );
         return true;
       } catch {
+        clearPendingSendTimeout(clientMessageId);
         if (mountedRef.current) dispatch({ type: 'message.failed', clientMessageId });
         return false;
       }
     },
-    [client]
+    [clearPendingSendTimeout, client]
   );
 
   const sendText = useCallback(

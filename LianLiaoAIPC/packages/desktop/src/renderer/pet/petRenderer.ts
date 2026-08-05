@@ -1,3 +1,7 @@
+import { installCurrentRendererCopyProtection } from '../utils/ui/copyProtection';
+
+installCurrentRendererCopyProtection();
+
 const LOAD_TIMEOUT = 3000;
 const FADE_MS = 150;
 const PET_STATES_BASE_PATH = '../pet-states';

@@ -48,6 +48,7 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
     total: 1,
   },
   'company.detail': { id: 'company-target-1', name: 'Acme' },
+  'company.industries': [{ industry: 'Equipment', companyCount: 23 }],
   'product.list': {
     list: [{ id: 'product-1', name: 'Pump', companyId: 'company-target-1' }],
     pageNum: 1,
@@ -56,6 +57,16 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
     total: 1,
   },
   'product.detail': { id: 'product-1', name: 'Pump', companyId: 'company-target-1' },
+  'catalogAssistant.plan': {
+    entityType: 'COMPANY',
+    filters: { city: '沈阳市', keyword: '精密机械' },
+    resultLimit: 3,
+    summary: '查询沈阳企业',
+  },
+  'catalogAssistant.rank': {
+    summary: '已找到匹配企业',
+    items: [{ id: 'company-target-1', reason: '地区与行业匹配' }],
+  },
   'project.dashboard': {
     kpi: {
       projectCount: 1,
@@ -71,6 +82,7 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
     shortNameTop: [],
   },
   'project.drill': [{ name: 'Cement', level: 'materialName', projectCount: 1 }],
+  'project.filterOptions': [{ value: 'Liaoning', label: 'Liaoning', projectCount: 1 }],
   'project.list': {
     list: [{ hpInfoId: '901', projectName: 'Factory' }],
     pageNum: 1,
@@ -80,7 +92,13 @@ const successfulData: Record<EnterpriseOperation, unknown> = {
   },
   'project.detail': { hpInfoId: '901', projectName: 'Factory' },
   'project.contactUnlock': { isPurchased: true, inserted: true },
-  'contact.acquire': { type: true, msg: '', url: '', errType: 0, phone: '13800000000' },
+  'contact.acquire': {
+    allowed: true,
+    errType: 0,
+    message: 'Contact acquired',
+    action: 'NONE',
+    phone: '13800000000',
+  },
   'demand.types': [],
   'demand.list': {
     list: [{ demandId: '101', typeId: 0, typeName: 'Machining', title: 'Precision parts', primaryTags: [] }],
@@ -146,16 +164,22 @@ const expectApiError = async (promise: Promise<unknown>, code: EnterpriseApiErro
 describe('enterprise API routes', () => {
   it('exposes only the fixed relative cloud routes', () => {
     expect(ENTERPRISE_API_ROUTES).toEqual({
-      'company.list': 'cloud-api/CompanyController/getQiYeMaCompanyList',
+      'company.list': 'cloud-api/CompanyController/getQiYeMaCompanyCatalogList',
       'company.detail': 'cloud-api/CompanyController/getDetailcompany',
+      'company.industries': 'cloud-api/CompanyController/getQiYeMaIndustryOptions',
       'product.list': 'cloud-api/CompanyController/getFindProducts',
       'product.detail': 'cloud-api/CompanyController/FindProduct',
+      'catalogAssistant.plan': 'cloud-api/CatalogAiAssistantController/plan',
+      'catalogAssistant.rank': 'cloud-api/CatalogAiAssistantController/rank',
+      'enterpriseAssistant.plan': 'cloud-api/EnterpriseAiAssistantController/plan',
+      'desktopAi.defaultConfig': 'cloud-api/DesktopAiModelController/defaultConfig',
       'project.dashboard': 'cloud-api/OpportunityController/getAiMaterialDashboard',
       'project.drill': 'cloud-api/OpportunityController/getAiMaterialDrillList',
+      'project.filterOptions': 'cloud-api/OpportunityController/getAiMaterialFilterOptions',
       'project.list': 'cloud-api/OpportunityController/getAiMaterialProjectList',
       'project.detail': 'cloud-api/OpportunityController/getAiMaterialProjectDetail',
       'project.contactUnlock': 'cloud-api/OpportunityController/unlockAiMaterialProjectDetail',
-      'contact.acquire': 'cloud-api/CompanyController/getCanCallPhone',
+      'contact.acquire': 'cloud-api/DesktopContactController/acquire',
       'demand.types': 'cloud-api/DemandQueryController/types',
       'demand.list': 'cloud-api/DemandQueryController/list',
       'demand.detail': 'cloud-api/DemandQueryController/detail',
@@ -173,6 +197,7 @@ describe('enterprise API routes', () => {
       'demand.uploadImage': 'cloud-api/DemandPublishController/image/upload',
       'demand.contactStatus': 'cloud-api/DemandContactController/status',
       'demand.contactAcquire': 'cloud-api/DemandContactController/acquire',
+      'behavior.log': 'cloud-api/DesktopBehaviorLogController/save',
       'unified.suggest': 'cloud-api/DesktopUnifiedSearchController/suggest',
       'unified.search': 'cloud-api/DesktopUnifiedSearchController/search',
       'auth.create': 'cloud-api/CommonWxGZHQrCodeLogIn/desktop/create',
@@ -191,6 +216,61 @@ describe('enterprise API routes', () => {
 
     expect(Reflect.set(mutableView, 'company.list', 'https://evil.test/collect')).toBe(false);
     expect(ENTERPRISE_API_ROUTES['company.list']).toBe(originalRoute);
+  });
+});
+
+describe('EnterpriseApiClient behavior logs', () => {
+  it('writes the H5-compatible log envelope with trusted session identity', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const client = new EnterpriseApiClient({
+      transport: async (url, init) => {
+        calls.push({ url, init });
+        return jsonResponse({ success: true, data: JSON.parse(String(init.body)) });
+      },
+    });
+
+    await expect(
+      client.request(
+        {
+          operation: 'behavior.log',
+          payload: {
+            eventType: 'PHONE_DIAL',
+            moduleName: '链辽AI桌面端-企业码',
+            title: '拨打测试企业联系电话',
+            pagePath: '/enterprise/companies/-8',
+            targetId: '-8',
+            toCompanyId: '-8',
+            toCompanyName: '测试企业',
+            params: { opened: true },
+          },
+        },
+        {
+          ...REGISTERED_CONTEXT,
+          userName: '测试用户',
+          companyName: '当前企业',
+        }
+      )
+    ).resolves.toEqual({ operation: 'behavior.log', data: { recorded: true } });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://cloud.lslnii.com/cloud-api/DesktopBehaviorLogController/save');
+    expect(JSON.parse(String(calls[0]?.init.body))).toMatchObject({
+      userId: REGISTERED_CONTEXT.openId,
+      userName: '测试用户',
+      fromCompanyId: REGISTERED_CONTEXT.companyId,
+      fromCompanyName: '当前企业',
+      newsTitle: '拨打测试企业联系电话',
+      type: '拨打电话',
+      moudelName: '链辽AI桌面端-企业码',
+      newsId: '-8',
+      newsUrl: 'lianliao://desktop/enterprise/companies/-8',
+      toCompanyId: '-8',
+      toCompanyName: '测试企业',
+    });
+    expect(JSON.parse(JSON.parse(String(calls[0]?.init.body)).params)).toEqual({
+      eventType: 'PHONE_DIAL',
+      opened: true,
+    });
   });
 });
 
@@ -452,6 +532,76 @@ describe('EnterpriseApiClient request boundary', () => {
 });
 
 describe('EnterpriseApiClient serialization and context injection', () => {
+  it('normalizes the desktop company catalog fields and featured product preview', async () => {
+    const client = new EnterpriseApiClient({
+      transport: async () =>
+        jsonResponse({
+          success: true,
+          data: {
+            list: [
+              {
+                ID: 42,
+                NAME: 'Liaoning Pumps',
+                TEMP_PIC: 'https://cloud.lslnii.com/company/logo.png',
+                CORPORATION: 'Zhang',
+                RES_COST: '5000万元人民币',
+                FOUND_TIME: '2014-02-21',
+                COM_TYPE: 'Limited company',
+                FEATURED_PRODUCTS: [
+                  {
+                    ID: 901,
+                    COMPANY_ID: 42,
+                    PRODUCTS_NAME: 'Precision pump',
+                    TEMP_PIC: 'https://cloud.lslnii.com/product/pump.png',
+                  },
+                ],
+                FEATURED_PRODUCT_COUNT: 4,
+              },
+            ],
+            pageNum: 1,
+            pageSize: 20,
+            pages: 1,
+            total: 1,
+          },
+        }),
+    });
+
+    const response = await client.request(
+      { operation: 'company.list', payload: { pageNum: 1, pageSize: 20 } },
+      REGISTERED_CONTEXT
+    );
+
+    expect(response).toEqual({
+      operation: 'company.list',
+      data: {
+        list: [
+          {
+            companyId: '42',
+            name: 'Liaoning Pumps',
+            logoUrl: 'https://cloud.lslnii.com/company/logo.png',
+            legalRepresentative: 'Zhang',
+            registeredCapital: '5000万元人民币',
+            establishedAt: '2014-02-21',
+            companyType: 'Limited company',
+            featuredProducts: [
+              {
+                productId: '901',
+                companyId: '42',
+                name: 'Precision pump',
+                imageUrl: 'https://cloud.lslnii.com/product/pump.png',
+              },
+            ],
+            featuredProductCount: 4,
+          },
+        ],
+        pageNum: 1,
+        pageSize: 20,
+        pages: 1,
+        total: 1,
+      },
+    });
+  });
+
   const cases: Array<{
     operation: EnterpriseOperation;
     request: EnterpriseRequest;
@@ -567,6 +717,34 @@ describe('EnterpriseApiClient serialization and context injection', () => {
         materialShortName: 'Cement',
         materialName: 'P.O 42.5',
         minProjectCount: 80,
+        openId: REGISTERED_CONTEXT.openId,
+        companyId: REGISTERED_CONTEXT.companyId,
+      },
+    },
+    {
+      operation: 'project.filterOptions',
+      request: {
+        operation: 'project.filterOptions',
+        payload: {
+          dimension: 'materialName',
+          runId: 'run-6',
+          province: 'Liaoning',
+          city: 'Shenyang',
+          categoryL1: 'Building',
+          categoryL2: 'Materials',
+          materialShortName: 'Cement',
+          limit: 500,
+        },
+      },
+      expectedBody: {
+        dimension: 'materialName',
+        runId: 'run-6',
+        province: 'Liaoning',
+        city: 'Shenyang',
+        categoryL1: 'Building',
+        categoryL2: 'Materials',
+        materialShortName: 'Cement',
+        limit: 500,
         openId: REGISTERED_CONTEXT.openId,
         companyId: REGISTERED_CONTEXT.companyId,
       },
@@ -854,11 +1032,7 @@ describe('EnterpriseApiClient serialization and context injection', () => {
 });
 
 describe('EnterpriseApiClient contact access', () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('keeps the raw company phone in the main process and releases it only after H5 permission succeeds', async () => {
+  it('requests the server-side resource endpoint and never sends a target phone from Electron', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const transport: EnterpriseApiTransport = async (url, init) => {
       calls.push({ url, init });
@@ -877,7 +1051,13 @@ describe('EnterpriseApiClient contact access', () => {
       }
       return jsonResponse({
         success: true,
-        data: { type: 'Y', msg: '', url: '', errType: 0 },
+        data: {
+          allowed: true,
+          errType: 0,
+          message: 'Contact acquired',
+          action: 'NONE',
+          phone: '13800000000',
+        },
       });
     };
     const client = new EnterpriseApiClient({ transport });
@@ -900,25 +1080,23 @@ describe('EnterpriseApiClient contact access', () => {
       data: {
         allowed: true,
         errType: 0,
-        message: '',
-        actionUrl: '',
+        message: 'Contact acquired',
+        action: 'NONE',
         phone: '13800000000',
       },
     });
-    expect(calls[1]?.url).toBe('https://cloud.lslnii.com/cloud-api/CompanyController/getCanCallPhone');
+    expect(calls[1]?.url).toBe('https://cloud.lslnii.com/cloud-api/DesktopContactController/acquire');
     expect(calls[1]?.init.headers).toEqual({
       Accept: 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      'Content-Type': 'application/json',
     });
-    expect(String(calls[1]?.init.body)).toBe(
-      new URLSearchParams({
-        openId: REGISTERED_CONTEXT.openId,
-        toCompanyId: '1807',
-        toPhone: '13800000000',
-        aiMaterialProject: '0',
-        consumeQuota: '1',
-      }).toString()
-    );
+    expect(JSON.parse(String(calls[1]?.init.body))).toEqual({
+      openId: REGISTERED_CONTEXT.openId,
+      resourceType: 'COMPANY',
+      resourceId: '1807',
+      consumeQuota: true,
+    });
+    expect(String(calls[1]?.init.body)).not.toContain('13800000000');
   });
 
   it('injects trusted project membership fields into the project unlock request', async () => {
@@ -955,29 +1133,22 @@ describe('EnterpriseApiClient contact access', () => {
     });
   });
 
-  it('checks project phone entitlement without consuming quota or exposing the raw phone before unlock', async () => {
+  it('checks project entitlement without consuming quota or receiving a raw phone before unlock', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const transport: EnterpriseApiTransport = async (url, init) => {
       calls.push({ url, init });
-      if (url.endsWith('/getAiMaterialProjectDetail')) {
-        return jsonResponse({
-          success: true,
-          data: {
-            hpInfoId: '901',
-            projectName: 'Factory',
-            phone: '13800000000',
-            isPurchased: false,
-          },
-        });
-      }
       return jsonResponse({
         success: true,
-        data: { type: true, msg: '', url: '', errType: 0 },
+        data: {
+          allowed: true,
+          errType: 0,
+          message: 'Entitlement confirmed',
+          action: 'NONE',
+        },
       });
     };
     const client = new EnterpriseApiClient({ transport });
 
-    await client.request({ operation: 'project.detail', payload: { hpInfoId: '901' } }, REGISTERED_CONTEXT);
     const permission = await client.request(
       {
         operation: 'contact.acquire',
@@ -988,59 +1159,90 @@ describe('EnterpriseApiClient contact access', () => {
 
     expect(permission).toEqual({
       operation: 'contact.acquire',
-      data: { allowed: true, errType: 0, message: '', actionUrl: '' },
+      data: { allowed: true, errType: 0, message: 'Entitlement confirmed', action: 'NONE' },
     });
-    expect(String(calls[1]?.init.body)).toBe(
-      new URLSearchParams({
-        openId: REGISTERED_CONTEXT.openId,
-        toCompanyId: '901',
-        toPhone: '13800000000',
-        aiMaterialProject: '1',
-        consumeQuota: '0',
-      }).toString()
-    );
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({
+      openId: REGISTERED_CONTEXT.openId,
+      resourceType: 'PROJECT',
+      resourceId: '901',
+      consumeQuota: false,
+    });
   });
 
-  it('reloads project detail when the protected contact cache has expired', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-28T01:00:00.000Z'));
+  it('performs a fresh cloud request for every contact acquisition attempt', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
+    let attempt = 0;
     const transport: EnterpriseApiTransport = async (url, init) => {
       calls.push({ url, init });
-      if (url.endsWith('/getAiMaterialProjectDetail')) {
-        return jsonResponse({
-          success: true,
-          data: {
-            hpInfoId: '901',
-            projectName: 'Factory',
-            phone: '13800000000',
-            isPurchased: false,
-          },
-        });
-      }
+      attempt += 1;
       return jsonResponse({
         success: true,
-        data: { type: true, msg: '', url: '', errType: 0 },
+        data: {
+          allowed: attempt === 2,
+          errType: attempt === 2 ? 0 : 6,
+          message: attempt === 2 ? 'Contact acquired' : 'Upgrade required',
+          action: attempt === 2 ? 'NONE' : 'UPGRADE',
+          ...(attempt === 2 ? { phone: '13800000000' } : {}),
+        },
       });
     };
     const client = new EnterpriseApiClient({ transport });
 
-    await client.request({ operation: 'project.detail', payload: { hpInfoId: '901' } }, REGISTERED_CONTEXT);
-    vi.advanceTimersByTime(10 * 60 * 1000 + 1);
-    const permission = await client.request(
-      {
-        operation: 'contact.acquire',
-        payload: { resourceType: 'PROJECT', resourceId: '901', consumeQuota: false },
-      },
-      REGISTERED_CONTEXT
-    );
-
-    expect(permission).toMatchObject({
+    const request: EnterpriseRequest = {
       operation: 'contact.acquire',
-      data: { allowed: true, errType: 0 },
+      payload: { resourceType: 'COMPANY', resourceId: '-8' },
+    };
+    const first = await client.request(request, REGISTERED_CONTEXT);
+    const second = await client.request(request, REGISTERED_CONTEXT);
+
+    expect(first).toEqual({
+      operation: 'contact.acquire',
+      data: { allowed: false, errType: 6, message: 'Upgrade required', action: 'UPGRADE' },
     });
-    expect(calls.filter(({ url }) => url.endsWith('/getAiMaterialProjectDetail'))).toHaveLength(2);
-    expect(calls.at(-1)?.url).toBe('https://cloud.lslnii.com/cloud-api/CompanyController/getCanCallPhone');
+    expect(second).toEqual({
+      operation: 'contact.acquire',
+      data: {
+        allowed: true,
+        errType: 0,
+        message: 'Contact acquired',
+        action: 'NONE',
+        phone: '13800000000',
+      },
+    });
+    expect(calls).toHaveLength(2);
+    expect(calls.every(({ url }) => url.endsWith('/DesktopContactController/acquire'))).toBe(true);
+  });
+
+  it('records sanitized local diagnostics when the contact endpoint is unavailable', async () => {
+    const diagnostic = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const transport: EnterpriseApiTransport = async () => jsonResponse({ message: 'Not Found' }, 404);
+    const client = new EnterpriseApiClient({
+      baseUrl: 'http://127.0.0.1:12580/',
+      environment: 'development',
+      transport,
+    });
+
+    await expect(
+      client.request(
+        {
+          operation: 'contact.acquire',
+          payload: { resourceType: 'PRODUCT', resourceId: '521634568053' },
+        },
+        REGISTERED_CONTEXT
+      )
+    ).rejects.toMatchObject({ code: 'HTTP' });
+
+    expect(diagnostic).toHaveBeenCalledWith(
+      '[enterprise-api] request failed',
+      expect.objectContaining({
+        operation: 'contact.acquire',
+        endpoint: '/cloud-api/DesktopContactController/acquire',
+        code: 'HTTP',
+        status: 404,
+      })
+    );
+    expect(JSON.stringify(diagnostic.mock.calls)).not.toContain(REGISTERED_CONTEXT.openId);
+    expect(JSON.stringify(diagnostic.mock.calls)).not.toContain('521634568053');
   });
 });
 

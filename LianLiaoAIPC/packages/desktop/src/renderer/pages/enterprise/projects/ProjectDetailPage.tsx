@@ -155,6 +155,8 @@ const ProjectDetailPage: React.FC<ProjectDetailPageProps> = ({ client = enterpri
                   client={client}
                   resourceType='PROJECT'
                   resourceId={project.hpInfoId}
+                  resourceTitle={project.projectName}
+                  toCompanyName={project.constructionUnit}
                   maskedPhone={project.phone}
                 />
                 <p className={styles.permissionNote}>{t('enterprise.projectDetail.contactPermissionNote')}</p>

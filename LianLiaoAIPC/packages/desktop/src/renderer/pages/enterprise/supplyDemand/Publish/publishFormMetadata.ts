@@ -30,7 +30,11 @@ const parseObject = <T>(value?: string): T | undefined => {
 };
 
 const valuesForComparison = (value: PublishFormValue): string[] => {
-  if (Array.isArray(value)) return value.map(String).map((item) => item.trim()).filter(Boolean);
+  if (Array.isArray(value))
+    return value
+      .map(String)
+      .map((item) => item.trim())
+      .filter(Boolean);
   if (value === undefined) return [];
   return String(value)
     .split(/[、，,]/)
@@ -43,10 +47,7 @@ const valuesForComparison = (value: PublishFormValue): string[] => {
  * Unknown or malformed rules fail open in the renderer; the server repeats validation and
  * remains the authority for writes.
  */
-export const isPublishFieldVisible = (
-  field: EnterpriseDemandPublishField,
-  values: PublishFormValues
-): boolean => {
+export const isPublishFieldVisible = (field: EnterpriseDemandPublishField, values: PublishFormValues): boolean => {
   const rule = parseObject<VisibilityRule>(field.visibleWhenJson);
   if (!rule?.field) return true;
   const actual = valuesForComparison(values[rule.field]);
@@ -64,10 +65,7 @@ export const readPublishControlProps = (field: EnterpriseDemandPublishField): Pu
 export const allowsCustomPublishOption = (field: EnterpriseDemandPublishField): boolean =>
   readPublishControlProps(field).allowCustom === true;
 
-export const serializePublishFieldValue = (
-  field: EnterpriseDemandPublishField,
-  value: PublishFormValue
-): string => {
+export const serializePublishFieldValue = (field: EnterpriseDemandPublishField, value: PublishFormValue): string => {
   if (value === undefined || value === null) return '';
   if (typeof value === 'object' && !Array.isArray(value) && 'format' in value) return value.format('YYYY-MM-DD');
   if (Array.isArray(value)) return value.map(String).join(field.valueSeparator || '、');

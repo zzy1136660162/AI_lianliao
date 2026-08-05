@@ -58,6 +58,9 @@ export const i18nReady = (async (): Promise<void> => {
   await i18n.init({
     resources: {
       [DEFAULT_LANGUAGE]: { translation: getLocaleModules(DEFAULT_LANGUAGE) },
+      // The Chain Liaoning tray is intentionally Chinese regardless of the
+      // renderer language, so its fixed translator must always have a bundle.
+      'zh-CN': { translation: getLocaleModules('zh-CN') },
     },
     fallbackLng: DEFAULT_LANGUAGE,
     debug: false,

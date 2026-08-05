@@ -81,7 +81,7 @@ See [docs/architecture/overview.md](docs/architecture/overview.md) for details.
 - 业务 HTTP/WS 调用不得复制代理 URL 的解析、校验或 Agent 创建逻辑，必须复用 `manualHttpProxy`、`manualHttpProxyRuntime` 和相应 factory。
 - 主进程中的版本查询、安装包下载等 Electron 网络请求必须使用 `electron.net.fetch`，不得使用不会继承 `defaultSession` 代理的 Node 全局 `fetch`。
 - `localhost`、整个 `127.0.0.0/8` IPv4 环回网段、`::1` 等环回目标必须绕过手动代理并保持直连。
-- 日志和错误上报禁止输出完整 proxy URL、ticket、openid；需要诊断时只记录不含敏感值的状态和原因码。
+- 开发环境在 `LIANLIAO_DIAGNOSTIC_SENSITIVE=1` 时可以向本机滚动诊断日志记录完整业务请求、openid 和模型响应；正式环境默认关闭。带认证信息的 proxy URL、ticket、密码和模型/API 密钥在任何环境仍不得记录。
 - 新增 `ManualHttpProxyFailureReason` reason 时，必须同步更新 UI i18n 的穷尽映射、全部 10 个 locale 和对应测试，禁止依赖默认分支吞掉新原因。
 - 保存操作只持久化配置，不得局部热应用；所有网络入口在用户确认重启后统一应用新配置。
 - provider 的所有执行路径都必须以 fulfilled 状态返回纯数据，失败也要转换为可序列化结果；禁止 reject 或遗留未决 Promise 导致调用挂起。

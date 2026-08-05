@@ -47,6 +47,7 @@ python tools/oracle/oracle_readonly.py
 tools/
 ├── oracle/  # Oracle 只读核验与受控数据导入
 ├── tests/   # 工具单元测试
+├── enterprise_openid_login.py  # Electron openid 模拟登录
 ├── README.md
 └── .gitignore
 ```
@@ -76,3 +77,32 @@ python tools/oracle/import_urgent_purchases.py --input "E:\ZZY_PROJECT\lianshang
 ```
 
 脚本不接受任意 SQL，不提供更新、删除、DDL 或自动回滚已提交业务数据的能力。
+
+## Electron openid 模拟登录
+
+`enterprise_openid_login.py` 用于将已注册用户的 openid 写入 Electron 现有登录态。脚本会先请求对应环境的真实 `DesktopEnterpriseController/userContext` 接口，确认用户、企业和角色信息有效后才写入本地文件。
+
+本地开发版使用 `http://127.0.0.1:12580/` 和 `%APPDATA%\LianLiaoAIPC-Dev`：
+
+```powershell
+python tools/enterprise_openid_login.py login --env dev --openid "otR7Lvw-OJxn1ubJfZCrcPybyoRM"
+python tools/enterprise_openid_login.py status --env dev
+python tools/enterprise_openid_login.py logout --env dev
+```
+
+正式版使用 `https://cloud.lslnii.com/` 和 `%APPDATA%\LianLiaoAIPC`：
+
+```powershell
+python tools/enterprise_openid_login.py login --env prod --openid "otR7Lvw-OJxn1ubJfZCrcPybyoRM"
+python tools/enterprise_openid_login.py status --env prod
+python tools/enterprise_openid_login.py logout --env prod
+```
+
+使用约束：
+
+- `login` 只接受已经完成企业注册、且关联有效企业的 openid；
+- `login` 和 `logout` 前必须从系统托盘完全退出对应 Electron 客户端；
+- 脚本不会自动结束 Electron 进程；检测到客户端仍在运行时会拒绝修改；
+- 脚本只修改对应 profile 下的 `enterprise-session.json`，不修改数据库、Redis、Electron 配置、Core 数据或其他缓存；
+- 写入后重新启动 Electron，客户端仍会请求对应环境的 cloud-api 获取实时用户上下文；
+- `status` 默认只显示掩码后的 openid。

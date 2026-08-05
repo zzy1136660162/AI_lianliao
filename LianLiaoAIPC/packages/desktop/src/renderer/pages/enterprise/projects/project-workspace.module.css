@@ -86,6 +86,15 @@
   width: 100%;
 }
 
+.filterForm :global(.ll-ant-select) {
+  width: 100%;
+}
+
+.optionState {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .filterActions {
   display: flex;
   grid-column: 1 / -1;
@@ -120,9 +129,67 @@
   box-shadow: var(--enterprise-shadow-card);
 }
 
-.dashboard,
 .catalogSection {
   padding: 18px;
+}
+
+.dashboard {
+  padding: 0;
+}
+
+.dashboardCollapse {
+  background: transparent;
+}
+
+.dashboardCollapse :global(.ll-ant-collapse-item) {
+  border: 0;
+}
+
+.dashboardCollapse :global(.ll-ant-collapse-header) {
+  align-items: center;
+  padding: 16px 18px;
+}
+
+.dashboardCollapse :global(.ll-ant-collapse-content-box) {
+  padding: 0 18px 18px;
+}
+
+.dashboardHeading {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.dashboardHeading h2 {
+  margin: 4px 0 0;
+  color: var(--text-primary);
+  font-family: var(--enterprise-font-ui);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.dashboardHeading > div > span,
+.dashboardHeadingMeta > span {
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.dashboardHeadingMeta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+
+.dashboardHeadingMeta p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .sectionHeading {
@@ -475,8 +542,14 @@
 
 @media (max-width: 820px) {
   .pageHeader,
-  .sectionHeading {
+  .sectionHeading,
+  .dashboardHeading {
     display: block;
+  }
+
+  .dashboardHeadingMeta {
+    margin-top: 8px;
+    justify-content: space-between;
   }
 
   .headerRule {

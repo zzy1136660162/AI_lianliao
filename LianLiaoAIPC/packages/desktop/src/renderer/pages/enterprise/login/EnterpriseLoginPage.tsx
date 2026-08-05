@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Card, Spin } from 'antd';
-import { BuildingFour, CheckOne, Refresh, Shield } from '@icon-park/react';
+import { CheckOne, Refresh, Shield } from '@icon-park/react';
 import { useTranslation } from 'react-i18next';
 
 import type { EnterpriseIpcErrorCode } from '@/common/enterprise/contracts';
+import lianliaoLogo from '@/renderer/assets/logos/brand/lianliao-logo.png';
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 import type { I18nKey } from '@/renderer/services/i18n';
 import EnterpriseAntdProvider from '../layout/EnterpriseAntdProvider';
@@ -42,6 +43,8 @@ const formatCountdown = (remainingSeconds: number): string => {
   const seconds = (safeSeconds % 60).toString().padStart(2, '0');
   return `${minutes}:${seconds}`;
 };
+
+const ENTERPRISE_BRAND_CAPABILITIES = ['companyCode', 'keyProducts', 'projects', 'demand'] as const;
 
 const EnterpriseLoginPage: React.FC = () => {
   const { t } = useTranslation();
@@ -152,24 +155,17 @@ const EnterpriseLoginPage: React.FC = () => {
       <main className='enterprise-login'>
         <EnterpriseWindowChrome title={t('enterprise.shell.brand')} />
         <section className='enterprise-login__story' aria-labelledby='enterprise-login-brand-title'>
-          <div className='enterprise-login__brand-mark' aria-hidden='true'>
-            <BuildingFour size={29} />
-          </div>
+          <div className='enterprise-login__brand-decoration' aria-hidden='true' />
+          <img className='enterprise-login__brand-logo' src={lianliaoLogo} alt={t('enterprise.brand.logoAlt')} />
           <p className='enterprise-login__brand-eyebrow'>{t('enterprise.brand.eyebrow')}</p>
           <h1 id='enterprise-login-brand-title'>{t('enterprise.brand.title')}</h1>
           <p className='enterprise-login__brand-description'>{t('enterprise.brand.description')}</p>
 
-          <ol className='enterprise-login__steps'>
-            {(['scan', 'identify', 'work'] as const).map((step, index) => (
-              <li key={step}>
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <div>
-                  <strong>{t(`enterprise.steps.${step}.title`)}</strong>
-                  <p>{t(`enterprise.steps.${step}.description`)}</p>
-                </div>
-              </li>
+          <ul className='enterprise-login__capabilities'>
+            {ENTERPRISE_BRAND_CAPABILITIES.map((capability) => (
+              <li key={capability}>{t(`enterprise.brand.capabilities.${capability}`)}</li>
             ))}
-          </ol>
+          </ul>
 
           <div className='enterprise-login__security-note'>
             <Shield size={18} />

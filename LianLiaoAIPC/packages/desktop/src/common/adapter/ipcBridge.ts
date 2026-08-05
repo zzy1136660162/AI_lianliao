@@ -41,7 +41,7 @@ import type {
 } from '../types/agent/assistantTypes';
 import type { PreviewHistoryTarget, PreviewSnapshotInfo } from '../types/office/preview';
 import type {
-  GetConfigOptionsResponse,
+  EnsureConversationRuntimeResponse,
   SetConfigOptionRequest,
   SetConfigOptionResponse,
 } from '../types/platform/acpTypes';
@@ -229,7 +229,9 @@ export const conversation = {
     }
   ),
   reset: httpPost<void, IResetConversationParams>((p) => `/api/conversations/${p.id}/reset`),
-  warmup: httpPost<void, { conversation_id: string }>((p) => `/api/conversations/${p.conversation_id}/warmup`),
+  ensureRuntime: httpPost<EnsureConversationRuntimeResponse, { conversation_id: string }>(
+    (p) => `/api/conversations/${p.conversation_id}/runtime/ensure`
+  ),
   stop: httpPost<{ runtime: TConversationRuntimeSummary }, { conversation_id: string; turn_id: string }>(
     (p) => `/api/conversations/${p.conversation_id}/cancel`,
     (p) => ({ turn_id: p.turn_id })
@@ -920,10 +922,6 @@ export const acpConversation = {
   ),
   checkProviderHealth: httpPost<ProviderHealthCheckResponse, ProviderHealthCheckRequest>(
     '/api/agents/provider-health-check'
-  ),
-  getConfigOptions: httpGet<GetConfigOptionsResponse, { conversation_id: string }>(
-    (p) => `/api/conversations/${p.conversation_id}/config-options`,
-    { silentStatuses: [404] }
   ),
   setConfigOption: httpPut<SetConfigOptionResponse, { conversation_id: string; option_id: string; value: string }>(
     (p) => `/api/conversations/${p.conversation_id}/config-options/${encodeURIComponent(p.option_id)}`,

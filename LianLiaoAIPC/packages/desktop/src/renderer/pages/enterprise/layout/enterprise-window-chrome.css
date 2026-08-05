@@ -7,6 +7,7 @@
   grid-column: 1 / -1;
   align-items: stretch;
   border-bottom: 1px solid var(--border-base);
+  cursor: default;
   user-select: none;
   background: color-mix(in srgb, var(--bg-1) 96%, transparent);
   -webkit-app-region: drag;

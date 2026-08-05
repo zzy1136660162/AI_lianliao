@@ -21,6 +21,9 @@ import { ENTERPRISE_API_ROUTES, type EnterpriseApiRouteKey } from './enterpriseA
 
 const DEFAULT_BASE_URL = 'https://cloud.lslnii.com/';
 const DEFAULT_TIMEOUT_MS = 15_000;
+// MiniMax classification and extraction can run sequentially; keep ordinary API calls fast while
+// allowing the model workflow to finish instead of turning a successful backend result into TIMEOUT.
+const DEMAND_AI_TIMEOUT_MS = 90_000;
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const MAX_LOGIN_EXPIRY_MS = 330_000;
 const MAX_QR_BYTES = 2 * 1024 * 1024;
@@ -59,6 +62,25 @@ const commonFailureResultSchema = z
   })
   .passthrough();
 
+const desktopAiModelConfigSchema = z
+  .object({
+    providerCode: z.string().trim().min(1),
+    modelName: z.string().trim().min(1),
+    baseUrl: z
+      .string()
+      .url()
+      .refine((value) => ['http:', 'https:'].includes(new URL(value).protocol)),
+    protocolType: z.literal('OPENAI_CHAT_COMPLETIONS'),
+    apiKey: z.string().trim().min(1),
+    timeoutMs: z.number().int().positive().optional(),
+    maxTokens: z.number().int().positive().optional(),
+    configVersion: z.string().trim().min(1),
+  })
+  .strict();
+
+/** Main-process-only cloud model configuration; never use it in a preload contract. */
+export type DesktopAiModelConfig = z.infer<typeof desktopAiModelConfigSchema>;
+
 export type EnterpriseApiEnvironment = 'production' | 'development';
 
 export type EnterpriseApiTransport = (url: string, init: RequestInit) => Promise<Response>;
@@ -84,29 +106,18 @@ export type EnterpriseApiClientOptions = {
 /** A sanitized enterprise API failure with a stable machine-readable code. */
 export class EnterpriseApiError extends Error {
   readonly code: EnterpriseApiErrorCode;
+  readonly status?: number;
 
-  constructor(code: EnterpriseApiErrorCode, message: string) {
+  constructor(code: EnterpriseApiErrorCode, message: string, status?: number) {
     super(message);
     this.name = 'EnterpriseApiError';
     this.code = code;
+    this.status = status;
   }
 }
 
-type EnterpriseRequestBodyValue =
-  | string
-  | number
-  | boolean
-  | readonly string[]
-  | Readonly<Record<string, string>>;
+type EnterpriseRequestBodyValue = string | number | boolean | readonly string[] | Readonly<Record<string, string>>;
 type EnterpriseRequestBody = Record<string, EnterpriseRequestBodyValue>;
-type ContactCacheEntry = {
-  openId: string;
-  phone: string;
-  targetCompanyId: string;
-  expiresAt: number;
-};
-
-const CONTACT_CACHE_TTL_MS = 10 * 60 * 1000;
 
 const errorMessages: Record<EnterpriseApiErrorCode, string> = {
   INVALID_BASE_URL: 'Enterprise API base URL is not allowed.',
@@ -120,8 +131,33 @@ const errorMessages: Record<EnterpriseApiErrorCode, string> = {
   INVALID_RESPONSE: 'Enterprise API response is invalid.',
 };
 
-const apiError = (code: EnterpriseApiErrorCode): EnterpriseApiError =>
-  new EnterpriseApiError(code, errorMessages[code]);
+const apiError = (code: EnterpriseApiErrorCode, status?: number): EnterpriseApiError =>
+  new EnterpriseApiError(code, errorMessages[code], status);
+
+/**
+ * Persists only routing and failure metadata through the main-process console.
+ *
+ * The console is redirected to electron-log during application startup, so
+ * operators can diagnose missing cloud routes without storing OpenID, resource
+ * IDs, request bodies, telephone numbers, or backend response content.
+ */
+const recordEnterpriseApiFailure = (
+  routeKey: EnterpriseApiRouteKey,
+  url: string,
+  error: unknown,
+  startedAt: number
+): void => {
+  const code = error instanceof EnterpriseApiError ? error.code : 'NETWORK';
+  const status = error instanceof EnterpriseApiError ? error.status : undefined;
+  const endpoint = new URL(url).pathname;
+  console.error('[enterprise-api] request failed', {
+    operation: routeKey,
+    endpoint,
+    code,
+    ...(status === undefined ? {} : { status }),
+    durationMs: Math.max(0, Date.now() - startedAt),
+  });
+};
 
 const normalizeBaseUrl = (baseUrl: string, environment: EnterpriseApiEnvironment): string => {
   let parsed: URL;
@@ -264,6 +300,19 @@ const serializeProductDetail = (
   };
 };
 
+/**
+ * Catalog AI receives only the already validated natural-language request and compact candidates.
+ * Registered-session validation prevents anonymous model use; identity fields are intentionally not
+ * appended because the catalog model never needs openId, userId or companyId.
+ */
+const serializeCatalogAssistantRequest = (
+  request: Extract<EnterpriseRequest, { operation: `catalogAssistant.${string}` | 'enterpriseAssistant.plan' }>,
+  context: EnterpriseUserContext
+): EnterpriseRequestBody => {
+  requireRegisteredIdentity(context);
+  return JSON.parse(JSON.stringify(request.payload)) as EnterpriseRequestBody;
+};
+
 const serializeProjectRequest = (
   request: Extract<EnterpriseRequest, { operation: `project.${string}` }>,
   context: EnterpriseUserContext
@@ -289,6 +338,16 @@ const serializeProjectRequest = (
       setDefined(body, 'materialShortName', request.payload.materialShortName);
       setDefined(body, 'materialName', request.payload.materialName);
       setDefined(body, 'minProjectCount', request.payload.minProjectCount);
+      return body;
+    case 'project.filterOptions':
+      setDefined(body, 'dimension', request.payload.dimension);
+      setDefined(body, 'runId', request.payload.runId);
+      setDefined(body, 'province', request.payload.province);
+      setDefined(body, 'city', request.payload.city);
+      setDefined(body, 'categoryL1', request.payload.categoryL1);
+      setDefined(body, 'categoryL2', request.payload.categoryL2);
+      setDefined(body, 'materialShortName', request.payload.materialShortName);
+      setDefined(body, 'limit', request.payload.limit);
       return body;
     case 'project.list':
       setDefined(body, 'keyword', request.payload.keyword);
@@ -397,18 +456,65 @@ const serializeUnifiedRequest = (
   return body;
 };
 
+const BEHAVIOR_TYPE_LABELS = Object.freeze({
+  PAGE_VIEW: '页面访问',
+  CONTACT_ACQUIRE: '获取联系方式',
+  PHONE_DIAL: '拨打电话',
+  DEMAND_PUBLISH: '发布需求',
+});
+
+/**
+ * Adapts desktop behavior events to the legacy H5 `addgzhLogs` storage contract.
+ * Identity and runtime fields are sourced here rather than accepted from the renderer.
+ */
+const serializeBehaviorLog = (
+  request: Extract<EnterpriseRequest, { operation: 'behavior.log' }>,
+  context: EnterpriseUserContext
+): EnterpriseRequestBody => {
+  requireRegisteredIdentity(context);
+  const { payload } = request;
+  const body: EnterpriseRequestBody = {
+    userId: context.openId,
+    userName: context.userName ?? '',
+    fromCompanyId: context.companyId ?? '',
+    fromCompanyName: context.companyName ?? '',
+    osType: process.platform,
+    userAgent: `LianLiaoAIPC Electron/${process.versions.electron} ${process.platform}/${process.arch}`,
+    newsTitle: payload.title,
+    type: BEHAVIOR_TYPE_LABELS[payload.eventType],
+    moudelName: payload.moduleName,
+    newsId: payload.targetId ?? '',
+    newsUrl: `lianliao://desktop${payload.pagePath}`,
+    params: JSON.stringify({
+      eventType: payload.eventType,
+      ...payload.params,
+    }),
+  };
+  setDefined(body, 'toCompanyId', payload.toCompanyId);
+  setDefined(body, 'toCompanyName', payload.toCompanyName);
+  return body;
+};
+
 const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserContext): EnterpriseRequestBody => {
   switch (request.operation) {
     case 'company.list':
       return serializeCompanyList(request, context);
     case 'company.detail':
       return serializeCompanyDetail(request, context);
+    case 'company.industries':
+      requireCompanyIdentity(context);
+      return {};
     case 'product.list':
       return serializeProductList(request, context);
     case 'product.detail':
       return serializeProductDetail(request, context);
+    case 'catalogAssistant.plan':
+    case 'catalogAssistant.rank':
+    case 'enterpriseAssistant.plan':
+      return serializeCatalogAssistantRequest(request, context);
     case 'project.dashboard':
     case 'project.drill':
+    case 'project.filterOptions':
     case 'project.list':
     case 'project.detail':
     case 'project.contactUnlock':
@@ -434,6 +540,8 @@ const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserCon
     case 'demand.publish':
     case 'demand.uploadImage':
       return serializeDemandRequest(request, context);
+    case 'behavior.log':
+      return serializeBehaviorLog(request, context);
     case 'unified.suggest':
     case 'unified.search':
       return serializeUnifiedRequest(request, context);
@@ -470,44 +578,6 @@ const sanitizeEnvelope = (input: unknown): Record<string, unknown> | undefined =
     return undefined;
   }
 };
-
-const ownRecord = (input: unknown): Record<string, unknown> | undefined => {
-  const record = sanitizeEnvelope(input);
-  return record;
-};
-
-const firstOwnText = (record: Record<string, unknown> | undefined, ...keys: string[]): string | undefined => {
-  if (!record) return undefined;
-  for (const key of keys) {
-    if (!Object.hasOwn(record, key)) continue;
-    const value = record[key];
-    if (typeof value !== 'string') continue;
-    const normalized = value.trim();
-    if (normalized && normalized.length <= 256 && !/\p{C}/u.test(normalized)) return normalized;
-  }
-  return undefined;
-};
-
-const extractContactPhone = (operation: EnterpriseRequest['operation'], responseData: unknown): string | undefined => {
-  const root = ownRecord(responseData);
-  if (!root) return undefined;
-  if (operation === 'company.detail') {
-    return firstOwnText(ownRecord(root.company) ?? root, 'phone', 'PHONE', 'compPhone', 'COMP_PHONE');
-  }
-  if (operation === 'product.detail') {
-    return firstOwnText(root, 'compPhone', 'COMP_PHONE', 'phone', 'PHONE');
-  }
-  if (operation === 'project.detail') {
-    return firstOwnText(root, 'phone', 'PHONE');
-  }
-  return undefined;
-};
-
-const contactCacheKey = (resourceType: string, resourceId: string): string => `${resourceType}:${resourceId}`;
-
-/** Mirrors the bounded legacy boolean values accepted by the response schema. */
-const isAffirmativeBackendValue = (value: unknown): boolean =>
-  value === true || value === 1 || value === '1' || value === 'true' || value === 'Y';
 
 const sanitizeAuthObject = (
   input: unknown,
@@ -707,7 +777,6 @@ export class EnterpriseApiClient {
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly transport: EnterpriseApiTransport;
-  private readonly contactCache = new Map<string, ContactCacheEntry>();
 
   constructor(options: EnterpriseApiClientOptions = {}) {
     const environment = options.environment ?? 'production';
@@ -745,12 +814,14 @@ export class EnterpriseApiClient {
         throw apiError('INVALID_RESPONSE');
       }
     }
+    if (validRequest.operation === 'behavior.log') {
+      await this.post(validRequest.operation, serializeBehaviorLog(validRequest, context));
+      return { operation: 'behavior.log', data: { recorded: true } };
+    }
     const responseData = await this.post(validRequest.operation, serializeRequest(validRequest, context));
 
     try {
-      const response = parseEnterpriseResponse(validRequest.operation, responseData);
-      this.rememberContact(validRequest, context, responseData, response);
-      return response;
+      return parseEnterpriseResponse(validRequest.operation, responseData);
     } catch {
       throw apiError('INVALID_RESPONSE');
     }
@@ -766,6 +837,14 @@ export class EnterpriseApiClient {
     } catch {
       throw apiError('INVALID_RESPONSE');
     }
+  }
+
+  /** Fetches the centrally managed AI model for the Electron main process. */
+  async getDesktopAiModelConfig(): Promise<DesktopAiModelConfig> {
+    const responseData = await this.post('desktopAi.defaultConfig', {});
+    const parsed = desktopAiModelConfigSchema.safeParse(responseData);
+    if (!parsed.success) throw apiError('INVALID_RESPONSE');
+    return parsed.data;
   }
 
   /** Creates a short-lived desktop login session and returns an embedded, validated QR image. */
@@ -835,54 +914,40 @@ export class EnterpriseApiClient {
 
   private async post(routeKey: EnterpriseApiRouteKey, body: EnterpriseRequestBody): Promise<unknown> {
     const url = new URL(ENTERPRISE_API_ROUTES[routeKey], this.baseUrl).toString();
-    return this.withDeadline(async (signal) => {
-      const response = await this.transport(url, {
-        method: 'POST',
-        redirect: 'error',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-        signal,
-      });
-      if (!response.ok) throw apiError('HTTP');
+    const startedAt = Date.now();
+    const timeoutMs =
+      routeKey.startsWith('demand.ai') ||
+      routeKey.startsWith('catalogAssistant.') ||
+      routeKey.startsWith('enterpriseAssistant.')
+        ? Math.max(this.timeoutMs, DEMAND_AI_TIMEOUT_MS)
+        : this.timeoutMs;
+    try {
+      return await this.withDeadline(async (signal) => {
+        const response = await this.transport(url, {
+          method: 'POST',
+          redirect: 'error',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+          signal,
+        });
+        if (!response.ok) throw apiError('HTTP', response.status);
 
-      let json: unknown;
-      try {
-        json = await response.json();
-      } catch {
-        if (signal.aborted) throw apiError('TIMEOUT');
-        throw apiError('INVALID_JSON');
-      }
-      return unwrapCommonResult(json);
-    });
-  }
-
-  private async postForm(routeKey: EnterpriseApiRouteKey, body: URLSearchParams): Promise<unknown> {
-    const url = new URL(ENTERPRISE_API_ROUTES[routeKey], this.baseUrl).toString();
-    return this.withDeadline(async (signal) => {
-      const response = await this.transport(url, {
-        method: 'POST',
-        redirect: 'error',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        },
-        body: body.toString(),
-        signal,
-      });
-      if (!response.ok) throw apiError('HTTP');
-
-      let json: unknown;
-      try {
-        json = await response.json();
-      } catch {
-        if (signal.aborted) throw apiError('TIMEOUT');
-        throw apiError('INVALID_JSON');
-      }
-      return unwrapCommonResult(json);
-    });
+        let json: unknown;
+        try {
+          json = await response.json();
+        } catch {
+          if (signal.aborted) throw apiError('TIMEOUT');
+          throw apiError('INVALID_JSON');
+        }
+        return unwrapCommonResult(json);
+      }, timeoutMs);
+    } catch (error) {
+      recordEnterpriseApiFailure(routeKey, url, error, startedAt);
+      throw error;
+    }
   }
 
   private async postMultipart(routeKey: EnterpriseApiRouteKey, body: FormData): Promise<unknown> {
@@ -908,94 +973,20 @@ export class EnterpriseApiClient {
     });
   }
 
-  /**
-   * Stores the unmasked telephone only inside the main-process client and binds it
-   * to the authenticated openId. Renderer responses remain masked until access succeeds.
-   */
-  private rememberContact(
-    request: EnterpriseRequest,
-    context: EnterpriseUserContext,
-    responseData: unknown,
-    response: EnterpriseResponse
-  ): void {
-    const phone = extractContactPhone(request.operation, responseData);
-    if (!phone) return;
-
-    let resourceType: 'COMPANY' | 'PRODUCT' | 'PROJECT';
-    let resourceId: string;
-    let targetCompanyId: string;
-    if (request.operation === 'company.detail' && response.operation === 'company.detail') {
-      resourceType = 'COMPANY';
-      resourceId = response.data.companyId;
-      targetCompanyId = response.data.companyId;
-    } else if (request.operation === 'product.detail' && response.operation === 'product.detail') {
-      resourceType = 'PRODUCT';
-      resourceId = response.data.productId;
-      targetCompanyId = response.data.companyId;
-    } else if (request.operation === 'project.detail' && response.operation === 'project.detail') {
-      resourceType = 'PROJECT';
-      resourceId = response.data.hpInfoId;
-      targetCompanyId = response.data.hpInfoId;
-    } else {
-      return;
-    }
-
-    this.contactCache.set(contactCacheKey(resourceType, resourceId), {
-      openId: context.openId,
-      phone,
-      targetCompanyId,
-      expiresAt: Date.now() + CONTACT_CACHE_TTL_MS,
-    });
-  }
-
   private async acquireContact(
     request: Extract<EnterpriseRequest, { operation: 'contact.acquire' }>,
     context: EnterpriseUserContext
   ): Promise<EnterpriseResponse> {
     requireRegisteredIdentity(context);
-    const cacheKey = contactCacheKey(request.payload.resourceType, request.payload.resourceId);
-    let cached = this.contactCache.get(cacheKey);
-    if (!cached || cached.openId !== context.openId || cached.expiresAt <= Date.now()) {
-      this.contactCache.delete(cacheKey);
-      if (request.payload.resourceType === 'PROJECT') {
-        // Project pages can remain open longer than the short-lived raw-contact cache.
-        // Re-fetching the protected detail repopulates the main-process-only phone
-        // without exposing it to the renderer or consuming any contact quota.
-        await this.request(
-          {
-            operation: 'project.detail',
-            payload: { hpInfoId: request.payload.resourceId },
-          },
-          context
-        );
-        cached = this.contactCache.get(cacheKey);
-      }
-      if (!cached || cached.openId !== context.openId || cached.expiresAt <= Date.now()) {
-        this.contactCache.delete(cacheKey);
-        throw apiError('INVALID_REQUEST');
-      }
-    }
-
-    const project = request.payload.resourceType === 'PROJECT';
     const consumeQuota = request.payload.consumeQuota !== false;
-    const responseData = await this.postForm(
-      'contact.acquire',
-      new URLSearchParams({
-        openId: context.openId,
-        toCompanyId: cached.targetCompanyId,
-        toPhone: cached.phone,
-        aiMaterialProject: project ? '1' : '0',
-        consumeQuota: consumeQuota ? '1' : '0',
-      })
-    );
-    const raw = ownRecord(responseData);
-    if (!raw) throw apiError('INVALID_RESPONSE');
-    const enriched = {
-      ...raw,
-      ...(consumeQuota && isAffirmativeBackendValue(raw.type) ? { phone: cached.phone } : {}),
-    };
+    const responseData = await this.post('contact.acquire', {
+      openId: context.openId,
+      resourceType: request.payload.resourceType,
+      resourceId: request.payload.resourceId,
+      consumeQuota,
+    });
     try {
-      return parseEnterpriseResponse('contact.acquire', enriched);
+      return parseEnterpriseResponse('contact.acquire', responseData);
     } catch {
       throw apiError('INVALID_RESPONSE');
     }
@@ -1021,14 +1012,17 @@ export class EnterpriseApiClient {
     });
   }
 
-  private async withDeadline<T>(operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async withDeadline<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+    timeoutMs = this.timeoutMs
+  ): Promise<T> {
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
       timeoutId = setTimeout(() => {
         controller.abort();
         reject(apiError('TIMEOUT'));
-      }, this.timeoutMs);
+      }, timeoutMs);
     });
 
     const requestPromise = Promise.resolve().then(() => operation(controller.signal));

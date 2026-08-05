@@ -42,6 +42,7 @@ import type {
   DesktopVersionIpcResult,
   DesktopVersionOpenDownloadedResult,
 } from '../../enterprise/desktop-version/contracts';
+import type { DesktopManagedAiSyncResult } from '../../enterprise/managed-ai-model/contracts';
 
 // WebUI 状态接口 / WebUI status interface
 export interface WebUIStatus {
@@ -73,6 +74,10 @@ export interface ElectronBridgeAPI {
     restoreSession: () => Promise<EnterpriseIpcResult<EnterpriseUserContext | null>>;
     clearSession: () => Promise<EnterpriseIpcResult<void>>;
     request: (request: EnterpriseRequest) => Promise<EnterpriseIpcResult<EnterpriseResponse>>;
+  };
+  /** Main-process synchronization for the centrally managed default AI model. */
+  desktopManagedAi?: {
+    sync: () => Promise<DesktopManagedAiSyncResult>;
   };
   customerService?: {
     connect: () => Promise<CustomerServiceIpcResult<CustomerServiceConnectionSnapshot>>;
@@ -179,6 +184,7 @@ export interface BackendStartupFailureInfo {
 declare global {
   interface Window {
     electronAPI?: ElectronBridgeAPI;
+    readonly __isPackaged?: boolean;
     __initialLanguage?: string | null;
     __aionuiE2ETest?: boolean;
     __backendStartupFailed?: boolean;

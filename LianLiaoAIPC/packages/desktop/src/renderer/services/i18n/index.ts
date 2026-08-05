@@ -139,10 +139,18 @@ async function initLanguage(): Promise<void> {
     await configService.whenReady();
     const savedLanguage = configService.get('language');
     const language = savedLanguage || normalizeLanguageCode(navigator.language || DEFAULT_LANGUAGE);
-    await ensureAndSwitch(i18n, language, loadLocaleModules);
+    const normalizedLanguage = normalizeLanguageCode(language);
+    await ensureAndSwitch(i18n, normalizedLanguage, loadLocaleModules);
     // Sync to localStorage so next page load can use it as a fast hint
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('i18nextLng', normalizeLanguageCode(language));
+      localStorage.setItem('i18nextLng', normalizedLanguage);
+    }
+    // Existing desktop installations may have the language only in backend
+    // config. Sync it on startup so the main-process tray uses the same locale.
+    if (typeof window !== 'undefined' && window.electronAPI) {
+      await ipcBridge.systemSettings.changeLanguage.invoke({
+        language: normalizedLanguage,
+      });
     }
   } catch (error) {
     console.error('Failed to initialize language:', error);

@@ -11,6 +11,7 @@
 import '@sentry/electron/preload';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { z } from 'zod';
+import { exposeRuntimeEnvironment } from './runtimeEnvironment';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
 import {
   CUSTOMER_CONSULTATION_IPC_CHANNELS,
@@ -28,6 +29,11 @@ import {
   DESKTOP_VERSION_IPC_CHANNELS,
   DESKTOP_VERSION_IPC_ERROR_MESSAGES,
 } from '../common/enterprise/desktop-version/constants';
+import {
+  DESKTOP_MANAGED_AI_SYNC_CHANNEL,
+  type DesktopManagedAiSyncResult,
+  unavailableDesktopManagedAiSyncResult,
+} from '../common/enterprise/managed-ai-model/contracts';
 import type {
   CustomerServiceCloseRequest,
   CustomerServiceConnectionSnapshot,
@@ -98,6 +104,7 @@ import {
   desktopVersionIpcResultSchema,
   desktopVersionOpenDownloadedResultSchema,
 } from '../common/enterprise/desktop-version/schemas';
+import { desktopManagedAiSyncResultSchema } from '../common/enterprise/managed-ai-model/schemas';
 import { ENTERPRISE_IPC_CHANNELS, ENTERPRISE_IPC_ERROR_MESSAGES } from '../common/enterprise/constants';
 import type {
   EnterpriseIpcErrorCode,
@@ -110,6 +117,8 @@ import type {
 } from '../common/enterprise/contracts';
 
 const DANGEROUS_DATA_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+exposeRuntimeEnvironment();
 
 const hasExactPlainDataProperties = (value: unknown, keys: readonly string[]): value is Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Object.getPrototypeOf(value) !== Object.prototype) return false;
@@ -327,6 +336,17 @@ const invokeDesktopVersion = async <T>(
   return result;
 };
 
+/** Managed-model IPC never returns provider credentials to the renderer. */
+const syncDesktopManagedAiModel = async (): Promise<DesktopManagedAiSyncResult> => {
+  try {
+    const untrustedResult: unknown = await ipcRenderer.invoke(DESKTOP_MANAGED_AI_SYNC_CHANNEL);
+    const parsed = desktopManagedAiSyncResultSchema.safeParse(untrustedResult);
+    return parsed.success ? parsed.data : unavailableDesktopManagedAiSyncResult();
+  } catch {
+    return unavailableDesktopManagedAiSyncResult();
+  }
+};
+
 const subscribeCustomerServiceEvents = (callback: (event: CustomerServiceServerEnvelope) => void): (() => void) => {
   if (typeof callback !== 'function') return () => undefined;
   const handler = (_event: unknown, untrustedEvent: unknown): void => {
@@ -408,6 +428,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     clearSession: () => invokeEnterprise<void>(ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
     request: (request: EnterpriseRequest) =>
       invokeEnterprise<EnterpriseResponse>(ENTERPRISE_IPC_CHANNELS.REQUEST, request),
+  },
+  desktopManagedAi: {
+    sync: syncDesktopManagedAiModel,
   },
   customerService: {
     connect: () =>

@@ -28,7 +28,11 @@ vi.mock('@process/utils/closeToTraySetting', () => ({
   writeCloseToTraySetting: vi.fn(),
 }));
 
-import { initializeCloseToTrayDefault, updateCloseToTraySetting } from '@process/bridge/systemSettingsBridge';
+import {
+  initializeCloseToTrayDefault,
+  syncMainProcessLanguage,
+  updateCloseToTraySetting,
+} from '@process/bridge/systemSettingsBridge';
 
 const CLOSE_TO_TRAY_DEFAULT_FLAG = 'system.closeToTrayDefaultV1Applied' as const;
 
@@ -112,5 +116,52 @@ describe('close-to-tray initialization and runtime setting', () => {
     expect(runtime.setEnabled).not.toHaveBeenCalled();
     expect(runtime.ensureTray).not.toHaveBeenCalled();
     expect(storage.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('main-process language synchronization', () => {
+  it('refreshes the tray only after the normalized language is persisted and applied', async () => {
+    const calls: string[] = [];
+
+    await syncMainProcessLanguage('zh_CN', {
+      persist: async (language) => {
+        calls.push(`persist:${language}`);
+      },
+      broadcast: (language) => {
+        calls.push(`broadcast:${language}`);
+      },
+      switchLanguage: async (language) => {
+        calls.push(`switch:${language}`);
+      },
+      refreshTray: () => {
+        calls.push('refresh');
+      },
+    });
+
+    expect(calls).toEqual(['persist:zh-CN', 'broadcast:zh-CN', 'switch:zh-CN', 'refresh']);
+  });
+
+  it('does not broadcast or refresh the tray when language persistence fails', async () => {
+    const calls: string[] = [];
+
+    await expect(
+      syncMainProcessLanguage('zh-CN', {
+        persist: async () => {
+          calls.push('persist');
+          throw new Error('write failed');
+        },
+        broadcast: () => {
+          calls.push('broadcast');
+        },
+        switchLanguage: async () => {
+          calls.push('switch');
+        },
+        refreshTray: () => {
+          calls.push('refresh');
+        },
+      })
+    ).rejects.toThrow('write failed');
+
+    expect(calls).toEqual(['persist']);
   });
 });

@@ -22,6 +22,17 @@ export const buildViewMenuItems = (isPackaged: boolean): MenuItemConstructorOpti
   { role: 'togglefullscreen' },
 ];
 
+export const buildEditMenuItems = (isPackaged: boolean, isMac: boolean): MenuItemConstructorOptions[] => [
+  { role: 'undo' },
+  { role: 'redo' },
+  { type: 'separator' },
+  ...(!isPackaged ? ([{ role: 'cut' }, { role: 'copy' }] as MenuItemConstructorOptions[]) : []),
+  { role: 'paste' },
+  ...(isMac
+    ? ([{ role: 'pasteAndMatchStyle' }, { role: 'delete' }, { role: 'selectAll' }] as MenuItemConstructorOptions[])
+    : ([{ role: 'delete' }, { type: 'separator' }, { role: 'selectAll' }] as MenuItemConstructorOptions[])),
+];
+
 export function setupApplicationMenu(): void {
   const isMac = process.platform === 'darwin';
 
@@ -46,17 +57,7 @@ export function setupApplicationMenu(): void {
 
   template.push({
     label: 'Edit',
-    submenu: [
-      { role: 'undo' },
-      { role: 'redo' },
-      { type: 'separator' },
-      { role: 'cut' },
-      { role: 'copy' },
-      { role: 'paste' },
-      ...(isMac
-        ? ([{ role: 'pasteAndMatchStyle' }, { role: 'delete' }, { role: 'selectAll' }] as MenuItemConstructorOptions[])
-        : ([{ role: 'delete' }, { type: 'separator' }, { role: 'selectAll' }] as MenuItemConstructorOptions[])),
-    ],
+    submenu: buildEditMenuItems(app.isPackaged, isMac),
   });
 
   template.push({

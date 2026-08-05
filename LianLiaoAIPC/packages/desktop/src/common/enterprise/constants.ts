@@ -4,8 +4,20 @@ export const ENTERPRISE_LOGIN_STATUSES = ['WAITING', 'AUTHENTICATED', 'REGISTER_
 
 export const ENTERPRISE_PROJECT_DRILL_LEVELS = ['l1', 'l2', 'shortName', 'materialName'] as const;
 
+export const ENTERPRISE_PROJECT_FILTER_DIMENSIONS = [
+  'province',
+  'city',
+  'categoryL1',
+  'categoryL2',
+  'materialShortName',
+  'materialName',
+] as const;
+
 export const ENTERPRISE_REGISTRATION_URL =
   'https://sjbang.lslnii.com/jjgc/foreground/vip_store/index.html#/qiyema/register';
+
+export const ENTERPRISE_CERTIFICATION_URL =
+  'https://sjbang.lslnii.com/jjgc/foreground/gesoftPayment/new_lsln/UPbusinesslicense.html';
 
 /** Fixed renderer-to-main channels for the enterprise desktop boundary. */
 export const ENTERPRISE_IPC_CHANNELS = Object.freeze({

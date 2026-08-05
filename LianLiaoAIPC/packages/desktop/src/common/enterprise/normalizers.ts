@@ -9,6 +9,7 @@ import type {
   EnterpriseDemandDetailField,
   EnterpriseDemandSummary,
   EnterpriseDemandTypeOption,
+  EnterpriseIndustryOption,
   EnterpriseOperation,
   EnterprisePage,
   EnterpriseProductDetail,
@@ -16,6 +17,7 @@ import type {
   EnterpriseProjectDetail,
   EnterpriseProjectDrillItem,
   EnterpriseProjectDrillLevel,
+  EnterpriseProjectFilterOption,
   EnterpriseProjectSummary,
   EnterpriseUserContext,
 } from './contracts';
@@ -25,6 +27,8 @@ import {
   enterpriseDemandRawSchema,
   enterpriseDemandTypeOptionRawSchema,
   enterpriseDrillRawSchema,
+  enterpriseProjectFilterOptionRawSchema,
+  enterpriseIndustryOptionRawSchema,
   enterprisePageRawSchema,
   enterpriseProductRawSchema,
   enterpriseProjectRawSchema,
@@ -43,6 +47,17 @@ const firstScalar = (...values: unknown[]): string | number | boolean | undefine
 const optionalText = (...values: unknown[]): string | undefined => {
   const value = firstScalar(...values);
   return typeof value === 'string' ? value.trim() : undefined;
+};
+
+/**
+ * Preserves display-oriented business values that may be serialized as either a
+ * number or a unit-bearing string by legacy H5 endpoints.
+ */
+const optionalDisplayText = (...values: unknown[]): string | undefined => {
+  const value = firstScalar(...values);
+  if (typeof value === 'string') return value.trim() || undefined;
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return String(value);
 };
 
 /** Accepts legacy textual dates and the finite integer timestamps returned by Oracle JSON serialization. */
@@ -200,6 +215,11 @@ const setText = <T extends object, K extends keyof T>(target: T, key: K, ...valu
   if (value !== undefined) target[key] = value as T[K];
 };
 
+const setDisplayText = <T extends object, K extends keyof T>(target: T, key: K, ...values: unknown[]) => {
+  const value = optionalDisplayText(...values);
+  if (value !== undefined) target[key] = value as T[K];
+};
+
 const setIdentifier = <T extends object, K extends keyof T>(
   target: T,
   key: K,
@@ -271,6 +291,7 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
   setText(result, 'city', raw.city, raw.CITY);
   setText(result, 'district', raw.district, raw.DISTRICT);
   setText(result, 'address', raw.address, raw.ADDRESS);
+  setText(result, 'logoUrl', raw.logoUrl, raw.LOGO_URL, raw.tempPic, raw.TEMP_PIC);
   setText(
     result,
     'legalRepresentative',
@@ -279,6 +300,7 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
     raw.corporation,
     raw.CORPORATION
   );
+  setDisplayText(result, 'registeredCapital', raw.registeredCapital, raw.REGISTERED_CAPITAL, raw.resCost, raw.RES_COST);
   setText(result, 'companyType', raw.companyType, raw.COMPANY_TYPE, raw.comType, raw.COM_TYPE);
   setNumber(result, 'companyLevel', raw.companyLevel, raw.COMPANY_LEVEL, raw.comLevel, raw.COM_LEVEL);
   setBoolean(result, 'vip', raw.vip, raw.VIP, raw.payVip, raw.PAY_VIP);
@@ -286,8 +308,26 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
   setText(result, 'businessSummary', raw.comAbs, raw.COM_ABS);
   setText(result, 'updatedAt', raw.inputTime, raw.INPUT_TIME);
   setBoolean(result, 'collected', raw.collected, raw.COLLECTED, raw.isCollect, raw.IS_COLLECT);
+  const featuredProducts = raw.featuredProducts ?? raw.FEATURED_PRODUCTS;
+  if (featuredProducts !== undefined) {
+    if (!Array.isArray(featuredProducts) || featuredProducts.length > 3) {
+      throw operationError(operation, 'invalid featuredProducts');
+    }
+    result.featuredProducts = featuredProducts.map((product) => normalizeProduct(product, 'product.list'));
+  }
+  const featuredProductCount = optionalNonNegativeInteger(
+    operation,
+    'featuredProductCount',
+    raw.featuredProductCount,
+    raw.FEATURED_PRODUCT_COUNT
+  );
+  if (featuredProductCount !== undefined) {
+    if (featuredProductCount < (result.featuredProducts?.length ?? 0)) {
+      throw operationError(operation, 'invalid featuredProductCount');
+    }
+    result.featuredProductCount = featuredProductCount;
+  }
   if (operation === 'company.detail') {
-    setText(result, 'logoUrl', raw.logoUrl, raw.LOGO_URL, raw.tempPic, raw.TEMP_PIC);
     setText(
       result,
       'description',
@@ -317,25 +357,49 @@ const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.d
 const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.detail'): EnterpriseProductDetail => {
   const raw = enterpriseProductRawSchema.parse(input);
   const hasDedicatedProductName =
-    optionalText(raw.productName, raw.PRODUCT_NAME, raw.productsName, raw.PRODUCTS_NAME) !== undefined;
+    optionalText(
+      raw.displayProductName,
+      raw.DISPLAY_PRODUCT_NAME,
+      raw.productName,
+      raw.PRODUCT_NAME,
+      raw.productsName,
+      raw.PRODUCTS_NAME
+    ) !== undefined;
   const result: EnterpriseProductDetail = {
-    productId: requiredIdentifier(operation, 'productId', raw.productId, raw.PRODUCT_ID, raw.id, raw.ID),
+    // Product detail endpoints are keyed by the numeric database ID. Some legacy
+    // rows also expose an opaque productId that cannot be used by FindProduct.
+    productId: requiredIdentifier(
+      operation,
+      'productId',
+      raw.detailProductId,
+      raw.DETAIL_PRODUCT_ID,
+      raw.id,
+      raw.ID,
+      raw.productId,
+      raw.PRODUCT_ID
+    ),
     name: requiredText(
       operation,
       'name',
+      raw.displayProductName,
+      raw.DISPLAY_PRODUCT_NAME,
       raw.productName,
       raw.PRODUCT_NAME,
       raw.productsName,
       raw.PRODUCTS_NAME,
       raw.name,
-      raw.NAME
+      raw.NAME,
+      raw.detailCompanyName,
+      raw.DETAIL_COMPANY_NAME,
+      raw.companyName,
+      raw.COMPANY_NAME
     ),
     companyId: requiredIdentifier(operation, 'companyId', raw.companyId, raw.COMPANY_ID),
   };
   setText(result, 'imageUrl', raw.imageUrl, raw.IMAGE_URL, raw.tempPic, raw.TEMP_PIC);
   setText(result, 'summary', raw.summary, raw.SUMMARY, raw.productAbs, raw.PRODUCT_ABS);
   setText(result, 'industry', raw.industry, raw.INDUSTRY);
-  setText(result, 'companyName', raw.companyName, raw.COMPANY_NAME);
+  setText(result, 'companyName', raw.detailCompanyName, raw.DETAIL_COMPANY_NAME, raw.companyName, raw.COMPANY_NAME);
   if (result.companyName === undefined && hasDedicatedProductName) setText(result, 'companyName', raw.name, raw.NAME);
   setText(result, 'companyIndustry', raw.compIndustry, raw.COMP_INDUSTRY, raw.industry1, raw.INDUSTRY1);
   setText(
@@ -537,6 +601,21 @@ const normalizeDemandTypeOption = (input: unknown): EnterpriseDemandTypeOption =
   const statMode = optionalText(raw.statMode);
   if (statMode === 'GRAB' || statMode === 'APPLICATION') result.statMode = statMode;
   return result;
+};
+
+const normalizeIndustryOptions = (input: unknown): EnterpriseIndustryOption[] => {
+  const operation = 'company.industries';
+  const rows = z.array(z.unknown()).parse(input);
+  const seen = new Set<string>();
+  return rows.map((item) => {
+    const raw = enterpriseIndustryOptionRawSchema.parse(item);
+    const industry = requiredText(operation, 'industry', raw.industry, raw.INDUSTRY);
+    const companyCount = requiredNonNegativeInteger(operation, 'companyCount', raw.companyCount, raw.COMPANY_COUNT);
+    if (companyCount < 10) throw operationError(operation, 'companyCount is below the supported threshold');
+    if (seen.has(industry)) throw operationError(operation, 'duplicate industry');
+    seen.add(industry);
+    return { industry, companyCount };
+  });
 };
 
 const normalizeDemandDetail = (input: unknown): EnterpriseDemandDetail => {
@@ -749,6 +828,17 @@ const normalizeDrillItem = (input: unknown): EnterpriseProjectDrillItem => {
   return result;
 };
 
+const normalizeProjectFilterOption = (input: unknown): EnterpriseProjectFilterOption => {
+  const operation = 'project.filterOptions';
+  const raw = enterpriseProjectFilterOptionRawSchema.parse(input);
+  const label = requiredText(operation, 'label', raw.label, raw.LABEL, raw.value, raw.VALUE);
+  return {
+    value: requiredText(operation, 'value', raw.value, raw.VALUE, label),
+    label,
+    projectCount: requiredNonNegativeInteger(operation, 'projectCount', raw.projectCount, raw.PROJECT_COUNT),
+  };
+};
+
 const describeParseError = (error: unknown): string => {
   if (error instanceof z.ZodError) {
     return error.issues.map((issue) => `${issue.path.join('.') || 'data'}: ${issue.message}`).join('; ');
@@ -769,6 +859,8 @@ export const enterpriseNormalizers = {
   normalizeDemandSummary,
   normalizeDemandTypeOption,
   normalizeDrillItem,
+  normalizeProjectFilterOption,
+  normalizeIndustryOptions,
   normalizePage,
   normalizeProduct,
   normalizeProjectDetail,

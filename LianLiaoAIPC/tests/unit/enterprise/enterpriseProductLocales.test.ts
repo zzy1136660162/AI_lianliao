@@ -3,9 +3,9 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const LOCALES = ['de-DE', 'en-US', 'ja-JP', 'ko-KR', 'pt-BR', 'ru-RU', 'tr-TR', 'uk-UA', 'zh-CN', 'zh-TW'];
-const ENGLISH_PRODUCTS = 'Browse the live enterprise product directory and open validated product records.';
+const ENGLISH_PRODUCTS = 'Browse verified featured products and open validated product records.';
 const ENGLISH_DETAIL = 'Review validated product information, its related company and masked contact details.';
-const CHINESE_PRODUCTS = '浏览已接入的真实企业产品库，并打开经过校验的产品档案。';
+const CHINESE_PRODUCTS = '浏览经过校验的重点产品，并打开完整产品档案。';
 const CHINESE_DETAIL = '查看经过校验的产品信息、关联企业与已脱敏的联系方式。';
 
 type EnterpriseLocale = {

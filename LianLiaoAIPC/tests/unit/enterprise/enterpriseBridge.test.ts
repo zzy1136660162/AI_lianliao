@@ -559,6 +559,22 @@ describe('enterprise bridge', () => {
     expect(apiClient.getUserContext).toHaveBeenCalledWith(OPEN_ID);
   });
 
+  it('re-queries the cloud user context when an authenticated session explicitly refreshes membership', async () => {
+    const refreshedContext: EnterpriseUserContext = { ...USER_CONTEXT, companyLevel: 3 };
+    const apiClient = makeApiClient();
+    apiClient.getUserContext.mockResolvedValueOnce(USER_CONTEXT).mockResolvedValueOnce(refreshedContext);
+    const sessionStore = makeSessionStore();
+    sessionStore.loadOpenId.mockResolvedValue(OPEN_ID);
+    const { handlers } = await initializeBridge(apiClient, sessionStore);
+
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE)).resolves.toEqual(USER_CONTEXT);
+    await expect(invokeHandler(handlers, ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE)).resolves.toEqual(refreshedContext);
+
+    expect(apiClient.getUserContext).toHaveBeenCalledTimes(2);
+    expect(apiClient.getUserContext).toHaveBeenNthCalledWith(2, OPEN_ID);
+    expect(sessionStore.loadOpenId).toHaveBeenCalledOnce();
+  });
+
   it('clears a persisted session when refresh explicitly reports unregistered', async () => {
     const apiClient = makeApiClient();
     apiClient.getUserContext.mockResolvedValue({ registered: false, openId: OPEN_ID });

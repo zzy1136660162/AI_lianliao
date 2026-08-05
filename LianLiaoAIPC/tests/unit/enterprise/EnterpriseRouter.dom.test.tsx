@@ -319,6 +319,34 @@ describe('enterprise desktop routing', () => {
     expect(assistant).toHaveAttribute('aria-hidden', 'true');
   });
 
+  it.each(['/enterprise/companies', '/enterprise/products'])(
+    'mounts the reusable catalog assistant on %s',
+    async (path) => {
+      renderAt(path);
+
+      expect(
+        await screen.findByRole(
+          'region',
+          { name: 'enterprise.catalogAssistant.title', hidden: true },
+          ROUTE_WAIT_OPTIONS
+        )
+      ).toBeInTheDocument();
+      expect(screen.queryByText('enterprise.assistant.title')).not.toBeInTheDocument();
+    }
+  );
+
+  it('keeps the shared catalog assistant collapsed on non-catalog routes', async () => {
+    renderAt('/enterprise/dashboard');
+
+    expect(
+      await screen.findByRole('button', { name: 'enterprise.assistant.actions.show' }, ROUTE_WAIT_OPTIONS)
+    ).toBeInTheDocument();
+    expect(screen.queryByText('enterprise.assistant.title')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('region', { name: 'enterprise.catalogAssistant.title', hidden: true })
+    ).toBeInTheDocument();
+  });
+
   it('returns to the collapsed default after the enterprise shell is remounted', async () => {
     const view = renderAt('/enterprise/dashboard');
     await userEvent.click(

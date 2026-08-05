@@ -9,6 +9,7 @@ import { customerServiceNavigationDetailSchema } from '@/common/enterprise/custo
 import { desktopNotificationClient } from '@/renderer/services/enterprise/desktop-notification/desktopNotificationClient';
 import type { DesktopNotificationInboxItem } from '@/common/enterprise/desktop-notification/contracts';
 import { desktopVersionClient } from '@/renderer/services/enterprise/desktop-version/desktopVersionClient';
+import { recordEnterprisePageView } from '@/renderer/services/enterprise/enterpriseBehaviorLog';
 import type {
   DesktopVersionDownloadResult,
   DesktopVersionRelease,
@@ -18,9 +19,23 @@ import EnterpriseAntdProvider from './EnterpriseAntdProvider';
 import EnterpriseHeader from './EnterpriseHeader';
 import EnterpriseSider from './EnterpriseSider';
 import EnterpriseWindowChrome from './EnterpriseWindowChrome';
+import { CatalogAiAssistant } from './catalog/assistant/CatalogAiAssistant';
+import { CatalogAssistantProvider } from './catalog/assistant/CatalogAssistantProvider';
 import './enterprise-shell.css';
 
 const MAX_RENDERER_REMINDER_IDS = 2_000;
+
+const EnterpriseAssistantPlaceholder: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <div className='enterprise-assistant__placeholder'>
+      <div className='enterprise-assistant__index'>{t('enterprise.assistant.index')}</div>
+      <Robot size={24} />
+      <h2>{t('enterprise.assistant.title')}</h2>
+      <p>{t('enterprise.assistant.description')}</p>
+    </div>
+  );
+};
 
 /** Enterprise workspace content rendered inside the shared Ant Design application context. */
 const EnterpriseShellContent: React.FC = () => {
@@ -42,12 +57,18 @@ const EnterpriseShellContent: React.FC = () => {
   const [forceOpening, setForceOpening] = useState(false);
   const isCustomerServiceRoute = location.pathname.startsWith('/enterprise/customer-service');
   const isCustomerConsultationRoute = location.pathname.startsWith('/enterprise/consultation');
+  const isDemandPublishRoute = location.pathname === '/enterprise/supply-demand/publish';
   const isRealtimeServiceRoute = isCustomerServiceRoute || isCustomerConsultationRoute;
-  const effectiveAssistantOpen = assistantOpen && !isRealtimeServiceRoute;
+  const isEnterpriseAssistantAvailable = !isRealtimeServiceRoute && !isDemandPublishRoute;
+  const effectiveAssistantOpen = assistantOpen && isEnterpriseAssistantAvailable;
 
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
   }, [location.pathname]);
+
+  useEffect(() => {
+    recordEnterprisePageView(location.pathname, location.search);
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const handleCustomerServiceNavigation = (event: Event): void => {
@@ -156,7 +177,7 @@ const EnterpriseShellContent: React.FC = () => {
         <div className='enterprise-shell__workspace'>
           <EnterpriseHeader
             assistantOpen={effectiveAssistantOpen}
-            assistantAvailable={!isRealtimeServiceRoute}
+            assistantAvailable={isEnterpriseAssistantAvailable}
             notificationUnreadCount={notificationUnreadCount}
             onOpenNotifications={() => void navigate('/enterprise/notifications')}
             onToggleAssistant={() => setAssistantOpen((current) => !current)}
@@ -177,10 +198,7 @@ const EnterpriseShellContent: React.FC = () => {
               aria-label={t('enterprise.accessibility.assistant')}
               aria-hidden={!effectiveAssistantOpen}
             >
-              <div className='enterprise-assistant__index'>{t('enterprise.assistant.index')}</div>
-              <Robot size={24} />
-              <h2>{t('enterprise.assistant.title')}</h2>
-              <p>{t('enterprise.assistant.description')}</p>
+              {isEnterpriseAssistantAvailable ? <CatalogAiAssistant /> : <EnterpriseAssistantPlaceholder />}
             </aside>
           </div>
         </div>
@@ -222,7 +240,9 @@ const EnterpriseShellContent: React.FC = () => {
 /** Three-column enterprise workspace with a separately collapsible assistant slot. */
 const EnterpriseShell: React.FC = () => (
   <EnterpriseAntdProvider>
-    <EnterpriseShellContent />
+    <CatalogAssistantProvider>
+      <EnterpriseShellContent />
+    </CatalogAssistantProvider>
   </EnterpriseAntdProvider>
 );
 

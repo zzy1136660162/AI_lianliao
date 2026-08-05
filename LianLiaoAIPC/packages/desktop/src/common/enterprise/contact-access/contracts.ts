@@ -3,13 +3,17 @@ export const ENTERPRISE_CONTACT_RESOURCE_TYPES = ['COMPANY', 'PRODUCT', 'PROJECT
 
 export type EnterpriseContactResourceType = (typeof ENTERPRISE_CONTACT_RESOURCE_TYPES)[number];
 
-/** Stable renderer model derived from CompanyController/getCanCallPhone. */
+export const ENTERPRISE_CONTACT_ACTIONS = ['NONE', 'REGISTER', 'CERTIFY', 'UPGRADE', 'RETRY'] as const;
+
+export type EnterpriseContactAction = (typeof ENTERPRISE_CONTACT_ACTIONS)[number];
+
+/** Stable renderer model returned by DesktopContactController/acquire. */
 export type EnterpriseContactAccess = {
   allowed: boolean;
   errType: number;
   message: string;
-  actionUrl: string;
-  /** Present only after the main process has received an affirmative backend decision. */
+  action: EnterpriseContactAction;
+  /** Present only after the cloud service has granted this real-time request. */
   phone?: string;
 };
 

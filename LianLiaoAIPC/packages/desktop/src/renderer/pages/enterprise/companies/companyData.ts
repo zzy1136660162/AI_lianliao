@@ -2,6 +2,7 @@ import type {
   CompanyListQuery,
   EnterpriseCompanyDetail,
   EnterpriseCompanySummary,
+  EnterpriseIndustryOption,
   EnterpriseIpcErrorCode,
   EnterprisePage,
   EnterpriseProductSummary,
@@ -9,7 +10,9 @@ import type {
 import { ENTERPRISE_IPC_ERROR_MESSAGES } from '@/common/enterprise/constants';
 import {
   createPlainEnterpriseRecordParser,
+  getPlainEnterpriseDataFields,
   isNumericEnterpriseId,
+  parsePlainEnterpriseDataArray,
   parseEnterpriseOperationData,
   parseEnterprisePage,
   parseSafeEnterpriseImageUrl,
@@ -50,6 +53,13 @@ export type CompanyDetailState = {
   data: CompanyDetailBundle | null;
   isLoading: boolean;
   isInvalidId: boolean;
+  errorCode: EnterpriseIpcErrorCode | null;
+  retry: () => void;
+};
+
+export type CompanyIndustryOptionsState = {
+  data: EnterpriseIndustryOption[];
+  isLoading: boolean;
   errorCode: EnterpriseIpcErrorCode | null;
   retry: () => void;
 };
@@ -166,6 +176,7 @@ const COMPANY_SUMMARY_FIELD_RULES = [
   ['companyId', 'string', true, true],
   ['name', 'string', true],
   ['shortName', 'string'],
+  ['logoUrl', 'string'],
   ['industry', 'string'],
   ['province', 'string'],
   ['city', 'string'],
@@ -174,11 +185,13 @@ const COMPANY_SUMMARY_FIELD_RULES = [
   ['businessSummary', 'string'],
   ['updatedAt', 'string'],
   ['legalRepresentative', 'string'],
+  ['registeredCapital', 'string'],
   ['companyType', 'string'],
   ['companyLevel', 'finiteNumber'],
   ['vip', 'boolean'],
   ['establishedAt', 'string'],
   ['collected', 'boolean'],
+  ['featuredProductCount', 'finiteNumber'],
 ] as const satisfies readonly EnterpriseDataFieldRule[];
 
 const COMPANY_DETAIL_FIELD_RULES = [
@@ -211,9 +224,39 @@ const PRODUCT_FIELD_RULES = [
   ['collected', 'boolean'],
 ] as const satisfies readonly EnterpriseDataFieldRule[];
 
-const parseCompanySummary = createPlainEnterpriseRecordParser<EnterpriseCompanySummary>(COMPANY_SUMMARY_FIELD_RULES);
+const INDUSTRY_OPTION_FIELD_RULES = [
+  ['industry', 'string', true, true],
+  ['companyCount', 'finiteNumber', true],
+] as const satisfies readonly EnterpriseDataFieldRule[];
+
 const parseCompanyDetail = createPlainEnterpriseRecordParser<EnterpriseCompanyDetail>(COMPANY_DETAIL_FIELD_RULES);
 const parseProduct = createPlainEnterpriseRecordParser<EnterpriseProductSummary>(PRODUCT_FIELD_RULES);
+const parseIndustryOptionFields =
+  createPlainEnterpriseRecordParser<EnterpriseIndustryOption>(INDUSTRY_OPTION_FIELD_RULES);
+const parseCompanySummaryFields =
+  createPlainEnterpriseRecordParser<EnterpriseCompanySummary>(COMPANY_SUMMARY_FIELD_RULES);
+
+const parseCompanySummary = (value: unknown): EnterpriseCompanySummary | null => {
+  const fields = getPlainEnterpriseDataFields(value);
+  if (!fields) return null;
+  const featuredProductsValue = fields.get('featuredProducts');
+  const scalarFields = Object.fromEntries([...fields].filter(([key]) => key !== 'featuredProducts')) as Record<
+    string,
+    unknown
+  >;
+  const company = parseCompanySummaryFields(scalarFields);
+  if (!company) return null;
+  if (featuredProductsValue === undefined) return company;
+  const featuredProducts = parsePlainEnterpriseDataArray(featuredProductsValue, parseProduct);
+  if (!featuredProducts || featuredProducts.length > 3) return null;
+  if (
+    company.featuredProductCount !== undefined &&
+    (!Number.isSafeInteger(company.featuredProductCount) || company.featuredProductCount < featuredProducts.length)
+  ) {
+    return null;
+  }
+  return { ...company, featuredProducts };
+};
 
 /** Fetches and validates a real company page; malformed pages fail closed. */
 export const loadCompanyList = async (
@@ -233,6 +276,31 @@ export const loadCompanyList = async (
   );
   if (!page) throw new CompanyDataError('INVALID_RESPONSE');
   return page;
+};
+
+const parseIndustryOption = (value: unknown): EnterpriseIndustryOption | null => {
+  const option = parseIndustryOptionFields(value);
+  if (!option || !Number.isSafeInteger(option.companyCount) || option.companyCount < 10) {
+    return null;
+  }
+  return option;
+};
+
+export const loadCompanyIndustryOptions = async (
+  client: Pick<EnterpriseClient, 'request'>,
+  signal: AbortSignal
+): Promise<EnterpriseIndustryOption[]> => {
+  throwIfAborted(signal);
+  const response = await client.request({ operation: 'company.industries', payload: {} });
+  throwIfAborted(signal);
+  const options = parsePlainEnterpriseDataArray(
+    parseEnterpriseOperationData(response, 'company.industries'),
+    parseIndustryOption
+  );
+  if (!options || new Set(options.map((option) => option.industry)).size !== options.length) {
+    throw new CompanyDataError('INVALID_RESPONSE');
+  }
+  return options;
 };
 
 /** Parses the numeric Oracle company identity accepted by the current backend route. */
@@ -379,6 +447,34 @@ export const useCompanyCatalog = (
   const retry = useCallback(() => setRetryGeneration((value) => value + 1), []);
 
   return { query, data, isLoading, isRetainingData, errorCode, applyFilters, changePage, retry };
+};
+
+export const useCompanyIndustryOptions = (client: Pick<EnterpriseClient, 'request'>): CompanyIndustryOptionsState => {
+  const [data, setData] = useState<EnterpriseIndustryOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorCode, setErrorCode] = useState<EnterpriseIpcErrorCode | null>(null);
+  const [retryGeneration, setRetryGeneration] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+    setErrorCode(null);
+    void loadCompanyIndustryOptions(client, controller.signal)
+      .then((options) => {
+        if (!controller.signal.aborted) setData(options);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || isAbortError(error)) return;
+        setErrorCode(safeErrorCode(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, [client, retryGeneration]);
+
+  const retry = useCallback(() => setRetryGeneration((value) => value + 1), []);
+  return { data, isLoading, errorCode, retry };
 };
 
 /** Loads one strict route identity and prevents unmounted or replaced requests from updating the page. */

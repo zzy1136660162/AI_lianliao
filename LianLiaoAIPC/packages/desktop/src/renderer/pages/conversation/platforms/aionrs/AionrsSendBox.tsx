@@ -142,7 +142,7 @@ const AionrsSendBox: React.FC<{
   const teamPermission = useTeamPermission();
   const propagateMode = teamPermission?.propagateMode;
 
-  const { thought, running, setActiveMsgId, setWaitingResponse, resetState } = useAionrsMessage(conversation_id, {
+  const { thought, setActiveMsgId, setWaitingResponse, resetState } = useAionrsMessage(conversation_id, {
     onConfigChanged: (capabilities) => {
       const modes = (capabilities as { modes?: string[] })?.modes;
       if (modes && modes.length > 0) {
@@ -167,7 +167,7 @@ const AionrsSendBox: React.FC<{
     if (teamPermission) {
       await teamPermission.warmupSession();
     }
-    await warmupConversation(conversation_id);
+    return warmupConversation(conversation_id);
   }, [conversation_id, teamPermission]);
   const runtimeConfig = useAcpConfigOptions({
     conversation_id,
@@ -621,7 +621,11 @@ const AionrsSendBox: React.FC<{
         onRemove={remove}
         onClear={clear}
       />
-      <ThoughtDisplay thought={thought} running={teamRuntime?.loading ?? running} onStop={effectiveHandleStop} />
+      <ThoughtDisplay
+        thought={thought}
+        running={teamRuntime?.loading ?? runtimeView.isProcessing}
+        onStop={effectiveHandleStop}
+      />
 
       <SendBox
         data-testid='aionrs-sendbox'

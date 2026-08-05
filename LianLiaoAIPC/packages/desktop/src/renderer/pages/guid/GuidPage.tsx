@@ -498,13 +498,13 @@ const GuidPage: React.FC = () => {
           <div className={styles.heroHeader}>
             <p className='text-2xl font-semibold mb-0 text-0 text-center'>{t('conversation.welcome.title')}</p>
           </div>
-
-          <AssistantSelectionArea
+          {/*暂时隐藏选择AI区域 2026年8月2日 22:38:42*/}
+          {/*    <AssistantSelectionArea
             selectedAssistantId={agentSelection.selectedAssistantId}
             assistants={agentSelection.assistants}
             localeKey={localeKey}
             onSelectAssistant={handleSelectAssistant}
-          />
+          />*/}
 
           <GuidInputCard
             input={guidInput.input}

@@ -21,6 +21,7 @@ import {
 } from './customerServiceReducer';
 
 const PAGE_SIZE = 50;
+const SEND_ACK_TIMEOUT_MS = 15_000;
 const ALLOWED_IMAGE_TYPES = ['image/gif', 'image/jpeg', 'image/png', 'image/webp'] as const;
 const SIGNED_BUSINESS_ID = /^-?[1-9]\d*$/;
 
@@ -83,10 +84,29 @@ export const useCustomerServiceWorkbench = (
   const mountedRef = useRef(false);
   const stateRef = useRef(state);
   const viewingLatestRef = useRef(true);
+  const pendingSendTimeoutsRef = useRef(
+    new Map<string, { conversationId: string; timeout: ReturnType<typeof setTimeout> }>()
+  );
 
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  const clearPendingSendTimeout = useCallback((clientMessageId: string): void => {
+    const pending = pendingSendTimeoutsRef.current.get(clientMessageId);
+    if (pending) clearTimeout(pending.timeout);
+    pendingSendTimeoutsRef.current.delete(clientMessageId);
+  }, []);
+
+  const failAllPendingSends = useCallback((): void => {
+    const pendingSends = [...pendingSendTimeoutsRef.current.entries()];
+    for (const [clientMessageId, pending] of pendingSends) {
+      clearPendingSendTimeout(clientMessageId);
+      if (mountedRef.current) {
+        dispatch({ type: 'message.failed', conversationId: pending.conversationId, clientMessageId });
+      }
+    }
+  }, [clearPendingSendTimeout]);
 
   const updateDeepLink = useCallback(
     (conversationId: string) => {
@@ -193,7 +213,17 @@ export const useCustomerServiceWorkbench = (
       const selectedConversationId = currentState.selectedConversationId;
       const viewingLatest = viewingLatestRef.current && event.conversationId === selectedConversationId;
       dispatch({ type: 'event.received', event, viewingLatest });
-      if (event.event === 'connection.ready') dispatch({ type: 'connection.changed', state: 'CONNECTED' });
+      if (event.event === 'connection.ready') {
+        dispatch({ type: 'connection.changed', state: 'CONNECTED' });
+        setErrorKey(null);
+      }
+      if (event.event === 'message.ack') {
+        clearPendingSendTimeout((event.payload as { clientMessageId: string }).clientMessageId);
+      }
+      if (event.event === 'message.created') {
+        clearPendingSendTimeout((event.payload as CustomerServiceMessage).clientMessageId);
+      }
+      if (event.event === 'error') failAllPendingSends();
 
       if (event.event === 'message.created') {
         const message = event.payload as CustomerServiceMessage;
@@ -225,9 +255,11 @@ export const useCustomerServiceWorkbench = (
     return () => {
       mountedRef.current = false;
       unsubscribe();
+      for (const pending of pendingSendTimeoutsRef.current.values()) clearTimeout(pending.timeout);
+      pendingSendTimeoutsRef.current.clear();
       void client.disconnect().catch((): undefined => undefined);
     };
-  }, [client, initialize]);
+  }, [clearPendingSendTimeout, client, failAllPendingSends, initialize]);
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
@@ -280,6 +312,14 @@ export const useCustomerServiceWorkbench = (
         image,
         localCreatedAt: Date.now(),
       });
+      clearPendingSendTimeout(clientMessageId);
+      pendingSendTimeoutsRef.current.set(clientMessageId, {
+        conversationId,
+        timeout: setTimeout(() => {
+          pendingSendTimeoutsRef.current.delete(clientMessageId);
+          if (mountedRef.current) dispatch({ type: 'message.failed', conversationId, clientMessageId });
+        }, SEND_ACK_TIMEOUT_MS),
+      });
       try {
         await client.sendMessage(
           messageType === 'TEXT'
@@ -288,11 +328,12 @@ export const useCustomerServiceWorkbench = (
         );
         return true;
       } catch {
+        clearPendingSendTimeout(clientMessageId);
         if (mountedRef.current) dispatch({ type: 'message.failed', conversationId, clientMessageId });
         return false;
       }
     },
-    [client]
+    [clearPendingSendTimeout, client]
   );
 
   const sendText = useCallback(

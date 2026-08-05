@@ -562,7 +562,10 @@ describe('customer-service native notification target', () => {
         database: { getUserConversations: { invoke: vi.fn(async () => ({ items: [] })) } },
       },
     }));
-    vi.doMock('@process/services/i18n', () => ({ default: { t: (key: string) => key } }));
+    vi.doMock('@process/services/i18n', () => ({
+      default: { getFixedT: () => (key: string) => key, t: (key: string) => key },
+      i18nReady: Promise.resolve(),
+    }));
     const { CUSTOMER_SERVICE_NAVIGATE_CHANNEL } = await import('@/common/enterprise/customer-service/constants');
     const { openCustomerServiceConversation, setTrayMainWindow, shouldNotifyCustomerServiceMessage } =
       await import('@process/utils/tray');
@@ -621,7 +624,10 @@ describe('customer-service native notification target', () => {
         database: { getUserConversations: { invoke: vi.fn(async () => ({ items: [] })) } },
       },
     }));
-    vi.doMock('@process/services/i18n', () => ({ default: { t: (key: string) => key } }));
+    vi.doMock('@process/services/i18n', () => ({
+      default: { getFixedT: () => (key: string) => key, t: (key: string) => key },
+      i18nReady: Promise.resolve(),
+    }));
     const { createOrUpdateTray, destroyTray, setCustomerServiceUnreadCount, setTrayMainWindow } =
       await import('@process/utils/tray');
     const window = {
@@ -657,6 +663,84 @@ describe('customer-service native notification target', () => {
     destroyTray();
   });
 
+  it('keeps the branded tray menu in Simplified Chinese when the active app language is English', async () => {
+    vi.resetModules();
+    vi.doUnmock('@process/utils/tray');
+    const trayInstance = {
+      destroy: vi.fn(),
+      on: vi.fn(),
+      setContextMenu: vi.fn(),
+      setTitle: vi.fn(),
+      setToolTip: vi.fn(),
+    };
+    const buildFromTemplate = vi.fn((template: Electron.MenuItemConstructorOptions[]) => template);
+    const simplifiedChineseLabels: Record<string, string> = {
+      'common.tray.showWindow': '显示链辽AI',
+      'common.tray.closeToTray': '隐藏到托盘',
+      'common.tray.newChat': '新建对话',
+      'enterprise.customerService.title': '客服接待',
+      'common.tray.runningTasks': '运行中的任务',
+      'common.tray.pauseAll': '暂停所有任务',
+      'pet.desktopPet': '桌面宠物',
+      'common.tray.checkUpdate': '检查更新',
+      'common.tray.about': '关于链辽AI',
+      'common.tray.restart': '重启应用',
+      'common.tray.quit': '退出',
+    };
+    const getFixedT = vi.fn((language: string) => {
+      expect(language).toBe('zh-CN');
+      return (key: string): string => simplifiedChineseLabels[key] ?? key;
+    });
+    vi.doMock('@/common/electronSafe', () => ({
+      electronApp: { isPackaged: false },
+      electronMenu: { buildFromTemplate },
+      electronNativeImage: {
+        createFromPath: vi.fn(() => ({ resize: vi.fn(() => ({})) })),
+      },
+      electronTray: vi.fn(function TrayMock() {
+        return trayInstance;
+      }),
+    }));
+    vi.doMock('@/common', () => ({
+      ipcBridge: {
+        conversation: { activeCount: { invoke: vi.fn(async () => ({ count: 0 })) } },
+        database: { getUserConversations: { invoke: vi.fn(async () => ({ items: [] })) } },
+      },
+    }));
+    vi.doMock('@process/services/i18n', () => ({
+      default: {
+        getFixedT,
+        t: (key: string): string => `English:${key}`,
+      },
+      i18nReady: Promise.resolve(),
+    }));
+
+    const { createOrUpdateTray, destroyTray } = await import('@process/utils/tray');
+    createOrUpdateTray();
+
+    await vi.waitFor(() => expect(buildFromTemplate).toHaveBeenCalled());
+    const template = buildFromTemplate.mock.calls.at(-1)?.[0] ?? [];
+    const labels = template.map((item) => item.label).filter((label): label is string => typeof label === 'string');
+    expect(getFixedT).toHaveBeenCalledWith('zh-CN');
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        '显示链辽AI',
+        '隐藏到托盘',
+        '新建对话',
+        '客服接待: 0',
+        '运行中的任务: 0',
+        '暂停所有任务',
+        '🐾 桌面宠物',
+        '检查更新',
+        '关于链辽AI',
+        '重启应用',
+        '退出',
+      ])
+    );
+    expect(labels.some((label) => label.startsWith('English:'))).toBe(false);
+    destroyTray();
+  });
+
   it('recreates a destroyed main window from the permanent tray entry', async () => {
     vi.resetModules();
     vi.doUnmock('@process/utils/tray');
@@ -687,7 +771,10 @@ describe('customer-service native notification target', () => {
         database: { getUserConversations: { invoke: vi.fn(async () => ({ items: [] })) } },
       },
     }));
-    vi.doMock('@process/services/i18n', () => ({ default: { t: (key: string) => key } }));
+    vi.doMock('@process/services/i18n', () => ({
+      default: { getFixedT: () => (key: string) => key, t: (key: string) => key },
+      i18nReady: Promise.resolve(),
+    }));
     const { createOrUpdateTray, destroyTray, setTrayMainWindow } = await import('@process/utils/tray');
     const createWindow = vi.fn();
     setTrayMainWindow(
@@ -720,7 +807,10 @@ describe('customer-service native notification target', () => {
         database: { getUserConversations: { invoke: vi.fn(async () => ({ items: [] })) } },
       },
     }));
-    vi.doMock('@process/services/i18n', () => ({ default: { t: (key: string) => key } }));
+    vi.doMock('@process/services/i18n', () => ({
+      default: { getFixedT: () => (key: string) => key, t: (key: string) => key },
+      i18nReady: Promise.resolve(),
+    }));
     const { CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL } = await import('@/common/enterprise/customer-service/constants');
     const { openCustomerConsultation, setTrayMainWindow, shouldNotifyCustomerConsultationMessage } =
       await import('@process/utils/tray');

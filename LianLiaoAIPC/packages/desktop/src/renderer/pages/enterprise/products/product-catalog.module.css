@@ -56,7 +56,7 @@
 
 .filterForm {
   display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) repeat(4, minmax(120px, 1fr));
+  grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(140px, 1fr));
   gap: 10px;
   align-items: end;
 }
@@ -323,8 +323,7 @@
   line-height: 1.55;
 }
 
-.quickViewHint,
-.permissionNote {
+.quickViewHint {
   margin: 18px 0;
   color: var(--text-secondary);
   font-size: 11px;
@@ -459,6 +458,59 @@
   line-height: 1.85;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.richText {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+
+.richText > :first-child {
+  margin-top: 0;
+}
+
+.richText > :last-child {
+  margin-bottom: 0;
+}
+
+.richText p,
+.richText ul,
+.richText ol,
+.richText blockquote {
+  margin: 0 0 12px;
+}
+
+.richText ul,
+.richText ol {
+  padding-left: 22px;
+}
+
+.richText a {
+  color: var(--primary);
+  text-underline-offset: 3px;
+}
+
+.richText img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border-radius: 8px;
+}
+
+.richText table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.richText th,
+.richText td {
+  padding: 6px 8px;
+  border: 1px solid var(--border-light);
 }
 
 @keyframes product-preview-enter {

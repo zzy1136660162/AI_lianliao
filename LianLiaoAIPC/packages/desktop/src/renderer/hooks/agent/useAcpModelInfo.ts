@@ -6,7 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import type { IResponseMessage } from '@/common/adapter/ipcBridge';
-import type { AcpConfigOptionDto, AcpModelInfo } from '@/common/types/platform/acpTypes';
+import type { AcpConfigOptionDto, AcpModelInfo, PrepareConversationRuntime } from '@/common/types/platform/acpTypes';
 import { type AcpConfigSetStatus, type AcpDerivedOption, useAcpConfigOptions } from './useAcpConfigOptions';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -14,7 +14,7 @@ type UseAcpModelInfoArgs = {
   conversation_id: string;
   backend?: string;
   initialModelId?: string;
-  prepareRuntime?: () => Promise<void>;
+  prepareRuntime?: PrepareConversationRuntime;
   enabled?: boolean;
   onSelectModelSuccess?: (model_id: string) => void;
   onSelectModelFailed?: (model_id: string, error: unknown) => void;

@@ -37,6 +37,25 @@ const recoveredSnapshot: DemandAiConversationSnapshot = {
 };
 
 describe('useDemandAiConversation candidate recovery', () => {
+  it('resumes the exact handoff session supplied by the navigation route', async () => {
+    const request = vi.fn(async (input): Promise<EnterpriseResponse> => {
+      if (input.operation !== 'demand.aiConversation.resume') {
+        throw new Error(`Unexpected operation: ${input.operation}`);
+      }
+      expect(input.payload.sessionId).toBe(confirmingSnapshot.sessionId);
+      return { operation: input.operation, data: confirmingSnapshot };
+    });
+    const client = { request } as unknown as EnterpriseClient;
+    const { result } = renderHook(() => useDemandAiConversation(client));
+
+    await act(async () => {
+      await result.current.resume(confirmingSnapshot.sessionId);
+    });
+
+    expect(result.current.snapshot?.sessionId).toBe(confirmingSnapshot.sessionId);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
   it('resumes the committed server snapshot when confirmation response is reported as failed', async () => {
     const request = vi.fn(async (input): Promise<EnterpriseResponse> => {
       if (input.operation === 'demand.aiConversation.start') {

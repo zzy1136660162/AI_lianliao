@@ -8,6 +8,7 @@ import type { EnterpriseProductSummary } from '@/common/enterprise/contracts';
 import { CatalogQuickViewPanel } from '@/renderer/pages/enterprise/layout/catalog/CatalogLayout';
 import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
 
+import ProductRichText from './ProductRichText';
 import styles from './product-catalog.module.css';
 
 export type ProductQuickViewProps = {
@@ -81,7 +82,9 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({ product, onClose, o
         </div>
         <div>
           <dt>{t('enterprise.products.fields.summary')}</dt>
-          <dd>{product.summary || missing}</dd>
+          <dd>
+            <ProductRichText className={styles.richText} html={product.summary} fallback={missing} />
+          </dd>
         </div>
       </dl>
     </CatalogQuickViewPanel>

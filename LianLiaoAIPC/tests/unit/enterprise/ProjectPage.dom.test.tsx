@@ -92,6 +92,23 @@ const drillResponse = (): EnterpriseResponse => ({
   ],
 });
 
+const filterOptionsResponse = (dimension: string): EnterpriseResponse =>
+  ({
+    operation: 'project.filterOptions',
+    data:
+      dimension === 'province'
+        ? [{ value: 'Liaoning', label: 'Liaoning', projectCount: 128 }]
+        : dimension === 'city'
+          ? [{ value: 'Shenyang', label: 'Shenyang', projectCount: 80 }]
+          : dimension === 'categoryL1'
+            ? [{ value: 'Building materials', label: 'Building materials', projectCount: 72 }]
+            : dimension === 'categoryL2'
+              ? [{ value: 'Cement', label: 'Cement', projectCount: 42 }]
+              : dimension === 'materialShortName'
+                ? [{ value: 'Portland cement', label: 'Portland cement', projectCount: 21 }]
+                : [{ value: 'P.O 42.5', label: 'P.O 42.5', projectCount: 12 }],
+  }) as unknown as EnterpriseResponse;
+
 const listResponse = (
   name = 'Factory expansion',
   hpInfoId = '901',
@@ -127,6 +144,11 @@ const createRequest = () =>
     if (request.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
     if (request.operation === 'project.drill') return Promise.resolve(drillResponse());
     if (request.operation === 'project.list') return Promise.resolve(listResponse());
+    if ((request as { operation: string }).operation === 'project.filterOptions') {
+      return Promise.resolve(
+        filterOptionsResponse((request as unknown as { payload: { dimension: string } }).payload.dimension)
+      );
+    }
     return Promise.reject(new Error('unexpected operation'));
   });
 
@@ -156,6 +178,17 @@ const renderProjects = (client: EnterpriseClient) =>
     </EnterpriseAntdProvider>
   );
 
+const selectProjectFilterOption = async (_user: ReturnType<typeof userEvent.setup>, label: string, option: RegExp) => {
+  const combobox = screen.getByRole('combobox', { name: label });
+  fireEvent.mouseDown(combobox);
+  const optionTextNodes = await screen.findAllByText(option);
+  const optionElement = optionTextNodes
+    .map((node) => node.closest('.ll-ant-select-item-option'))
+    .find((node): node is HTMLElement => node instanceof HTMLElement);
+  expect(optionElement).toBeDefined();
+  fireEvent.click(optionElement!);
+};
+
 describe('project dashboard and catalog', () => {
   afterEach(() => {
     cleanup();
@@ -169,14 +202,20 @@ describe('project dashboard and catalog', () => {
     expect(await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible();
     expect(container.querySelector('.ll-ant-table')).toBeInTheDocument();
     expect(container.querySelector('[class*="arco-"]')).not.toBeInTheDocument();
-    expect(screen.getByText('128')).toBeVisible();
+    expect(screen.queryByText('128')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /enterprise\.projects\.dashboard\.expand/ }));
+    const expandedToggle = await screen.findByRole('button', {
+      name: /enterprise\.projects\.dashboard\.collapse/,
+    });
+    expect(expandedToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('128')).toBeInTheDocument();
     expect(container).toHaveTextContent('36.5');
-    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.regionTitle' })).toBeVisible();
-    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.materialTitle' })).toBeVisible();
-    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeVisible();
-    expect(screen.getByText('Shenyang')).toBeVisible();
-    expect(screen.getByText('Building materials')).toBeVisible();
-    expect(screen.getByText('<strong>Steel and cement</strong>')).toBeVisible();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.regionTitle' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.materialTitle' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeInTheDocument();
+    expect(screen.getByText('Shenyang')).toBeInTheDocument();
+    expect(screen.getByText('Building materials')).toBeInTheDocument();
+    expect(screen.getByText('<strong>Steel and cement</strong>')).toBeInTheDocument();
     expect(container.querySelector('strong strong')).toBeNull();
   });
 
@@ -201,12 +240,17 @@ describe('project dashboard and catalog', () => {
 
     renderProjects(createClient(request));
     await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
+    fireEvent.click(screen.getByRole('button', { name: /enterprise\.projects\.dashboard\.expand/ }));
 
+    const expandedToggle = await screen.findByRole('button', {
+      name: /enterprise\.projects\.dashboard\.collapse/,
+    });
+    expect(expandedToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('enterprise.projects.dashboard.categoryEmpty')).toBeInTheDocument();
     expect(screen.queryByRole('img', { name: 'enterprise.projects.dashboard.regionTitle' })).toBeNull();
     expect(screen.queryByRole('img', { name: 'enterprise.projects.dashboard.materialTitle' })).toBeNull();
     expect(screen.queryByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeNull();
     expect(screen.getAllByText('enterprise.projects.dashboard.distributionEmpty')).toHaveLength(2);
-    expect(screen.getByText('enterprise.projects.dashboard.categoryEmpty')).toBeVisible();
   });
 
   it('desensitizes list and quick-view names while preserving the numeric detail route', async () => {
@@ -231,6 +275,7 @@ describe('project dashboard and catalog', () => {
   });
 
   it('submits all desktop project filters at page one', async () => {
+    const user = userEvent.setup();
     const request = createRequest();
     renderProjects(createClient(request));
     await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
@@ -238,24 +283,16 @@ describe('project dashboard and catalog', () => {
     fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.keywordPlaceholder'), {
       target: { value: ' factory ' },
     });
-    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.categoryL1Placeholder'), {
-      target: { value: ' Building ' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.categoryL2Placeholder'), {
-      target: { value: ' Materials ' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.materialShortNamePlaceholder'), {
-      target: { value: ' Cement ' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.materialNamePlaceholder'), {
-      target: { value: ' P.O 42.5 ' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.provincePlaceholder'), {
-      target: { value: ' Liaoning ' },
-    });
-    fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.cityPlaceholder'), {
-      target: { value: ' Shenyang ' },
-    });
+    await selectProjectFilterOption(user, 'enterprise.projects.filters.provinceLabel', /^Liaoning \(128\)$/);
+    await selectProjectFilterOption(user, 'enterprise.projects.filters.cityLabel', /^Shenyang \(80\)$/);
+    await selectProjectFilterOption(user, 'enterprise.projects.filters.categoryL1Label', /^Building materials \(72\)$/);
+    await selectProjectFilterOption(user, 'enterprise.projects.filters.categoryL2Label', /^Cement \(42\)$/);
+    await selectProjectFilterOption(
+      user,
+      'enterprise.projects.filters.materialShortNameLabel',
+      /^Portland cement \(21\)$/
+    );
+    await selectProjectFilterOption(user, 'enterprise.projects.filters.materialNameLabel', /^P\.O 42\.5 \(12\)$/);
     fireEvent.change(screen.getByPlaceholderText('enterprise.projects.filters.minInvestmentPlaceholder'), {
       target: { value: '1000' },
     });
@@ -269,9 +306,9 @@ describe('project dashboard and catalog', () => {
         operation: 'project.list',
         payload: {
           keyword: 'factory',
-          categoryL1: 'Building',
-          categoryL2: 'Materials',
-          materialShortName: 'Cement',
+          categoryL1: 'Building materials',
+          categoryL2: 'Cement',
+          materialShortName: 'Portland cement',
           materialName: 'P.O 42.5',
           province: 'Liaoning',
           city: 'Shenyang',
@@ -284,6 +321,35 @@ describe('project dashboard and catalog', () => {
     );
   });
 
+  it('loads database filter roots and scopes cities to the selected province', async () => {
+    const user = userEvent.setup();
+    const request = createRequest();
+    renderProjects(createClient(request));
+    await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
+
+    await waitFor(() => {
+      expect(request).toHaveBeenCalledWith({
+        operation: 'project.filterOptions',
+        payload: { dimension: 'province', limit: 500 },
+      });
+      expect(request).toHaveBeenCalledWith({
+        operation: 'project.filterOptions',
+        payload: { dimension: 'categoryL1', limit: 500 },
+      });
+    });
+
+    await selectProjectFilterOption(user, 'enterprise.projects.filters.provinceLabel', /^Liaoning \(128\)$/);
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith({
+        operation: 'project.filterOptions',
+        payload: { dimension: 'city', province: 'Liaoning', limit: 500 },
+      })
+    );
+    expect(screen.getByRole('combobox', { name: 'enterprise.projects.filters.cityLabel' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'enterprise.projects.filters.categoryL2Label' })).toBeDisabled();
+  });
+
   it('bounds project filter controls before they can reach IPC', async () => {
     renderProjects(createClient(createRequest()));
     await screen.findByRole('heading', { name: /enterprise\.projectDetail\.lockedProjectTitle/ });
@@ -292,14 +358,10 @@ describe('project dashboard and catalog', () => {
       'maxlength',
       '100'
     );
-    expect(screen.getByPlaceholderText('enterprise.projects.filters.categoryL1Placeholder')).toHaveAttribute(
-      'maxlength',
-      '200'
-    );
-    expect(screen.getByPlaceholderText('enterprise.projects.filters.provincePlaceholder')).toHaveAttribute(
-      'maxlength',
-      '100'
-    );
+    expect(screen.getByRole('combobox', { name: 'enterprise.projects.filters.provinceLabel' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'enterprise.projects.filters.categoryL1Label' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'enterprise.projects.filters.cityLabel' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'enterprise.projects.filters.materialNameLabel' })).toBeDisabled();
     expect(screen.getByPlaceholderText('enterprise.projects.filters.minInvestmentPlaceholder')).toHaveAttribute(
       'aria-valuemax',
       '1000000000000'
@@ -439,7 +501,7 @@ describe('project detail permission display', () => {
       if (input.operation === 'contact.acquire') {
         return {
           operation: 'contact.acquire',
-          data: { allowed: true, errType: 0, message: '', actionUrl: '' },
+          data: { allowed: true, errType: 0, message: '', action: 'NONE' },
         };
       }
       if (input.operation === 'project.contactUnlock') {
@@ -522,7 +584,7 @@ describe('project detail permission display', () => {
       if (input.operation === 'contact.acquire') {
         return {
           operation: 'contact.acquire',
-          data: { allowed: false, errType: 9, message: 'Quota reached', actionUrl: '' },
+          data: { allowed: false, errType: 9, message: 'Quota reached', action: 'UPGRADE' },
         };
       }
       return {

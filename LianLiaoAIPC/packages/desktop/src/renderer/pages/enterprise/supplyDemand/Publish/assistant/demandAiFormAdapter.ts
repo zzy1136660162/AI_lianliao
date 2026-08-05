@@ -6,11 +6,7 @@ import type {
   EnterpriseDemandPublishSchema,
 } from '@/common/enterprise/contracts';
 
-import {
-  allowsCustomPublishOption,
-  serializePublishFieldValue,
-  type PublishFormValue,
-} from '../publishFormMetadata';
+import { allowsCustomPublishOption, serializePublishFieldValue, type PublishFormValue } from '../publishFormMetadata';
 
 export type DemandAiPublishFormPatch = Record<string, string | string[] | number | Dayjs | undefined>;
 
