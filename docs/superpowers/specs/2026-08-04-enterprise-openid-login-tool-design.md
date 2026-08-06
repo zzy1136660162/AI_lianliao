@@ -33,18 +33,18 @@ Electron 的企业工作台登录态由主进程管理：
 新增工具：
 
 ```text
-tools/enterprise_openid_login.py
+tools/auth/enterprise_openid_login.py
 ```
 
 命令：
 
 ```powershell
-python tools/enterprise_openid_login.py login --env dev --openid "目标openid"
-python tools/enterprise_openid_login.py login --env prod --openid "目标openid"
-python tools/enterprise_openid_login.py status --env dev
-python tools/enterprise_openid_login.py status --env prod
-python tools/enterprise_openid_login.py logout --env dev
-python tools/enterprise_openid_login.py logout --env prod
+python tools/auth/enterprise_openid_login.py login --env dev --openid "目标openid"
+python tools/auth/enterprise_openid_login.py login --env prod --openid "目标openid"
+python tools/auth/enterprise_openid_login.py status --env dev
+python tools/auth/enterprise_openid_login.py status --env prod
+python tools/auth/enterprise_openid_login.py logout --env dev
+python tools/auth/enterprise_openid_login.py logout --env prod
 ```
 
 第一版只允许 `dev` 和 `prod`，不接受任意 API 地址或任意文件路径，避免误写其他目录。

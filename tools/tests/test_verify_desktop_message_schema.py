@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
-from tools.oracle.oracle_readonly import ConnectionSettings
-from tools.oracle.verify_desktop_message_schema import (
+from tools.database.oracle.oracle_readonly import ConnectionSettings
+from tools.database.oracle.verify_desktop_message_schema import (
     EXPECTED_TABLES,
     build_expected_contract,
     validate_readonly_query,

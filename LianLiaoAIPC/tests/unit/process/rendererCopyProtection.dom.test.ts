@@ -15,6 +15,7 @@ describe('renderer copy protection', () => {
 
   afterEach(() => {
     dispose();
+    document.body.replaceChildren();
     Reflect.deleteProperty(window, '__isPackaged');
     if (originalClipboardDescriptor) {
       Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
@@ -50,6 +51,41 @@ describe('renderer copy protection', () => {
     document.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(false);
+  });
+
+  it.each(['copy', 'cut', 'paste'])('keeps %s available in editable text controls', (eventName) => {
+    dispose = installRendererCopyProtection({
+      isPackaged: true,
+      window,
+      document,
+      navigator,
+    });
+    const textarea = document.createElement('textarea');
+    document.body.appendChild(textarea);
+    textarea.focus();
+    const event = new Event(eventName, { bubbles: true, cancelable: true });
+
+    textarea.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('continues blocking copy from a read-only textarea', () => {
+    dispose = installRendererCopyProtection({
+      isPackaged: true,
+      window,
+      document,
+      navigator,
+    });
+    const textarea = document.createElement('textarea');
+    textarea.readOnly = true;
+    document.body.appendChild(textarea);
+    textarea.focus();
+    const event = new Event('copy', { bubbles: true, cancelable: true });
+
+    textarea.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('blocks legacy execCommand copy without affecting other commands', () => {

@@ -162,7 +162,7 @@ const LocationProbe: React.FC = () => {
 describe('desktop customer-service workbench', () => {
   it('selects a signed deep-link conversation and keeps all three work areas independently scrollable', async () => {
     const client = createClient();
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/enterprise/customer-service?conversationId=-8']}>
         <CustomerServiceWorkbench client={client} currentStaffUserId='-19' />
       </MemoryRouter>
@@ -173,6 +173,12 @@ describe('desktop customer-service workbench', () => {
     expect(screen.getByTestId('customer-service-queue-scroll')).toHaveStyle({ overflowY: 'auto' });
     expect(screen.getByTestId('customer-service-timeline-scroll')).toHaveStyle({ overflowY: 'auto' });
     expect(screen.getByTestId('customer-service-profile-scroll')).toHaveStyle({ overflowY: 'auto' });
+    expect(screen.getByPlaceholderText('enterprise.customerService.composer.placeholder')).toHaveStyle({
+      paddingBlockEnd: '26px',
+      paddingInlineEnd: '72px',
+      userSelect: 'text',
+    });
+    expect(container.querySelector('.arco-textarea-word-limit')).toHaveTextContent('0/2000');
     expect(screen.getByTestId('customer-service-workbench')).not.toHaveTextContent('must-not-render');
   });
 

@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { isEnterpriseEntityId } from '../entityId';
 import { UNIFIED_RESOURCE_TYPES, type UnifiedSearchResult } from './contracts';
 
-const optionalText = z.string().min(1).optional();
+const nullAsUndefined = (value: unknown): unknown => (value === null ? undefined : value);
+const optionalText = z.preprocess(nullAsUndefined, z.string().min(1).optional());
+const optionalHttpsUrl = z.preprocess(nullAsUndefined, z.string().url().startsWith('https://').optional());
 
 const itemSchema = z
   .object({
@@ -12,7 +14,7 @@ const itemSchema = z
     title: z.string().min(1).max(200),
     subtitle: optionalText,
     summary: optionalText,
-    coverUrl: z.string().url().startsWith('https://').optional(),
+    coverUrl: optionalHttpsUrl,
     city: optionalText,
     district: optionalText,
     industry: optionalText,

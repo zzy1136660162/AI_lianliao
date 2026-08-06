@@ -9,6 +9,7 @@ type ClipboardWriteMethodName = 'write' | 'writeText';
 
 const COPY_PROTECTION_ERROR_MESSAGE = 'Clipboard writes are disabled in packaged builds';
 const installedWindows = new WeakSet<Window>();
+const EDITABLE_INPUT_TYPES = new Set(['email', 'number', 'search', 'tel', 'text', 'url']);
 
 export const createCopyProtectionError = (): DOMException =>
   new DOMException(COPY_PROTECTION_ERROR_MESSAGE, 'NotAllowedError');
@@ -18,7 +19,27 @@ const isCopyProtectionError = (reason: unknown): boolean =>
   reason.name === 'NotAllowedError' &&
   reason.message === COPY_PROTECTION_ERROR_MESSAGE;
 
-const preventCopy = (event: Event): void => {
+const asElement = (target: EventTarget | null): Element | null =>
+  target && typeof target === 'object' && 'closest' in target ? (target as Element) : null;
+
+const isEditableTextElement = (element: Element | null): boolean => {
+  if (!element) return false;
+  if (element.tagName === 'TEXTAREA') {
+    const textarea = element as HTMLTextAreaElement;
+    return !textarea.disabled && !textarea.readOnly;
+  }
+  if (element.tagName === 'INPUT') {
+    const input = element as HTMLInputElement;
+    return !input.disabled && !input.readOnly && EDITABLE_INPUT_TYPES.has(input.type.toLowerCase());
+  }
+  return element.closest('[contenteditable]:not([contenteditable="false"])') !== null;
+};
+
+const isEditableClipboardEvent = (event: Event, targetDocument: Document): boolean =>
+  isEditableTextElement(asElement(event.target)) || isEditableTextElement(targetDocument.activeElement);
+
+const preventProtectedCopy = (event: Event, targetDocument: Document): void => {
+  if (isEditableClipboardEvent(event, targetDocument)) return;
   event.preventDefault();
   event.stopImmediatePropagation();
 };
@@ -64,8 +85,9 @@ export const installRendererCopyProtection = ({
 }: RendererCopyProtectionOptions): (() => void) => {
   if (!isPackaged || installedWindows.has(targetWindow)) return () => {};
 
-  targetDocument.addEventListener('copy', preventCopy, true);
-  targetDocument.addEventListener('cut', preventCopy, true);
+  const handleProtectedCopy = (event: Event): void => preventProtectedCopy(event, targetDocument);
+  targetDocument.addEventListener('copy', handleProtectedCopy, true);
+  targetDocument.addEventListener('cut', handleProtectedCopy, true);
   targetWindow.addEventListener('unhandledrejection', preventUnhandledCopyRejection, true);
 
   const originalExecCommand =
@@ -83,8 +105,8 @@ export const installRendererCopyProtection = ({
 
   installedWindows.add(targetWindow);
   return () => {
-    targetDocument.removeEventListener('copy', preventCopy, true);
-    targetDocument.removeEventListener('cut', preventCopy, true);
+    targetDocument.removeEventListener('copy', handleProtectedCopy, true);
+    targetDocument.removeEventListener('cut', handleProtectedCopy, true);
     targetWindow.removeEventListener('unhandledrejection', preventUnhandledCopyRejection, true);
     if (hadOwnExecCommand && originalExecCommand) {
       targetDocument.execCommand = originalExecCommand;

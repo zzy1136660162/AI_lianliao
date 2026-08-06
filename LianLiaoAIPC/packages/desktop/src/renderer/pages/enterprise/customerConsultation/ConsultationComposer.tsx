@@ -54,6 +54,27 @@ const ConsultationComposer: React.FC<ConsultationComposerProps> = ({
         autoSize={{ minRows: 2, maxRows: 4 }}
         maxLength={2_000}
         showCount
+        styles={{
+          root: { position: 'relative' },
+          textarea: {
+            paddingBlockEnd: 26,
+            paddingInlineEnd: 72,
+            userSelect: 'text',
+            WebkitUserSelect: 'text',
+          },
+          count: {
+            position: 'absolute',
+            zIndex: 1,
+            bottom: 6,
+            insetInlineEnd: 10,
+            paddingLeft: 8,
+            borderRadius: 4,
+            background: 'var(--enterprise-surface)',
+            fontSize: 12,
+            lineHeight: '18px',
+            pointerEvents: 'none',
+          },
+        }}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) {

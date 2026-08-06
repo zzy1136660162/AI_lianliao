@@ -46,7 +46,7 @@
 
 ## 导入程序
 
-新增 `tools/oracle/import_urgent_purchases.py`：
+当前脚本位于 `tools/database/oracle/import_urgent_purchases.py`：
 
 1. 从现有 Spring `application.yml` 或 `ORACLE_*` 环境变量读取连接配置，凭据不写入源码或日志。
 2. 校验文件存在、工作表、精确表头、7 行有效数据、必填值、目标列长度和企业档案。

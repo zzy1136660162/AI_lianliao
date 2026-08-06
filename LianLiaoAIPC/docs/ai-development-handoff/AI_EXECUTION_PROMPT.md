@@ -100,7 +100,7 @@ git -C E:\ZZY_PROJECT\lianshang_liaoning log -20 --oneline
 - 当前阶段完成后继续下一阶段，直到遇到必须由用户确认的业务决策、需要执行数据库写操作、需要远端推送，或所有路线阶段完成。
 
 【数据库规则】
-现有只读工具：E:\ZZY_PROJECT\AI_lianliao\tools\oracle\oracle_readonly.py
+现有只读工具：E:\ZZY_PROJECT\AI_lianliao\tools\database\oracle\oracle_readonly.py
 它只核对客服 DDL 对应的 USER_* 元数据，不开放任意 SQL。若需调查其他表，优先读取已有 Mapper/DDL/代码；新增查询工具也必须是固定只读模板、参数白名单、只读事务和 rollback，不得开放修改能力。
 任何数据库变更都暂停执行，向用户说明目标库、对象、SQL摘要、影响范围、锁风险、回滚和验证方案，等待明确“确认”后再执行。
 

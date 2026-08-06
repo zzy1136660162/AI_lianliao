@@ -142,7 +142,7 @@ PowerShell/Maven 对 `-D` 解析异常时使用引号包裹整个属性，例如
 ```powershell
 Set-Location E:\ZZY_PROJECT\AI_lianliao
 python -m unittest tools.tests.test_oracle_readonly
-python tools\oracle\oracle_readonly.py --json
+python tools\database\oracle\oracle_readonly.py --json
 ```
 
 数据库变更在任何执行前必须经过用户确认。获准后，验收至少包括：

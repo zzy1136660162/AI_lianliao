@@ -83,6 +83,29 @@ function ensurePlaceholder(relativePath) {
   }
 }
 
+const originalExistsSync = fs.existsSync.bind(fs);
+const originalStatSync = fs.statSync.bind(fs);
+const originalRmSync = fs.rmSync.bind(fs);
+const windowsArtifactPattern = /LianLiaoAIPC-[^\\/]+-win-(?:x64|arm64)\.exe$/;
+const windowsUnpackedPattern = /[\\/]out[\\/]win(?:-[a-z0-9]+)?-unpacked$/i;
+
+fs.existsSync = function mockedExistsSync(targetPath) {
+  if (windowsArtifactPattern.test(String(targetPath))) return true;
+  return originalExistsSync(targetPath);
+};
+
+fs.statSync = function mockedStatSync(targetPath) {
+  if (windowsArtifactPattern.test(String(targetPath))) {
+    return { mtimeMs: Date.now(), size: 1024 * 1024 };
+  }
+  return originalStatSync(targetPath);
+};
+
+fs.rmSync = function mockedRmSync(targetPath, options) {
+  if (windowsUnpackedPattern.test(String(targetPath))) return;
+  return originalRmSync(targetPath, options);
+};
+
 childProcess.execSync = function mockedExecSync(command) {
   const commandText = String(command);
   if (commandText.includes('electron-vite build')) {
@@ -107,6 +130,11 @@ childProcess.execSync = function mockedExecSync(command) {
       });
 
       expect(result.status, result.stderr || result.stdout).toBe(0);
+      expect(result.stdout).toContain('[timing]');
+      if (args.includes('--win')) {
+        expect(result.stdout).toContain('Windows installer:');
+        expect(result.stdout).toContain('Local packaging mode: store compression with NSIS ZIP payload');
+      }
 
       const calls = JSON.parse(readFileSync(callsPath, 'utf8')) as Array<{ arch?: string } | null>;
       expect(calls).toContainEqual(expect.objectContaining({ arch: expectedArch }));

@@ -41,6 +41,8 @@ module.exports = async function afterPack(context) {
   const { arch, electronPlatformName, appOutDir, packager } = context;
   const targetArch = normalizeArch(typeof arch === 'string' ? arch : Arch[arch] || process.arch);
   const buildArch = normalizeArch(os.arch());
+  const trustLocalPreparedResources =
+    process.env.LIANLIAO_AICORE_TRUST_PREPARED === '1' && process.env.LIANLIAO_RELEASE_BUILD !== '1';
 
   console.log(`\n🔧 afterPack hook started`);
   console.log(`   Platform: ${electronPlatformName}, Build arch: ${buildArch}, Target arch: ${targetArch}`);
@@ -72,7 +74,11 @@ module.exports = async function afterPack(context) {
       console.warn(`   ⚠️  app.asar.unpacked not found`);
     }
 
-    verifyBundledResources(resourcesDir, electronPlatformName, targetArch);
+    if (trustLocalPreparedResources) {
+      console.log('   Local Core trust mode: bundled Core structure verification skipped');
+    } else {
+      verifyBundledResources(resourcesDir, electronPlatformName, targetArch);
+    }
   } else {
     throw new Error(`resources directory not found: ${resourcesDir}`);
   }

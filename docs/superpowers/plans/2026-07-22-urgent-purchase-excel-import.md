@@ -4,7 +4,7 @@
 
 **Goal:** Import seven approved, public type-22 urgent-purchase rows from the supplied Excel workbook into `JJGC.J_COMMON_DEMAND` through a guarded, reusable Python command, while organizing the existing Oracle tools.
 
-**Architecture:** Keep shared Oracle connection and schema-verification code in `tools/oracle`, and place tests in `tools/tests`. The importer has pure Excel normalization and validation functions covered by unit tests, plus a narrow database adapter that performs duplicate preflight and seven inserts in one transaction; dry-run is the default and `--execute` is the only write switch.
+**Architecture:** Keep shared Oracle connection and schema-verification code in `tools/database/oracle`, and place tests in `tools/tests`. The importer has pure Excel normalization and validation functions covered by unit tests, plus a narrow database adapter that performs duplicate preflight and seven inserts in one transaction; dry-run is the default and `--execute` is the only write switch.
 
 **Tech Stack:** Python 3.10, pandas/openpyxl, JayDeBeApi, Oracle JDBC, unittest, PowerShell.
 
@@ -37,13 +37,13 @@ git mv tools\test_oracle_readonly.py tools\tests\test_oracle_readonly.py
 
 - [ ] **Step 2: Update imports and path calculations**
 
-Change test imports to `tools.oracle.oracle_readonly` and `tools.oracle.verify_desktop_message_schema`. In `oracle_readonly.py`, calculate the projects root from the moved file using:
+The current test imports are `tools.database.oracle.oracle_readonly` and `tools.database.oracle.verify_desktop_message_schema`. In `oracle_readonly.py`, calculate the projects root from its categorized location.
 
 ```python
 PROJECTS_ROOT = Path(__file__).resolve().parents[3]
 ```
 
-Change the dependency error to reference `tools/oracle/requirements.txt`.
+The dependency error must reference `tools/database/oracle/requirements.txt`.
 
 - [ ] **Step 3: Run moved tests**
 
@@ -57,7 +57,7 @@ Expected: all existing tests pass from their new package paths.
 
 - [ ] **Step 4: Update usage documentation**
 
-Update `tools/README.md` commands to `python tools/oracle/oracle_readonly.py` and `python -m pip install -r tools/oracle/requirements.txt`. Update repository documentation references without changing unrelated content.
+Update `tools/README.md` commands to `python tools/database/oracle/oracle_readonly.py` and `python -m pip install -r tools/database/oracle/requirements.txt`. Update repository documentation references without changing unrelated content.
 
 ### Task 2: Add Importer Unit Tests
 
@@ -174,7 +174,7 @@ Run `Get-FileHash` and retain the SHA-256 for post-import verification.
 Run:
 
 ```powershell
-python tools/oracle/import_urgent_purchases.py --input "E:\ZZY_PROJECT\lianshang_liaoning\docs\附录文件\紧急采购需求字段1.xlsx"
+python tools/database/oracle/import_urgent_purchases.py --input "E:\ZZY_PROJECT\lianshang_liaoning\docs\附录文件\紧急采购需求字段1.xlsx"
 ```
 
 Expected: `DRY RUN PASS`, 7 validated rows, company ID 400496, zero active duplicates, and no generated IDs.
@@ -193,7 +193,7 @@ Run a read-only count for the seven exact demand names and expect zero.
 Run:
 
 ```powershell
-python tools/oracle/import_urgent_purchases.py --input "E:\ZZY_PROJECT\lianshang_liaoning\docs\附录文件\紧急采购需求字段1.xlsx" --execute
+python tools/database/oracle/import_urgent_purchases.py --input "E:\ZZY_PROJECT\lianshang_liaoning\docs\附录文件\紧急采购需求字段1.xlsx" --execute
 ```
 
 Expected: one committed transaction and seven generated `NO` values.

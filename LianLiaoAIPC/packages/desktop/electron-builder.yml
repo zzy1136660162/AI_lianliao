@@ -113,6 +113,13 @@ extraResources:
   # aioncore binary (pre-compiled per platform/arch, ships its own bun runtime)
   - from: resources/bundled-aioncore
     to: bundled-aioncore
+    filter:
+      - '**/*'
+      # Preparation and deferred-cleanup directories are never runtime inputs.
+      - '!*.preparing-*'
+      - '!*.preparing-*/**/*'
+      - '!*.stale-*'
+      - '!*.stale-*/**/*'
   - from: resources/hub
     to: hub
 win:

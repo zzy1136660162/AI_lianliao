@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.enterprise_openid_login import (
+from tools.auth.enterprise_openid_login import (
     ToolError,
     clear_session,
     read_session,

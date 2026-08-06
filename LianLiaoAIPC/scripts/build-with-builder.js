@@ -14,6 +14,10 @@ const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { performance } = require('perf_hooks');
+
+const buildStartedAt = performance.now();
+const buildStartedAtEpochMs = Date.now();
 
 // DMG retry logic for macOS: detects DMG creation failures by checking artifacts
 // (.app exists but .dmg missing) and retries only the DMG step using
@@ -26,6 +30,41 @@ const DMG_RETRY_DELAY_SEC = 30;
 
 // Incremental build: hash of source files to detect changes
 const INCREMENTAL_CACHE_FILE = 'out/.build-hash';
+
+function formatDuration(durationMs) {
+  if (durationMs >= 60_000) {
+    const minutes = Math.floor(durationMs / 60_000);
+    const seconds = ((durationMs % 60_000) / 1000).toFixed(1);
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${(durationMs / 1000).toFixed(1)}s`;
+}
+
+function runTimedPhase(label, operation) {
+  const startedAt = performance.now();
+  try {
+    return operation();
+  } finally {
+    console.log(`  [timing] ${label}: ${formatDuration(performance.now() - startedAt)}`);
+  }
+}
+
+function reportWindowsArtifacts({ outDir, packageVersion, architectures, startedAtEpochMs }) {
+  for (const architecture of architectures) {
+    const artifactPath = path.join(outDir, `LianLiaoAIPC-${packageVersion}-win-${architecture}.exe`);
+    if (!fs.existsSync(artifactPath)) {
+      throw new Error(`Windows installer was not found after packaging: ${artifactPath}`);
+    }
+
+    const artifact = fs.statSync(artifactPath);
+    if (artifact.mtimeMs + 1000 < startedAtEpochMs) {
+      throw new Error(`Windows installer was not refreshed by this build: ${artifactPath}`);
+    }
+
+    console.log(`  Windows installer: ${artifactPath}`);
+    console.log(`  Installer size: ${(artifact.size / 1024 / 1024).toFixed(1)} MB`);
+  }
+}
 
 function walkFiles(dir, acc = []) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -50,8 +89,6 @@ function computeSourceHash() {
     'bun.lock',
     'tsconfig.json',
     'packages/desktop/electron.vite.config.ts',
-    'packages/desktop/electron-builder.yml',
-    'justfile',
   ];
 
   for (const file of filesToHash) {
@@ -63,7 +100,10 @@ function computeSourceHash() {
     }
   }
 
-  const hashDirs = ['packages/desktop/src', 'packages', 'public', 'scripts'];
+  // Packaging orchestration/configuration does not affect electron-vite output.
+  // Keep this list limited to bundle inputs so local installer-only changes do
+  // not trigger a full renderer rebuild.
+  const hashDirs = ['packages/desktop/src', 'packages', 'public'];
   for (const dir of hashDirs) {
     const dirPath = path.resolve(rootDir, dir);
     if (!fs.existsSync(dirPath)) continue;
@@ -267,8 +307,9 @@ function buildWithDmgRetry(cmd, targetArch) {
   }
 }
 
-// Clean stale Windows packaging outputs from previous runs
-function cleanupWindowsPackOutput() {
+// Clean stale Windows packaging directories. Keep the last successful installer
+// visible while the next local build runs; retries can explicitly remove it.
+function cleanupWindowsPackOutput({ removeArtifacts = false } = {}) {
   const outDir = path.resolve(__dirname, '../out');
   if (!fs.existsSync(outDir)) return;
 
@@ -285,7 +326,7 @@ function cleanupWindowsPackOutput() {
       continue;
     }
 
-    if (entry.isFile() && winArtifactFileRe.test(entry.name)) {
+    if (removeArtifacts && entry.isFile() && winArtifactFileRe.test(entry.name)) {
       fs.rmSync(fullPath, { force: true });
       removed.push(entry.name);
     }
@@ -316,6 +357,18 @@ const builderArgs = args
     return true;
   })
   .join(' ');
+const isWindowsBuild = builderArgs.includes('--win') || builderArgs.includes('--all');
+const useTrustedLocalAioncore =
+  process.platform === 'win32' &&
+  isWindowsBuild &&
+  process.env.LIANLIAO_RELEASE_BUILD !== '1' &&
+  process.env.LIANLIAO_AICORE_VERIFY !== '1';
+
+if (useTrustedLocalAioncore) {
+  process.env.LIANLIAO_AICORE_TRUST_PREPARED = '1';
+} else if (process.env.LIANLIAO_AICORE_VERIFY === '1') {
+  delete process.env.LIANLIAO_AICORE_TRUST_PREPARED;
+}
 
 // Get target architecture from electron-builder.yml
 function getTargetArchFromConfig(platform) {
@@ -383,6 +436,7 @@ if (archArgs.length > 1) {
 
 console.log(`🔨 Building for architecture: ${targetArch}`);
 console.log(`📋 Builder arguments: ${builderArgs || '(none)'}`);
+if (useTrustedLocalAioncore) console.log('⚡ Local Core mode: trust existing prepared resources');
 if (skipVite) console.log('⚡ --skip-vite: Will skip Vite compilation if output exists');
 if (skipNative) console.log('⚡ --skip-native: Will skip native module rebuilding');
 if (packOnly) console.log('⚡ --pack-only: Will skip electron-builder distributable creation');
@@ -404,22 +458,24 @@ try {
   }
 
   // 2. Check if we can skip Vite build (incremental build)
-  const skipViteBuild = shouldSkipViteBuild(skipVite, forceBuild);
+  const skipViteBuild = runTimedPhase('Vite cache check', () => shouldSkipViteBuild(skipVite, forceBuild));
 
   if (!skipViteBuild) {
     // Run electron-vite to build all bundles (main + preload + renderer)
     console.log(`📦 Building ${targetArch}...`);
-    execSync(`bunx electron-vite build --config packages/desktop/electron.vite.config.ts`, {
-      stdio: 'inherit',
-      shell: process.platform === 'win32',
-      env: {
-        ...process.env,
-        ELECTRON_BUILDER_ARCH: targetArch,
-      },
-    });
+    runTimedPhase('Vite build', () => {
+      execSync(`bunx electron-vite build --config packages/desktop/electron.vite.config.ts`, {
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+        env: {
+          ...process.env,
+          ELECTRON_BUILDER_ARCH: targetArch,
+        },
+      });
 
-    // Save hash after successful build
-    saveCurrentHash(computeSourceHash());
+      // Save hash after successful build
+      saveCurrentHash(computeSourceHash());
+    });
   } else {
     console.log('📦 Using cached Vite build output');
   }
@@ -431,9 +487,11 @@ try {
   // Uses a dedicated script (build-mcp-servers.js) to avoid shell-quoting issues
   // with special characters in esbuild --define values.
   console.log('📦 Bundling builtin MCP servers (self-contained)...');
-  execSync(`node "${path.join(__dirname, 'build-mcp-servers.js')}"`, {
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
+  runTimedPhase('Builtin MCP bundle', () => {
+    execSync(`node "${path.join(__dirname, 'build-mcp-servers.js')}"`, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+    });
   });
 
   // 3. Verify electron-vite output
@@ -457,6 +515,7 @@ try {
   // If --pack-only, skip electron-builder distributable creation
   if (packOnly) {
     console.log('✅ Package completed! (skipped distributable creation)');
+    console.log(`  [timing] Total: ${formatDuration(performance.now() - buildStartedAt)}`);
     return;
   }
 
@@ -464,15 +523,19 @@ try {
   const { prepareAioncore } = require('../packages/shared-scripts/src/prepare-aioncore.js');
   const { resolveAioncoreVersion } = require('./resolveAioncoreVersion.js');
   const projectRoot = path.resolve(__dirname, '..');
-  prepareAioncore({
-    projectRoot,
-    platform: process.platform,
-    arch: targetArch,
-    version: resolveAioncoreVersion(projectRoot),
+  runTimedPhase('LianLiaoAICore preparation', () => {
+    prepareAioncore({
+      projectRoot,
+      platform: process.platform,
+      arch: targetArch,
+      version: useTrustedLocalAioncore ? packageJson.aioncoreVersion : resolveAioncoreVersion(projectRoot),
+    });
   });
 
   // 6. Prepare hub resources (index.json + extension zips for offline fallback)
-  execSync('node scripts/prepareHubResources.js', { stdio: 'inherit', env: process.env });
+  runTimedPhase('Hub resource preparation', () => {
+    execSync('node scripts/prepareHubResources.js', { stdio: 'inherit', env: process.env });
+  });
 
   // 6. 运行 electron-builder 生成分发包（DMG/ZIP/EXE等）
   // Run electron-builder to create distributables (DMG/ZIP/EXE, etc.)
@@ -482,14 +545,14 @@ try {
 
   // Set compression level based on environment
   // 7za -mx accepts numeric values: 0 (store) to 9 (ultra)
-  // CI builds use 9 (maximum) for smallest size
-  // Local builds use 7 (normal) for 30-50% faster ASAR packing
+  // Trusted local builds use store mode for the fastest feedback loop.
+  // Verified local and CI builds retain compressed release-like artifacts.
   const isCI = process.env.CI === 'true';
   if (!process.env.ELECTRON_BUILDER_COMPRESSION_LEVEL) {
-    process.env.ELECTRON_BUILDER_COMPRESSION_LEVEL = isCI ? '9' : '7';
+    process.env.ELECTRON_BUILDER_COMPRESSION_LEVEL = useTrustedLocalAioncore ? '0' : isCI ? '9' : '7';
   }
   console.log(
-    `📦 Compression level: ${process.env.ELECTRON_BUILDER_COMPRESSION_LEVEL} (${isCI ? 'CI build' : 'local build'})`
+    `📦 Compression level: ${process.env.ELECTRON_BUILDER_COMPRESSION_LEVEL} (${useTrustedLocalAioncore ? 'trusted local build' : isCI ? 'CI build' : 'verified local build'})`
   );
 
   // 根据模式添加架构标志
@@ -557,60 +620,76 @@ try {
     }
   }
 
-  const isWindowsBuild = builderArgs.includes('--win') || builderArgs.includes('--all');
   if (isWindowsBuild) {
     cleanupWindowsPackOutput();
   }
 
-  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude} ${publishArg}`;
-  try {
-    buildWithDmgRetry(builderCommand, targetArch);
-  } catch (error) {
-    const winExePath = path.join(outDir, 'win-unpacked', windowsExecutableName);
-    const legacyWinExePath = path.join(outDir, 'win-unpacked', legacyWindowsExecutableName);
-    const windowsExecutableWasProduced =
-      fs.existsSync(winExePath) || (legacyWinExePath !== winExePath && fs.existsSync(legacyWinExePath));
-    const firstError = formatExecError(error);
-    const canRetryWithoutExecutableEdit =
-      process.platform === 'win32' && isWindowsBuild && process.env.CI !== 'true' && windowsExecutableWasProduced;
-
-    if (!canRetryWithoutExecutableEdit) {
-      throw error;
-    }
-
-    console.log(`⚠️  Windows local build failed after ${windowsExecutableName} was produced.`);
-    if (firstError) {
-      console.log('   First failure summary:');
-      console.log(
-        firstError
-          .split(/\r?\n/)
-          .slice(0, 6)
-          .map((line) => `   ${line}`)
-          .join('\n')
-      );
-    }
-    console.log('   Retrying local build with win.signAndEditExecutable=false...');
-    console.log('   This fallback is intended for transient rcedit / file-lock failures on developer machines.');
-    killWindowsProcesses([...windowsExecutableNames, 'electron.exe']);
-    cleanupWindowsPackOutput();
-
+  const localFastBuilderConfig = useTrustedLocalAioncore ? ' --config.compression=store --config.nsis.useZip=true' : '';
+  if (localFastBuilderConfig) {
+    console.log('⚡ Local packaging mode: store compression with NSIS ZIP payload');
+  }
+  const builderCommand = `bunx electron-builder --config packages/desktop/electron-builder.yml ${builderArgs} ${archFlag} ${nsisInclude}${localFastBuilderConfig} ${publishArg}`;
+  runTimedPhase('electron-builder', () => {
     try {
-      buildWithDmgRetry(`${builderCommand} --config.win.signAndEditExecutable=false`, targetArch);
-    } catch (retryError) {
-      const retryFailure = formatExecError(retryError);
-      throw new Error(
-        [
-          'Windows local retry with win.signAndEditExecutable=false also failed.',
-          'First failure:',
-          firstError || String(error),
-          'Retry failure:',
-          retryFailure || String(retryError),
-        ].join('\n')
-      );
+      buildWithDmgRetry(builderCommand, targetArch);
+    } catch (error) {
+      const winExePath = path.join(outDir, 'win-unpacked', windowsExecutableName);
+      const legacyWinExePath = path.join(outDir, 'win-unpacked', legacyWindowsExecutableName);
+      const windowsExecutableWasProduced =
+        fs.existsSync(winExePath) || (legacyWinExePath !== winExePath && fs.existsSync(legacyWinExePath));
+      const firstError = formatExecError(error);
+      const canRetryWithoutExecutableEdit =
+        process.platform === 'win32' && isWindowsBuild && process.env.CI !== 'true' && windowsExecutableWasProduced;
+
+      if (!canRetryWithoutExecutableEdit) {
+        throw error;
+      }
+
+      console.log(`⚠️  Windows local build failed after ${windowsExecutableName} was produced.`);
+      if (firstError) {
+        console.log('   First failure summary:');
+        console.log(
+          firstError
+            .split(/\r?\n/)
+            .slice(0, 6)
+            .map((line) => `   ${line}`)
+            .join('\n')
+        );
+      }
+      console.log('   Retrying local build with win.signAndEditExecutable=false...');
+      console.log('   This fallback is intended for transient rcedit / file-lock failures on developer machines.');
+      killWindowsProcesses([...windowsExecutableNames, 'electron.exe']);
+      cleanupWindowsPackOutput({ removeArtifacts: true });
+
+      try {
+        buildWithDmgRetry(`${builderCommand} --config.win.signAndEditExecutable=false`, targetArch);
+      } catch (retryError) {
+        const retryFailure = formatExecError(retryError);
+        throw new Error(
+          [
+            'Windows local retry with win.signAndEditExecutable=false also failed.',
+            'First failure:',
+            firstError || String(error),
+            'Retry failure:',
+            retryFailure || String(retryError),
+          ].join('\n')
+        );
+      }
     }
+  });
+
+  if (isWindowsBuild) {
+    const builtArchitectures = multiArch ? archArgs : [targetArch];
+    reportWindowsArtifacts({
+      outDir,
+      packageVersion: packageJson.version,
+      architectures: builtArchitectures,
+      startedAtEpochMs: buildStartedAtEpochMs,
+    });
   }
 
   console.log('✅ Build completed!');
+  console.log(`  [timing] Total: ${formatDuration(performance.now() - buildStartedAt)}`);
 } catch (error) {
   console.error('❌ Build failed:', error.message);
   process.exit(1);

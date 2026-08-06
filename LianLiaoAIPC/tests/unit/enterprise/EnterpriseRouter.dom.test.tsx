@@ -207,6 +207,8 @@ describe('enterprise desktop routing', () => {
       'href',
       '#/enterprise/supply-demand'
     );
+    expect(within(navigation).queryByRole('link', { name: 'enterprise.navigation.favorites' })).not.toBeInTheDocument();
+    expect(within(navigation).queryByRole('link', { name: 'enterprise.navigation.leads' })).not.toBeInTheDocument();
   });
 
   it('shows online consultation only to ordinary enterprise users', async () => {

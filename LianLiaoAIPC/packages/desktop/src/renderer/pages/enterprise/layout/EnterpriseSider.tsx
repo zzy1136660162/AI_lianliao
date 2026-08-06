@@ -4,12 +4,10 @@ import {
   DashboardOne,
   EngineeringBrand,
   ExchangeFour,
-  FollowUpDateSort,
   HeadsetOne,
   Logout,
   Robot,
   SettingTwo,
-  Star,
 } from '@icon-park/react';
 import { Button } from 'antd';
 import React, { useState } from 'react';
@@ -39,8 +37,7 @@ const navigationGroups = [
     key: 'collaboration',
     labelKey: 'enterprise.navigationGroups.collaboration',
     items: [
-      { path: '/enterprise/favorites', labelKey: 'enterprise.navigation.favorites', Icon: Star },
-      { path: '/enterprise/leads', labelKey: 'enterprise.navigation.leads', Icon: FollowUpDateSort },
+      // Favorites and lead follow-up remain routable but stay hidden until those collaboration features are enabled.
       {
         path: '/enterprise/consultation',
         labelKey: 'enterprise.navigation.consultation',

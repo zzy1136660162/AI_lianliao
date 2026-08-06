@@ -9,19 +9,23 @@ const css = readFileSync(
 
 describe('customer consultation layout CSS contract', () => {
   it('keeps the composer visible while the timeline owns the remaining scrollable height', () => {
+    const chatCardRule = css.match(/\.chatCard\s*\{([^}]*)\}/s)?.[1] ?? '';
     const cardBodyRule = css.match(/\.chatCard\s+:global\(\.ant-card-body\)\s*\{([^}]*)\}/s)?.[1] ?? '';
     const headerRule = css.match(/\.chatHeader\s*\{([^}]*)\}/s)?.[1] ?? '';
     const timelineRegionRule = css.match(/\.timelineRegion\s*\{([^}]*)\}/s)?.[1] ?? '';
     const composerRule = css.match(/\.composer\s*\{([^}]*)\}/s)?.[1] ?? '';
 
+    expect(chatCardRule).toMatch(/overflow-y:\s*auto/);
     expect(cardBodyRule).toMatch(/display:\s*flex/);
     expect(cardBodyRule).toMatch(/flex-direction:\s*column/);
-    expect(cardBodyRule).toMatch(/overflow:\s*hidden/);
+    expect(cardBodyRule).toMatch(/overflow:\s*visible/);
     expect(headerRule).toMatch(/flex:\s*0\s+0\s+auto/);
     expect(timelineRegionRule).toMatch(/flex:\s*1\s+1\s+0/);
     expect(timelineRegionRule).toMatch(/min-height:\s*0/);
     expect(timelineRegionRule).toMatch(/overflow:\s*hidden/);
     expect(composerRule).toMatch(/flex:\s*0\s+0\s+auto/);
+    expect(composerRule).toMatch(/position:\s*sticky/);
+    expect(composerRule).toMatch(/bottom:\s*0/);
   });
 
   it('lets the loading state shrink inside short application windows', () => {

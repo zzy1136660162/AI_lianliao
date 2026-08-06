@@ -101,11 +101,20 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
   border: 1px solid var(--enterprise-border);
   border-radius: var(--enterprise-radius-card);
   background: var(--enterprise-surface);
   box-shadow: var(--enterprise-shadow-card);
+}
+
+.chatCard {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.profileCard {
+  overflow: hidden;
 }
 
 .chatCard :global(.ant-card-body) {
@@ -114,7 +123,7 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
 }
 
@@ -310,6 +319,9 @@
 }
 
 .composer {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
   display: grid;
   flex: 0 0 auto;
   gap: 9px;

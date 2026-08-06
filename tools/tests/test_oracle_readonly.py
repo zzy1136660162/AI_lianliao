@@ -7,7 +7,7 @@ from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from tools.oracle.oracle_readonly import (
+from tools.database.oracle.oracle_readonly import (
     ConnectionSettings,
     SchemaInventory,
     build_parser,
@@ -141,8 +141,8 @@ class OracleReadonlyToolTest(unittest.TestCase):
             ddl_path = Path(directory) / "customer_service.sql"
             ddl_path.write_text(ddl, encoding="utf-8")
             with (
-                patch("tools.oracle.oracle_readonly._connect", return_value=connection),
-                patch("tools.oracle.oracle_readonly.read_schema_inventory", return_value=inventory),
+                patch("tools.database.oracle.oracle_readonly._connect", return_value=connection),
+                patch("tools.database.oracle.oracle_readonly.read_schema_inventory", return_value=inventory),
             ):
                 verify_customer_service_schema(
                     ConnectionSettings(

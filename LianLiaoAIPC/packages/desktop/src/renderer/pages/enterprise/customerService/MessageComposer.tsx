@@ -57,6 +57,13 @@ const MessageComposer: React.FC<MessageComposerProps> = ({
         rows={3}
         maxLength={2_000}
         showWordLimit
+        style={{
+          paddingBlockEnd: 26,
+          paddingInlineEnd: 72,
+          userSelect: 'text',
+          WebkitUserSelect: 'text',
+        }}
+        wrapperStyle={{ position: 'relative' }}
         onChange={onChange}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) {

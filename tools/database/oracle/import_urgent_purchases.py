@@ -29,7 +29,7 @@ except ImportError:  # Direct execution adds this script directory to sys.path.
 
 
 DEFAULT_INPUT_PATH = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[4]
     / "lianshang_liaoning"
     / "docs"
     / "附录文件"

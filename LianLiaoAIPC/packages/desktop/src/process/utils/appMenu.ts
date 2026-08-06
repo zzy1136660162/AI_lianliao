@@ -22,11 +22,12 @@ export const buildViewMenuItems = (isPackaged: boolean): MenuItemConstructorOpti
   { role: 'togglefullscreen' },
 ];
 
-export const buildEditMenuItems = (isPackaged: boolean, isMac: boolean): MenuItemConstructorOptions[] => [
+export const buildEditMenuItems = (_isPackaged: boolean, isMac: boolean): MenuItemConstructorOptions[] => [
   { role: 'undo' },
   { role: 'redo' },
   { type: 'separator' },
-  ...(!isPackaged ? ([{ role: 'cut' }, { role: 'copy' }] as MenuItemConstructorOptions[]) : []),
+  { role: 'cut' },
+  { role: 'copy' },
   { role: 'paste' },
   ...(isMac
     ? ([{ role: 'pasteAndMatchStyle' }, { role: 'delete' }, { role: 'selectAll' }] as MenuItemConstructorOptions[])

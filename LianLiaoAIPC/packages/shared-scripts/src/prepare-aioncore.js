@@ -20,6 +20,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { getLockedAsset } = require('../../../scripts/verifyAioncoreReleaseLock.js');
+const { verifyBundledAioncoreResources } = require('./verify-bundled-aioncore-resources.js');
 
 const GITHUB_OWNER = 'zzy1136660162';
 const GITHUB_REPO = 'AI_lianliao';
@@ -100,8 +101,152 @@ function writeJson(filePath, payload) {
   fs.writeFileSync(filePath, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
 }
 
+function readJsonSafe(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === 'EPERM';
+  }
+}
+
+function generatedDirectoryPid(name) {
+  const matches = [...name.matchAll(/-(\d+)(?=\.stale-|$)/g)];
+  if (matches.length === 0) return null;
+  const pid = Number(matches.at(-1)[1]);
+  return Number.isInteger(pid) ? pid : null;
+}
+
+/**
+ * Remove abandoned preparation/backup directories without touching a valid
+ * runtime directory or another build process that is still using its staging
+ * tree. These paths contain generated release assets only.
+ */
+function cleanupGeneratedRuntimeDirectories(rootDir, activePid = process.pid) {
+  const resolvedRoot = path.resolve(rootDir);
+  const generatedNamePattern = /^(?:darwin|linux|win32)-(?:x64|arm64|ia32|armv7l)\.(?:preparing-\d+|stale-.+)$/;
+  const activeDirectoryMaxAgeMs = 24 * 60 * 60 * 1000;
+  const result = { removed: [], skippedActive: [], failed: [] };
+
+  if (!fs.existsSync(resolvedRoot)) return result;
+
+  for (const entry of fs.readdirSync(resolvedRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || !generatedNamePattern.test(entry.name)) continue;
+
+    const candidatePath = path.resolve(resolvedRoot, entry.name);
+    if (path.dirname(candidatePath) !== resolvedRoot) continue;
+
+    const ownerPid = generatedDirectoryPid(entry.name);
+    const directoryAgeMs = Date.now() - fs.statSync(candidatePath).mtimeMs;
+    const belongsToActiveBuild =
+      ownerPid && (ownerPid === activePid || (directoryAgeMs <= activeDirectoryMaxAgeMs && isProcessAlive(ownerPid)));
+    if (belongsToActiveBuild) {
+      result.skippedActive.push(entry.name);
+      continue;
+    }
+
+    try {
+      fs.rmSync(candidatePath, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+      result.removed.push(entry.name);
+    } catch (error) {
+      result.failed.push({ name: entry.name, message: error.message });
+    }
+  }
+
+  return result;
+}
+
 function getBinaryName(platform) {
   return platform === 'win32' ? 'aioncore.exe' : 'aioncore';
+}
+
+function normalizeSha256(value) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function matchesLockedReleaseSource(manifest, platform, arch, lock, asset) {
+  const expectedSha256 = normalizeSha256(asset.sha256);
+  return (
+    manifest?.platform === platform &&
+    manifest?.arch === arch &&
+    manifest?.version === lock.version &&
+    manifest?.sourceType === 'locked-release' &&
+    manifest?.source?.repository === lock.repository &&
+    manifest?.source?.releaseTag === lock.releaseTag &&
+    manifest?.source?.assetName === asset.name &&
+    normalizeSha256(manifest?.source?.expectedSha256) === expectedSha256 &&
+    normalizeSha256(manifest?.source?.actualSha256) === expectedSha256
+  );
+}
+
+function tryReusePreparedAioncore({
+  targetDir,
+  platform,
+  arch,
+  lock,
+  asset,
+  isReleaseBuild,
+  localBinaryPath,
+  actionsRunId,
+}) {
+  if (isReleaseBuild || localBinaryPath || actionsRunId) return null;
+
+  const manifestPath = path.join(targetDir, 'manifest.json');
+  const manifest = readJsonSafe(manifestPath);
+  if (!matchesLockedReleaseSource(manifest, platform, arch, lock, asset)) return null;
+
+  const binaryPath = path.join(targetDir, getBinaryName(platform));
+  if (!fs.existsSync(binaryPath) || !fs.statSync(binaryPath).isFile()) return null;
+
+  const resourcesDir = path.resolve(targetDir, '..', '..');
+  const verification = verifyBundledAioncoreResources({
+    resourcesDir,
+    electronPlatformName: platform,
+    targetArch: arch,
+  });
+  if (verification.missing.length > 0) return null;
+
+  const binarySha256 = sha256File(binaryPath);
+  const manifestBinarySha256 = normalizeSha256(manifest.binarySha256);
+  if (manifestBinarySha256 && manifestBinarySha256 !== binarySha256.toLowerCase()) return null;
+
+  if (!manifestBinarySha256) {
+    writeJson(manifestPath, { ...manifest, binarySha256 });
+  }
+
+  return {
+    prepared: true,
+    cached: true,
+    dir: targetDir,
+    sourceType: manifest.sourceType,
+    binarySha256,
+  };
+}
+
+function tryTrustLocalPreparedAioncore({ targetDir, platform, enabled, isReleaseBuild }) {
+  if (!enabled || isReleaseBuild) return null;
+
+  const binaryPath = path.join(targetDir, getBinaryName(platform));
+  const managedResourcesDir = path.join(targetDir, 'managed-resources');
+  if (!fs.existsSync(binaryPath) || !fs.statSync(binaryPath).isFile()) return null;
+  if (!fs.existsSync(managedResourcesDir) || !fs.statSync(managedResourcesDir).isDirectory()) return null;
+
+  return {
+    prepared: true,
+    cached: true,
+    trustedLocal: true,
+    dir: targetDir,
+    sourceType: 'trusted-local-resources',
+  };
 }
 
 function getActionsTarget(platform, arch) {
@@ -511,18 +656,15 @@ function prepareAioncore(options) {
   const actionsRunId = (process.env.AIONUI_BACKEND_RUN_ID || '').trim();
   const localBinaryPath = (process.env.LIANLIAO_AICORE_LOCAL_BINARY || '').trim();
   const isReleaseBuild = process.env.LIANLIAO_RELEASE_BUILD === '1';
-  const { lock, asset } = getLockedAsset(projectRoot, runtimeKey, {
-    requireChecksum: !localBinaryPath && !actionsRunId,
-  });
-
-  if (version !== lock.version) {
-    throw new Error(`LianLiaoAICore version ${version} does not match release lock ${lock.version}`);
-  }
+  const trustLocalPreparedResources = process.env.LIANLIAO_AICORE_TRUST_PREPARED === '1';
   if (isReleaseBuild && localBinaryPath) {
     throw new Error('LIANLIAO_AICORE_LOCAL_BINARY is not allowed in a release build');
   }
   if (isReleaseBuild && actionsRunId) {
     throw new Error('AIONUI_BACKEND_RUN_ID is not allowed in a release build; publish a locked Core release first');
+  }
+  if (isReleaseBuild && trustLocalPreparedResources) {
+    throw new Error('LIANLIAO_AICORE_TRUST_PREPARED is not allowed in a release build');
   }
 
   const targetDir = path.join(projectRoot, 'resources', 'bundled-aioncore', runtimeKey);
@@ -530,9 +672,57 @@ function prepareAioncore(options) {
   const binaryName = getBinaryName(platform);
   const targetBinaryPath = path.join(stagingDir, binaryName);
 
+  const generatedCleanup = cleanupGeneratedRuntimeDirectories(path.dirname(targetDir), process.pid);
+  if (generatedCleanup.removed.length > 0) {
+    console.log(`  Removed abandoned Core directories: ${generatedCleanup.removed.join(', ')}`);
+  }
+  if (generatedCleanup.failed.length > 0) {
+    console.warn(
+      `  Unable to remove ${generatedCleanup.failed.length} abandoned Core director${generatedCleanup.failed.length === 1 ? 'y' : 'ies'}; packaging filters will exclude them.`
+    );
+  }
+
+  const trustedLocalResult = tryTrustLocalPreparedAioncore({
+    targetDir,
+    platform,
+    enabled: trustLocalPreparedResources,
+    isReleaseBuild,
+  });
+  if (trustedLocalResult) {
+    console.log(`Preparing LianLiaoAICore for ${runtimeKey} (trusted local resources)`);
+    console.log(`  Reusing local Core resources without Release or SHA256 validation: ${targetDir}`);
+    return trustedLocalResult;
+  }
+  if (trustLocalPreparedResources) {
+    console.log(`  Local Core resources are unavailable for ${runtimeKey}; falling back to the locked GitHub release.`);
+  }
+
+  const { lock, asset } = getLockedAsset(projectRoot, runtimeKey, {
+    requireChecksum: !localBinaryPath && !actionsRunId,
+  });
+
+  if (version !== lock.version) {
+    throw new Error(`LianLiaoAICore version ${version} does not match release lock ${lock.version}`);
+  }
+
   console.log(
     `Preparing LianLiaoAICore for ${runtimeKey} (${localBinaryPath ? 'local development binary' : actionsRunId ? `actions run: ${actionsRunId}` : `release: ${lock.releaseTag}`})`
   );
+
+  const cachedResult = tryReusePreparedAioncore({
+    targetDir,
+    platform,
+    arch,
+    lock,
+    asset,
+    isReleaseBuild,
+    localBinaryPath,
+    actionsRunId,
+  });
+  if (cachedResult) {
+    console.log(`  Reusing verified bundled Core cache: resources/bundled-aioncore/${runtimeKey}`);
+    return cachedResult;
+  }
 
   removeDirectorySafe(stagingDir);
   ensureDirectory(stagingDir);
@@ -594,6 +784,7 @@ function prepareAioncore(options) {
       arch,
       version: lock.version,
       generatedAt: new Date().toISOString(),
+      binarySha256: sha256File(targetBinaryPath),
       sourceType,
       source: sourceDetail,
       files: [binaryName, 'managed-resources/'],
@@ -628,7 +819,11 @@ module.exports = {
   getReleaseByTagApiPath,
   getActionsArtifactMissingMessage,
   getActionsArtifactName,
+  cleanupGeneratedRuntimeDirectories,
+  matchesLockedReleaseSource,
   moveExistingDirectoryAside,
   prepareAioncore,
   sha256File,
+  tryReusePreparedAioncore,
+  tryTrustLocalPreparedAioncore,
 };

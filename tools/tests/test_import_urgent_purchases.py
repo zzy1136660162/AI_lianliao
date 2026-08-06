@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from tools.oracle.import_urgent_purchases import (
+from tools.database.oracle.import_urgent_purchases import (
     COMPANY_ID,
     EXPECTED_HEADERS,
     EXPECTED_ROW_COUNT,
@@ -350,9 +350,9 @@ class UrgentPurchaseDatabaseTest(unittest.TestCase):
         settings = SimpleNamespace(password="secret", jdbc_url="jdbc:oracle:thin:@example")
 
         with (
-            patch("tools.oracle.import_urgent_purchases.load_workbook_rows", return_value=rows),
-            patch("tools.oracle.import_urgent_purchases.load_connection_settings", return_value=settings),
-            patch("tools.oracle.import_urgent_purchases._connect", side_effect=[connection, RuntimeError("reconnect failed")]),
+            patch("tools.database.oracle.import_urgent_purchases.load_workbook_rows", return_value=rows),
+            patch("tools.database.oracle.import_urgent_purchases.load_connection_settings", return_value=settings),
+            patch("tools.database.oracle.import_urgent_purchases._connect", side_effect=[connection, RuntimeError("reconnect failed")]),
         ):
             with redirect_stderr(StringIO()):
                 result = main(["--execute"])

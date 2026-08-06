@@ -149,6 +149,29 @@ describe('release packaging configuration', () => {
     expect(winBlock).not.toContain('    - zip');
   });
 
+  it('excludes generated Core preparation and stale directories from packaged resources', () => {
+    const config = readProjectFile('packages/desktop/electron-builder.yml');
+
+    expect(config).toContain("      - '!*.preparing-*/**/*'");
+    expect(config).toContain("      - '!*.stale-*/**/*'");
+  });
+
+  it('trusts prepared Core resources for local Windows builds but keeps an explicit verified command', () => {
+    const packageJson = JSON.parse(readProjectFile('package.json')) as { scripts?: Record<string, string> };
+    const buildScript = readProjectFile('scripts/build-with-builder.js');
+    const afterPackScript = readProjectFile('scripts/afterPack.js');
+
+    expect(packageJson.scripts?.['build-win']).toBe('node scripts/build-with-builder.js auto --win');
+    expect(packageJson.scripts?.['build-win:verified']).toContain('LIANLIAO_AICORE_VERIFY=1');
+    expect(buildScript).toContain("process.env.LIANLIAO_RELEASE_BUILD !== '1'");
+    expect(buildScript).toContain("process.env.LIANLIAO_AICORE_TRUST_PREPARED = '1'");
+    expect(buildScript).toContain('--config.compression=store --config.nsis.useZip=true');
+    expect(buildScript).toContain("process.env.LIANLIAO_AICORE_VERIFY !== '1'");
+    expect(afterPackScript).toContain("process.env.LIANLIAO_AICORE_TRUST_PREPARED === '1'");
+    expect(afterPackScript).toContain("process.env.LIANLIAO_RELEASE_BUILD !== '1'");
+    expect(afterPackScript).toContain('bundled Core structure verification skipped');
+  });
+
   it('uses stable ASCII desktop artifact names while retaining compatible updater references', () => {
     const createMockScript = readProjectFile('scripts/create-mock-release-artifacts.sh');
     const prepareScript = readProjectFile('scripts/prepare-release-assets.sh');

@@ -652,7 +652,7 @@ mod tests {
         );
         assert!(
             rows.iter()
-                .any(|r| r.name == "Aion CLI" && r.agent_source == "internal")
+                .any(|r| r.name == "LianLiao AI" && r.agent_source == "internal")
         );
         // Nanobot and OpenClaw are builtin (not internal).
         assert!(rows.iter().any(|r| r.name == "Nanobot" && r.agent_source == "builtin"));
@@ -759,8 +759,8 @@ mod tests {
         let aionrs = rows
             .iter()
             .find(|row| row.agent_type == "aionrs" && row.agent_source == "internal")
-            .expect("seeded aion cli row");
-        assert_eq!(aionrs.icon.as_deref(), Some("/api/assets/logos/brand/aion.svg"));
+            .expect("seeded LianLiao AI row");
+        assert_eq!(aionrs.icon.as_deref(), Some("/api/assets/logos/brand/ai.svg"));
         let aionrs_modes: serde_json::Value =
             serde_json::from_str(aionrs.available_modes.as_deref().expect("aionrs modes catalog")).unwrap();
         assert_eq!(aionrs_modes["current_mode_id"].as_str(), Some("default"));

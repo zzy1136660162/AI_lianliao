@@ -98,6 +98,29 @@ describe('demand contact security contract', () => {
 });
 
 describe('unified search response boundary', () => {
+  it('normalizes nullable optional fields from Java responses', () => {
+    const result = parseUnifiedSearchResult({
+      total: 1,
+      pageNum: 1,
+      pageSize: 20,
+      items: [
+        {
+          resourceType: 'PRODUCT',
+          businessId: '407563',
+          title: '测试产品',
+          subtitle: null,
+          coverUrl: null,
+          publishedAt: null,
+          tags: [],
+        },
+      ],
+    });
+
+    expect(result.items[0].subtitle).toBeUndefined();
+    expect(result.items[0].coverUrl).toBeUndefined();
+    expect(result.items[0].publishedAt).toBeUndefined();
+  });
+
   it('accepts signed nonzero business IDs and rejects unexpected sensitive fields', () => {
     const safeItem = {
       resourceType: 'COMPANY',

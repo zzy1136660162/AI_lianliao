@@ -55,9 +55,9 @@ Run:
 
 ```powershell
 python -m unittest tools.tests.test_enterprise_openid_login -v
-python tools/enterprise_openid_login.py --help
-python tools/enterprise_openid_login.py login --help
-python -m py_compile tools/enterprise_openid_login.py
+python tools/auth/enterprise_openid_login.py --help
+python tools/auth/enterprise_openid_login.py login --help
+python -m py_compile tools/auth/enterprise_openid_login.py
 ```
 
 Expected: all tests pass, both help commands exit `0`, and compilation produces no error.
@@ -73,12 +73,12 @@ Document the three commands, fixed API/profile mappings, the requirement to full
 
 - [ ] **Step 2: Verify documentation commands match the parser**
 
-Compare every documented flag with `python tools/enterprise_openid_login.py --help`; no undocumented required arguments or stale command names may remain.
+Compare every documented flag with `python tools/auth/enterprise_openid_login.py --help`; no undocumented required arguments or stale command names may remain.
 
 ### Task 3: Final scoped verification
 
 **Files:**
-- Verify only: `tools/enterprise_openid_login.py`
+- Verify only: `tools/auth/enterprise_openid_login.py`
 - Verify only: `tools/tests/test_enterprise_openid_login.py`
 - Verify only: `tools/README.md`
 
@@ -93,7 +93,7 @@ Expected: PASS.
 - [ ] **Step 2: Inspect the scoped diff**
 
 ```powershell
-git diff -- tools/enterprise_openid_login.py tools/tests/test_enterprise_openid_login.py tools/README.md
+git diff -- tools/auth/enterprise_openid_login.py tools/tests/test_enterprise_openid_login.py tools/README.md
 ```
 
 Expected: no credentials, real openids, database writes, Redis writes, Electron changes or cloud-api changes.

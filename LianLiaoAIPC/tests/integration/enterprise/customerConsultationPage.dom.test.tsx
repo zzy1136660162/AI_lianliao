@@ -127,6 +127,16 @@ describe('CustomerConsultationPage', () => {
     expect(client.openConversation).toHaveBeenCalledTimes(1);
     expect(client.getHistory).toHaveBeenCalledWith({ conversationId: '-8', limit: 50 });
     expect(screen.getByTestId('customer-consultation-timeline')).toHaveStyle({ overflowY: 'auto' });
+    expect(screen.getByPlaceholderText('enterprise.consultation.composer.placeholder')).toHaveStyle({
+      paddingBlockEnd: '26px',
+      paddingInlineEnd: '72px',
+      userSelect: 'text',
+    });
+    expect(screen.getByText('0 / 2000')).toHaveStyle({
+      position: 'absolute',
+      bottom: '6px',
+      insetInlineEnd: '10px',
+    });
   });
 
   it('sends customer text and renders a realtime staff reply', async () => {

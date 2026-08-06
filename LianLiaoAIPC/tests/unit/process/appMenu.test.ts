@@ -31,11 +31,11 @@ describe('application Edit menu', () => {
     expect(roles).toContain('cut');
   });
 
-  it('omits copy and cut from packaged builds while keeping paste', () => {
+  it('keeps native editing commands available in packaged builds', () => {
     const roles = buildEditMenuItems(true, false).map((item) => item.role);
 
-    expect(roles).not.toContain('copy');
-    expect(roles).not.toContain('cut');
+    expect(roles).toContain('copy');
+    expect(roles).toContain('cut');
     expect(roles).toContain('paste');
   });
 });

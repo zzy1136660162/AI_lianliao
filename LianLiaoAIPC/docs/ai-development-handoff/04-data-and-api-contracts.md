@@ -318,7 +318,7 @@ E:/ZZY_PROJECT/lianshang_liaoning/cloud-service/cloud-api/src/main/resources/db/
 
 ```powershell
 cd E:\ZZY_PROJECT\AI_lianliao
-python tools\oracle\oracle_readonly.py --json
+python tools\database\oracle\oracle_readonly.py --json
 ```
 
 工具只查询 Oracle `USER_*` 元数据，执行只读事务并 `rollback`，不提供任意 SQL 和写入入口。

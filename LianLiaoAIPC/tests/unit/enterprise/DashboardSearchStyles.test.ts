@@ -7,6 +7,10 @@ const dashboardStyles = readFileSync(
   resolve(process.cwd(), 'packages/desktop/src/renderer/pages/enterprise/dashboard/dashboard-workbench.module.css'),
   'utf8'
 );
+const unifiedSearchStyles = readFileSync(
+  resolve(process.cwd(), 'packages/desktop/src/renderer/pages/enterprise/search/unified-search.module.css'),
+  'utf8'
+);
 
 describe('enterprise dashboard search styles', () => {
   it('uses the shared bright card surface for the main dashboard panels', () => {
@@ -54,5 +58,20 @@ describe('enterprise dashboard search styles', () => {
     expect(searchButtonRule).toMatch(/min-width:\s*46px/);
     expect(searchButtonRule).toMatch(/border-start-end-radius:\s*10px/);
     expect(searchButtonRule).toMatch(/border-end-end-radius:\s*10px/);
+  });
+
+  it('keeps the dashboard and unified-search inputs visually aligned without a native focus outline', () => {
+    [
+      { styles: dashboardStyles, scope: 'searchControl' },
+      { styles: unifiedSearchStyles, scope: 'searchCard' },
+    ].forEach(({ styles, scope }) => {
+      expect(styles).toMatch(
+        new RegExp(`\\.${scope}\\s+:global\\(\\.ll-ant-input-search\\)\\s*\\{[^}]*height:\\s*46px`, 's')
+      );
+      expect(styles).toMatch(
+        new RegExp(`\\.${scope}\\s+:global\\(\\.ll-ant-input-affix-wrapper\\)\\s*\\{[^}]*border-radius:\\s*10px`, 's')
+      );
+      expect(styles).toMatch(new RegExp(`\\.${scope}\\s+input:focus-visible\\s*\\{[^}]*outline:\\s*none`, 's'));
+    });
   });
 });

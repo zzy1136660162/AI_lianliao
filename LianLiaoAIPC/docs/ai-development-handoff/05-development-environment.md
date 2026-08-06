@@ -189,8 +189,8 @@ E:\ZZY_PROJECT\AI_lianliao\tools
 
 ```powershell
 Set-Location E:\ZZY_PROJECT\AI_lianliao
-python tools\oracle\oracle_readonly.py --json
-python tools\oracle\oracle_readonly.py --help
+python tools\database\oracle\oracle_readonly.py --json
+python tools\database\oracle\oracle_readonly.py --help
 ```
 
 当前工具专门对照客服 DDL 查询 Oracle `USER_*` 元数据，不提供任意 SQL 参数。该工具必须保持严格只读：禁止新增、修改、删除、DDL、PL/SQL、存储过程调用、锁表和多语句执行。若后续增加其他只读调查能力，应采用固定查询模板和参数白名单，不能开放任意 SQL。任何数据库写操作都必须先向用户展示 SQL、影响范围和回滚方案，并取得明确确认。
