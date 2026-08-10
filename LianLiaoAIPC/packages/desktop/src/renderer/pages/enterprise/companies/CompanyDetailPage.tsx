@@ -13,7 +13,9 @@ import {
   StickyDetailSidebar,
 } from '@/renderer/pages/enterprise/layout/catalog/DetailLayout';
 import {
+  type CompanyCatalogReturn,
   createCatalogReturnState,
+  createProductDetailCompanyReturnState,
   readCatalogReturnState,
 } from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
@@ -68,12 +70,20 @@ const CompanyLogo: React.FC<{ company: EnterpriseCompanyDetail }> = ({ company }
   );
 };
 
-const CompanyProductCard: React.FC<{ product: EnterpriseProductSummary }> = ({ product }) => {
+const CompanyProductCard: React.FC<{
+  product: EnterpriseProductSummary;
+  companyId: string;
+  catalogReturn: CompanyCatalogReturn | null;
+}> = ({ product, companyId, catalogReturn }) => {
   const { t } = useTranslation();
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = parseSafeCompanyImageUrl(product.imageUrl);
   return (
-    <Link className={styles.productCard} to={`/enterprise/products/${encodeURIComponent(product.productId)}`}>
+    <Link
+      className={styles.productCard}
+      to={`/enterprise/products/${encodeURIComponent(product.productId)}`}
+      state={createProductDetailCompanyReturnState(companyId, catalogReturn)}
+    >
       <div className={styles.productImage}>
         {imageUrl && !imageFailed ? (
           <img
@@ -139,10 +149,6 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
             missing={missing}
             facts={[
               {
-                label: t('enterprise.companyDetail.fields.contactName'),
-                value: company.contactName,
-              },
-              {
                 label: t('enterprise.companyDetail.fields.contactTitle'),
                 value: company.contactTitle,
               },
@@ -156,6 +162,8 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
             resourceTitle={company.name}
             toCompanyId={company.companyId}
             toCompanyName={company.name}
+            contactName={company.contactName}
+            contactNameLabel={t('enterprise.companyDetail.fields.contactName')}
             maskedPhone={company.phone}
           />
           <p className={styles.permissionNote}>{t('enterprise.companyDetail.contactPermissionNote')}</p>
@@ -224,7 +232,12 @@ const CompanyDetailPage: React.FC<CompanyDetailPageProps> = ({ client = enterpri
             {products.list.length ? (
               <div className={styles.productGrid}>
                 {products.list.map((product) => (
-                  <CompanyProductCard key={product.productId} product={product} />
+                  <CompanyProductCard
+                    key={product.productId}
+                    product={product}
+                    companyId={company.companyId}
+                    catalogReturn={catalogReturn}
+                  />
                 ))}
               </div>
             ) : (

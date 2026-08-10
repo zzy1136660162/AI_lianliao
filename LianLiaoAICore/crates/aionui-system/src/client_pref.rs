@@ -230,11 +230,11 @@ mod tests {
     async fn update_and_get_number() {
         let svc = setup().await;
         let mut req = UpdateClientPreferencesRequest::new();
-        req.insert("pet.size".into(), json!(360));
+        req.insert("ui.fontSize.chat".into(), json!(16));
         svc.update_preferences(req).await.unwrap();
 
         let prefs = svc.get_preferences(None).await.unwrap();
-        assert_eq!(prefs["pet.size"], json!(360));
+        assert_eq!(prefs["ui.fontSize.chat"], json!(16));
     }
 
     #[tokio::test]

@@ -148,8 +148,23 @@
 }
 
 .detailHeroMedia,
-.detailHeroContent {
+.detailHeroContent,
+.detailHeroAside {
   min-width: 0;
+}
+
+.detailHeroWithAside {
+  grid-template-columns: minmax(160px, 240px) minmax(220px, 1fr) minmax(250px, 300px);
+  align-items: stretch;
+}
+
+.detailHeroWithAside .detailHeroMedia,
+.detailHeroWithAside .detailHeroContent {
+  align-self: center;
+}
+
+.detailHeroAside > * {
+  height: 100%;
 }
 
 .detailColumns {
@@ -200,6 +215,14 @@
 }
 
 @media (max-width: 940px) {
+  .detailHeroWithAside {
+    grid-template-columns: minmax(160px, 220px) minmax(0, 1fr);
+  }
+
+  .detailHeroAside {
+    grid-column: 2;
+  }
+
   .detailColumns {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -239,6 +262,10 @@
   .detailHero {
     grid-template-columns: minmax(0, 1fr);
     padding: 14px;
+  }
+
+  .detailHeroAside {
+    grid-column: auto;
   }
 }
 

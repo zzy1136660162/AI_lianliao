@@ -18,6 +18,7 @@ export type EnterpriseClient = {
   completeRegistration: (openId: string) => Promise<EnterpriseUserContext>;
   restoreSession: () => Promise<EnterpriseUserContext | null>;
   clearSession: () => Promise<void>;
+  copyPhone?: (phone: string) => Promise<void>;
   request: (request: EnterpriseRequest) => Promise<EnterpriseResponse>;
 };
 
@@ -166,6 +167,11 @@ export const createEnterpriseClient = (getRawBridge: EnterpriseRawBridgeProvider
   completeRegistration: (openId) => invokeEnterprise(getRawBridge, (bridge) => bridge.completeRegistration(openId)),
   restoreSession: () => invokeEnterprise(getRawBridge, (bridge) => bridge.restoreSession()),
   clearSession: () => invokeEnterprise(getRawBridge, (bridge) => bridge.clearSession()),
+  copyPhone: (phone) =>
+    invokeEnterprise(getRawBridge, (bridge) => {
+      if (!bridge.copyPhone) throw rendererError('IPC_UNAVAILABLE');
+      return bridge.copyPhone(phone);
+    }),
   request: (request) => invokeEnterprise(getRawBridge, (bridge) => bridge.request(request)),
 });
 

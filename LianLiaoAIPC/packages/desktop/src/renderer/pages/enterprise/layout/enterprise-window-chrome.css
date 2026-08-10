@@ -44,3 +44,13 @@
   flex: 0 0 auto;
   -webkit-app-region: no-drag;
 }
+
+@media (max-width: 780px) {
+  .enterprise-window-chrome {
+    position: sticky;
+    z-index: 50;
+    top: 0;
+    align-self: start;
+    background: var(--bg-1);
+  }
+}

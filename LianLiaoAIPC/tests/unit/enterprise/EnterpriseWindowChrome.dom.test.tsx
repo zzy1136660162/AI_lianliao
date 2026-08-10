@@ -127,4 +127,15 @@ describe('EnterpriseWindowChrome', () => {
     expect(chromeCss).toMatch(/\.enterprise-window-chrome\s*\{[^}]*-webkit-app-region:\s*drag/s);
     expect(titlebarCss).toMatch(/\.app-window-controls\s*\{[^}]*-webkit-app-region:\s*no-drag/s);
   });
+
+  it('keeps the complete window chrome pinned above narrow document scrolling', () => {
+    const chromeCss = readFileSync(
+      resolve('packages/desktop/src/renderer/pages/enterprise/layout/enterprise-window-chrome.css'),
+      'utf8'
+    );
+
+    expect(chromeCss).toMatch(
+      /@media\s*\(max-width:\s*780px\)[\s\S]*?\.enterprise-window-chrome\s*\{[^}]*position:\s*sticky[^}]*z-index:\s*50[^}]*top:\s*0/s
+    );
+  });
 });

@@ -33,6 +33,12 @@ describe('enterprise catalog visual contract', () => {
     expectCardTokens(filterRule);
   });
 
+  it('keeps the four linked project dimensions on one desktop row', () => {
+    const linkedFilterRule = projectCss.match(/\.linkedFilterRow\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(linkedFilterRule).toMatch(/grid-column:\s*1\s*\/\s*-1/);
+    expect(linkedFilterRule).toMatch(/grid-template-columns:\s*repeat\(4,/);
+  });
+
   it('uses the shared card surface for project workspace sections', () => {
     const projectSurfaceRule =
       projectCss.match(/\.dashboard,\s*\.catalogSection,\s*\.detailContent\s*\{([^}]*)\}/s)?.[1] ?? '';
@@ -57,5 +63,11 @@ describe('enterprise catalog visual contract', () => {
     expect(enterpriseThemeCss).toContain('--enterprise-catalog-image-ratio: 4 / 3');
     expect(enterpriseThemeCss).toContain('--enterprise-detail-sidebar-width: 300px');
     expect(catalogLayoutCss).toMatch(/position:\s*sticky/);
+  });
+
+  it('provides a dedicated hero column for product contact access', () => {
+    const heroAsideRule = catalogLayoutCss.match(/\.detailHeroWithAside\s*\{([^}]*)\}/s)?.[1] ?? '';
+    expect(heroAsideRule).toMatch(/grid-template-columns:\s*minmax\(160px,\s*240px\)/);
+    expect(catalogLayoutCss).toContain('.detailHeroAside');
   });
 });

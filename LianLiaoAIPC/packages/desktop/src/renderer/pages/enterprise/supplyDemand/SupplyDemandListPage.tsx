@@ -87,7 +87,6 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       render: (_value, item) => (
         <div className={styles.titleCell}>
           <strong>{item.title}</strong>
-          <span>{item.summary || t('enterprise.supplyDemand.notProvided')}</span>
         </div>
       ),
     },
@@ -96,12 +95,14 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       dataIndex: 'typeName',
       key: 'typeName',
       width: 120,
+      responsive: ['lg'],
       render: (value: string) => <Tag color='blue'>{value}</Tag>,
     },
     {
       title: t('enterprise.supplyDemand.columns.region'),
       key: 'region',
       width: 150,
+      responsive: ['xl'],
       render: (_value, item) => [item.city, item.district].filter(Boolean).join(' / ') || '-',
     },
     {
@@ -109,12 +110,14 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       dataIndex: 'budget',
       key: 'budget',
       width: 110,
+      responsive: ['xl'],
       render: (value?: string) => value || '-',
     },
     {
       title: t('enterprise.supplyDemand.columns.progress'),
       key: 'progress',
       width: 138,
+      responsive: ['xxl'],
       render: (_value, item) => (
         <div className={styles.progressCell}>
           <span>
@@ -137,6 +140,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       dataIndex: 'remainingDays',
       key: 'remainingDays',
       width: 100,
+      responsive: ['xxl'],
       render: (value?: number) =>
         value === undefined ? '-' : t('enterprise.supplyDemand.stats.daysRemaining', { count: value }),
     },
@@ -145,6 +149,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
       dataIndex: 'publishedAt',
       key: 'publishedAt',
       width: 118,
+      responsive: ['xxl'],
       render: (value?: string) => value || '-',
     },
     {
@@ -226,7 +231,6 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
             dataSource={page.list}
             pagination={false}
             loading={loading}
-            scroll={{ x: 1320 }}
           />
           <div className={styles.paginationBar}>
             <span>{t('enterprise.supplyDemand.total', { total: page.total })}</span>
@@ -234,6 +238,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
               current={page.pageNum}
               pageSize={page.pageSize}
               total={page.total}
+              responsive
               showSizeChanger
               pageSizeOptions={[10, 20, 50]}
               onChange={(pageNum, pageSize) => {

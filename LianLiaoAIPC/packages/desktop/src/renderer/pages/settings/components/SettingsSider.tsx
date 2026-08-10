@@ -4,7 +4,6 @@ import { type IExtensionSettingsTab } from '@/common/adapter/ipcBridge';
 import { useExtI18n } from '@/renderer/hooks/system/useExtI18n';
 import { useExtensionSettingsTabs } from '@/renderer/hooks/system/useExtensionSettingsTabs';
 import {
-  Cat,
   Communication,
   Computer,
   Earth,
@@ -13,7 +12,6 @@ import {
   LinkCloud,
   Puzzle,
   Robot,
-  Speed,
   System,
 } from '@icon-park/react';
 import classNames from 'classnames';
@@ -25,13 +23,11 @@ import { getSiderTooltipProps } from '@/renderer/utils/ui/siderTooltip';
 
 /** Builtin settings tab IDs in display order (must match router paths). */
 export const BUILTIN_TAB_IDS = [
-  'agent',
   'model',
   'assistants',
   'capabilities',
   'appearance',
   'webui',
-  'pet',
   'system',
   'about',
 ] as const;
@@ -53,7 +49,7 @@ export const LEGACY_ANCHOR_REMAP: Record<string, string> = {
  * Extension tabs anchored between these builtins inherit the enclosing group visually.
  */
 const GROUP_HEADER_BEFORE: Record<string, string> = {
-  agent: 'settings.groupAiCore',
+  model: 'settings.groupAiCore',
   appearance: 'settings.groupApp',
   about: 'settings.groupAbout',
 };
@@ -89,12 +85,6 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
         icon: <Robot />,
         path: 'assistants',
       },
-      agent: {
-        id: 'agent',
-        label: t('settings.agents', { defaultValue: 'Agents' }),
-        icon: <Speed />,
-        path: 'agent',
-      },
       capabilities: {
         id: 'capabilities',
         label: t('settings.capabilities', { defaultValue: 'Capabilities' }),
@@ -108,13 +98,11 @@ const SettingsSider: React.FC<{ collapsed?: boolean; tooltipEnabled?: boolean }>
         icon: isDesktop ? <Earth /> : <Communication />,
         path: 'webui',
       },
-      pet: { id: 'pet', label: t('pet.desktopPet'), icon: <Cat />, path: 'pet' },
       system: { id: 'system', label: t('settings.system'), icon: <System />, path: 'system' },
       about: { id: 'about', label: t('settings.about'), icon: <Info />, path: 'about' },
     };
 
-    // Start with ordered builtin IDs, hiding desktop-only tabs in browser mode
-    const result: SiderItem[] = BUILTIN_TAB_IDS.filter((id) => isDesktop || id !== 'pet').map((id) => builtinMap[id]);
+    const result: SiderItem[] = BUILTIN_TAB_IDS.map((id) => builtinMap[id]);
 
     // Extension tabs with position anchoring
     const beforeMap = new Map<string, IExtensionSettingsTab[]>();

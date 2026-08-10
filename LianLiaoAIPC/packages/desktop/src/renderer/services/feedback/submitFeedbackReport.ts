@@ -1,4 +1,3 @@
-const SUMMARY_PREVIEW_LENGTH = 60;
 const LOG_PREFIX = '[FeedbackReport]';
 type FeedbackLogLevel = 'info' | 'warn' | 'error';
 type FeedbackLogAttachmentStatus = 'collected' | 'empty' | 'failed' | 'skipped' | 'unavailable';
@@ -17,9 +16,9 @@ export type SubmitFeedbackReportInput = {
   collectLogs?: boolean;
   description: string;
   extra?: FeedbackEventExtra;
-  flushTimeoutMs?: number;
   module: string;
   moduleLabel: string;
+  reportType?: 'USER_FEEDBACK' | 'STARTUP_FAILURE' | 'DATA_MIGRATION';
   tags?: FeedbackEventTags;
 };
 
@@ -119,17 +118,8 @@ function normalizeDescription(description: string): string {
   return description.trim().replace(/\s+/g, ' ');
 }
 
-function buildSummary(moduleLabel: string, description: string): string {
-  const summaryPreview =
-    description.length > SUMMARY_PREVIEW_LENGTH
-      ? `${description.slice(0, SUMMARY_PREVIEW_LENGTH).trimEnd()}...`
-      : description;
-  return `${moduleLabel}: ${summaryPreview}`;
-}
-
-export async function submitFeedbackReport(input: SubmitFeedbackReportInput): Promise<void> {
+export async function submitFeedbackReport(input: SubmitFeedbackReportInput) {
   const attachments = [...(input.attachments ?? [])];
-  let eventId: string | undefined;
   let logAttachmentStatus: FeedbackLogAttachmentStatus = input.collectLogs ? 'empty' : 'skipped';
   let logAttachment: FeedbackAttachment | null = null;
 
@@ -144,62 +134,43 @@ export async function submitFeedbackReport(input: SubmitFeedbackReportInput): Pr
     }
 
     const normalizedDescription = normalizeDescription(input.description);
-    const eventSummary = buildSummary(input.moduleLabel, normalizedDescription);
-    const Sentry = await import('@sentry/electron/renderer');
-
-    Sentry.withScope((scope) => {
-      scope.setTag('type', 'user-feedback');
-      scope.setTag('module', input.module);
-      Object.entries(input.tags ?? {}).forEach(([key, value]) => {
-        if (value.trim()) {
-          scope.setTag(key, value);
-        }
-      });
-
-      eventId = Sentry.captureEvent(
-        {
-          level: 'info',
-          message: eventSummary,
-          extra: {
-            description: normalizedDescription,
-            ...input.extra,
-          },
-        },
-        { attachments }
-      );
+    const submit = window.electronAPI?.submitFeedbackReport;
+    if (!submit) throw new Error('Desktop diagnostic bridge is unavailable.');
+    const result = await submit({
+      reportType: input.reportType,
+      module: input.module,
+      description: normalizedDescription,
+      diagnostic: {
+        moduleLabel: input.moduleLabel,
+        tags: input.tags,
+        extra: input.extra,
+        logAttachmentStatus,
+      },
+      attachments: attachments.map((attachment) => ({
+        filename: attachment.filename,
+        contentType: attachment.contentType,
+        data: Array.from(attachment.data),
+      })),
     });
-
-    if (input.flushTimeoutMs !== undefined) {
-      const client = Sentry.getClient();
-      if (!client) {
-        throw new Error(`Failed to flush feedback report${eventId ? ` (${eventId})` : ''}: Sentry is not initialized`);
-      }
-
-      const flushed = await client.flush(input.flushTimeoutMs);
-      if (!flushed) {
-        throw new Error(`Failed to flush feedback report${eventId ? ` (${eventId})` : ''}`);
-      }
-    }
 
     logFeedbackReport('info', 'submitted', {
       module: input.module,
-      eventId,
+      reportNo: result.reportNo,
+      status: result.status,
       collectLogs: Boolean(input.collectLogs),
       logAttachment: summarizeLogAttachment(logAttachmentStatus, logAttachment),
       attachmentCount: attachments.length,
       attachments: summarizeAttachments(attachments),
-      flushTimeoutMs: input.flushTimeoutMs,
       tagKeys: Object.keys(input.tags ?? {}),
     });
+    return result;
   } catch (error) {
     logFeedbackReport('error', 'failed', {
       module: input.module,
-      eventId,
       collectLogs: Boolean(input.collectLogs),
       logAttachment: summarizeLogAttachment(logAttachmentStatus, logAttachment),
       attachmentCount: attachments.length,
       attachments: summarizeAttachments(attachments),
-      flushTimeoutMs: input.flushTimeoutMs,
       error,
     });
     throw error;

@@ -24,7 +24,7 @@ async fn get_all_returns_empty_when_no_preferences() {
 #[tokio::test]
 async fn upsert_then_get_all_returns_inserted_entries() {
     let r = repo().await;
-    r.upsert_batch(&[("theme", "\"dark\""), ("pet.size", "360")])
+    r.upsert_batch(&[("theme", "\"dark\""), ("ui.fontSize.chat", "16")])
         .await
         .unwrap();
 
@@ -33,7 +33,7 @@ async fn upsert_then_get_all_returns_inserted_entries() {
 
     let keys: Vec<&str> = prefs.iter().map(|p| p.key.as_str()).collect();
     assert!(keys.contains(&"theme"));
-    assert!(keys.contains(&"pet.size"));
+    assert!(keys.contains(&"ui.fontSize.chat"));
 }
 
 #[tokio::test]

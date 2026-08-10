@@ -1263,14 +1263,6 @@ export const systemSettings = {
   setAutoPreviewOfficeFiles: httpPut<void, { enabled: boolean }>('/api/settings/client', (p) => ({
     autoPreviewOfficeFiles: p.enabled,
   })),
-  getPetEnabled: bridge.buildProvider<boolean, void>('system-settings:get-pet-enabled'),
-  setPetEnabled: bridge.buildProvider<void, { enabled: boolean }>('system-settings:set-pet-enabled'),
-  getPetSize: bridge.buildProvider<number, void>('system-settings:get-pet-size'),
-  setPetSize: bridge.buildProvider<void, { size: number }>('system-settings:set-pet-size'),
-  getPetDnd: bridge.buildProvider<boolean, void>('system-settings:get-pet-dnd'),
-  setPetDnd: bridge.buildProvider<void, { dnd: boolean }>('system-settings:set-pet-dnd'),
-  getPetConfirmEnabled: bridge.buildProvider<boolean, void>('system-settings:get-pet-confirm-enabled'),
-  setPetConfirmEnabled: bridge.buildProvider<void, { enabled: boolean }>('system-settings:set-pet-confirm-enabled'),
   ensureNodeRuntime: httpPost<{ ready: boolean }, { scope: IRuntimeStatusScope }>('/api/system/ensure-node-runtime'),
   ensureManagedAcpTool: httpPost<{ ready: boolean }, { scope: IRuntimeStatusScope; tool_id: string }>(
     '/api/system/ensure-managed-acp-tool'

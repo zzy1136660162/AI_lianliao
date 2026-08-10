@@ -11,6 +11,7 @@ import * as zlib from 'node:zlib';
 const LOG_SUFFIXES = ['.log', '.aioncore.log', '.aionrs.log'];
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
 const DEFAULT_LOG_DAYS = 3;
+const MAX_LOG_TEXT_BYTES = 4 * 1024 * 1024;
 
 export type FeedbackLogAttachment = {
   filename: string;
@@ -136,10 +137,24 @@ export function collectFeedbackLogAttachment(logsDirs: string | string[]): Feedb
   }
 
   const parts: string[] = [];
+  let remainingBytes = MAX_LOG_TEXT_BYTES;
   for (const logPath of logPaths) {
+    if (remainingBytes <= 0) break;
     const basename = getLogHeaderName(logPath, normalizedDirs[0], normalizedDirs.length > 1);
-    const content = fs.readFileSync(logPath, 'utf8');
+    const raw = fs.readFileSync(logPath);
+    // Keep the newest tail of large logs and cap the complete report before
+    // compression so a runaway log cannot exceed the diagnostic upload limit.
+    const selected = raw.subarray(Math.max(0, raw.length - remainingBytes));
+    const content = selected
+      .toString('utf8')
+      .replace(/\bBearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+      .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}\b/g, '[REDACTED]')
+      .replace(
+        /\b(api[-_]?key|access[-_]?key|token|password|passwd|secret)\s*[:=]\s*["']?[^\s"',;]+/gi,
+        '$1=[REDACTED]'
+      );
     parts.push(`=== ${basename} ===\n${content}\n`);
+    remainingBytes -= selected.byteLength;
   }
 
   return {

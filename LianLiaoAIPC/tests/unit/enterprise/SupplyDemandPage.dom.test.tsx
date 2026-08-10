@@ -17,12 +17,19 @@ vi.mock('react-i18next', () => ({
 const scrollIntoViewMock = vi.fn();
 
 beforeAll(() => {
-  window.matchMedia = vi.fn().mockReturnValue({
-    matches: false,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1024 });
+  window.matchMedia = vi.fn((query: string) => {
+    const minimumWidth = query.match(/min-width:\s*(\d+)px/)?.[1];
+    const maximumWidth = query.match(/max-width:\s*(\d+)px/)?.[1];
+    return {
+      matches:
+        (!minimumWidth || window.innerWidth >= Number(minimumWidth)) &&
+        (!maximumWidth || window.innerWidth <= Number(maximumWidth)),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
   }) as typeof window.matchMedia;
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
@@ -49,6 +56,7 @@ const listResponse: EnterpriseResponse = {
         budget: '面议',
         publishedAt: '2026-07-20',
         status: 0,
+        summary: 'List-only demand details must stay hidden',
         grabCount: 1,
         remainingGrabCount: 9,
         primaryTags: ['车削', '铝合金'],
@@ -148,6 +156,7 @@ describe('supply-demand pages', () => {
     expect(screen.getByText('机加外包')).toBeVisible();
     expect(screen.queryByText('辽宁装备制造有限公司')).not.toBeInTheDocument();
     expect(screen.getAllByText('enterprise.supplyDemand.columns.status')[0]).toBeVisible();
+    expect(screen.queryByText('List-only demand details must stay hidden')).not.toBeInTheDocument();
     expect(screen.queryByText(/open.?id/i)).not.toBeInTheDocument();
 
     const previewAction = screen.getByRole('button', {
@@ -164,6 +173,18 @@ describe('supply-demand pages', () => {
 
     await userEvent.click(detailAction);
     expect(screen.getByLabelText('location')).toHaveTextContent('/enterprise/supply-demand/0/101');
+  });
+
+  it('keeps the demand table compact at small laptop width without horizontal scrolling', async () => {
+    renderList(createClient());
+
+    expect(await screen.findByText('精密零件加工')).toBeVisible();
+    expect(screen.getByText('enterprise.supplyDemand.columns.title')).toBeVisible();
+    expect(screen.getAllByText('enterprise.supplyDemand.columns.status')[0]).toBeVisible();
+    expect(screen.queryByText('enterprise.supplyDemand.columns.region')).not.toBeInTheDocument();
+    expect(screen.queryByText('enterprise.supplyDemand.columns.progress')).not.toBeInTheDocument();
+    expect(screen.queryByText('enterprise.supplyDemand.columns.publishedAt')).not.toBeInTheDocument();
+    expect(document.querySelector('.ll-ant-table-content')).not.toHaveAttribute('style');
   });
 
   it('renders mapped Chinese fields on the detail page', async () => {

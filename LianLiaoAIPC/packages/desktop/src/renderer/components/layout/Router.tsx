@@ -8,11 +8,11 @@ import { isElectronDesktop } from '@renderer/utils/platform';
 import { useTranslation } from 'react-i18next';
 import { TEAM_MODE_ENABLED } from '@/common/config/constants';
 import { CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-service/constants';
+import { isCustomerServiceStaff } from '@/common/enterprise/customer-service/permissions';
 import { DESKTOP_NOTIFICATION_NAVIGATE_CHANNEL } from '@/common/enterprise/desktop-notification/constants';
 import { desktopNotificationNavigationDetailSchema } from '@/common/enterprise/desktop-notification/schemas';
 const Conversation = React.lazy(() => import('@renderer/pages/conversation'));
 const Guid = React.lazy(() => import('@renderer/pages/guid'));
-const AgentSettings = React.lazy(() => import('@renderer/pages/settings/AgentSettings'));
 const AgentRepairPage = React.lazy(() => import('@renderer/pages/settings/AgentSettings/AgentRepairPage'));
 const AssistantSettings = React.lazy(() => import('@renderer/pages/settings/AssistantSettings'));
 const CapabilitiesSettings = React.lazy(() => import('@renderer/pages/settings/CapabilitiesSettings'));
@@ -20,7 +20,6 @@ const AppearanceSettings = React.lazy(() => import('@renderer/pages/settings/App
 const ModeSettings = React.lazy(() => import('@renderer/pages/settings/ModeSettings'));
 const SystemSettings = React.lazy(() => import('@renderer/pages/settings/SystemSettings'));
 const WebuiSettings = React.lazy(() => import('@renderer/pages/settings/WebuiSettings'));
-const PetSettings = React.lazy(() => import('@renderer/pages/settings/PetSettings'));
 const ExtensionSettingsPage = React.lazy(() => import('@renderer/pages/settings/ExtensionSettingsPage'));
 const LoginPage = React.lazy(() => import('@renderer/pages/login'));
 const ComponentsShowcase = React.lazy(() => import('@renderer/pages/TestShowcase'));
@@ -97,7 +96,7 @@ const EnterpriseConversationRoleRoute: React.FC<EnterpriseConversationRoleRouteP
   if (status === 'checking') return <AppLoader />;
   if (status !== 'authenticated') return <Navigate to='/enterprise/login' replace />;
 
-  const isStaff = user?.roleId === '19';
+  const isStaff = isCustomerServiceStaff(user);
   if (audience === 'staff' && !isStaff) return <Navigate to='/enterprise/consultation' replace />;
   if (audience === 'customer' && isStaff) return <Navigate to='/enterprise/customer-service' replace />;
   return <>{children}</>;
@@ -248,7 +247,7 @@ export const PanelRoutes: React.FC<{ layout: React.ReactElement }> = ({ layout }
           />
           <Route path='/settings/model' element={withRouteFallback(ModeSettings)} />
           <Route path='/settings/assistants' element={withRouteFallback(AssistantSettings)} />
-          <Route path='/settings/agent' element={withRouteFallback(AgentSettings)} />
+          <Route path='/settings/agent' element={<Navigate to='/settings/model' replace />} />
           <Route path='/settings/agent/:id/repair' element={withRouteFallback(AgentRepairPage)} />
           <Route path='/settings/capabilities' element={withRouteFallback(CapabilitiesSettings)} />
           <Route
@@ -261,7 +260,6 @@ export const PanelRoutes: React.FC<{ layout: React.ReactElement }> = ({ layout }
           <Route path='/settings/appearance' element={withRouteFallback(AppearanceSettings)} />
           <Route path='/settings/display' element={<Navigate to='/settings/appearance' replace />} />
           <Route path='/settings/webui' element={withRouteFallback(WebuiSettings)} />
-          <Route path='/settings/pet' element={withRouteFallback(PetSettings)} />
           <Route path='/settings/system' element={withRouteFallback(SystemSettings)} />
           <Route path='/settings/about' element={withRouteFallback(SystemSettings)} />
           <Route path='/settings/ext/:tabId' element={withRouteFallback(ExtensionSettingsPage)} />

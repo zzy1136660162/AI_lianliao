@@ -8,6 +8,7 @@ import type { EnterpriseResponse } from '@/common/enterprise/contracts';
 import CompanyDetailPage from '@/renderer/pages/enterprise/companies/CompanyDetailPage';
 import CompanyListPage from '@/renderer/pages/enterprise/companies/CompanyListPage';
 import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
+import ProductDetailPage from '@/renderer/pages/enterprise/products/ProductDetailPage';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 vi.mock('react-i18next', () => ({
@@ -434,6 +435,60 @@ describe('company detail', () => {
         </MemoryRouter>
       </EnterpriseAntdProvider>
     );
+
+  it('returns from a related product detail to the originating company detail', async () => {
+    const request = vi.fn<EnterpriseClient['request']>(async (input) => {
+      if (input.operation === 'company.detail') {
+        return {
+          operation: 'company.detail',
+          data: { companyId: '42', name: 'Alpha Hydraulics' },
+        };
+      }
+      if (input.operation === 'product.list') {
+        return {
+          operation: 'product.list',
+          data: {
+            list: [{ productId: '9', companyId: '42', name: 'Industrial pump' }],
+            pageNum: 1,
+            pageSize: 12,
+            pages: 1,
+            total: 1,
+          },
+        };
+      }
+      if (input.operation === 'product.detail') {
+        return {
+          operation: 'product.detail',
+          data: {
+            productId: '9',
+            companyId: '42',
+            companyName: 'Alpha Hydraulics',
+            name: 'Industrial pump',
+          },
+        };
+      }
+      throw new Error(`Unexpected operation: ${input.operation}`);
+    });
+    const client = createClient(request);
+    const user = userEvent.setup();
+
+    render(
+      <EnterpriseAntdProvider>
+        <MemoryRouter initialEntries={['/enterprise/companies/42']}>
+          <Routes>
+            <Route path='/enterprise/companies/:companyId' element={<CompanyDetailPage client={client} />} />
+            <Route path='/enterprise/products/:productId' element={<ProductDetailPage client={client} />} />
+          </Routes>
+        </MemoryRouter>
+      </EnterpriseAntdProvider>
+    );
+
+    await user.click((await screen.findByText('Industrial pump')).closest('a') as HTMLElement);
+    expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'enterprise.productDetail.backToList' }));
+    expect(await screen.findByRole('heading', { name: 'Alpha Hydraulics' })).toBeVisible();
+  });
 
   it('shows only returned contact permissions, plain-text profile fields and related products', async () => {
     const rawPhone = '13800000000';

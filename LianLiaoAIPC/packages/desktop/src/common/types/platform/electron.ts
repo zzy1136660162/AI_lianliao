@@ -43,6 +43,7 @@ import type {
   DesktopVersionOpenDownloadedResult,
 } from '../../enterprise/desktop-version/contracts';
 import type { DesktopManagedAiSyncResult } from '../../enterprise/managed-ai-model/contracts';
+import type { DesktopDiagnosticSubmitRequest, DesktopDiagnosticSubmitResult } from '../desktopDiagnostic';
 
 // WebUI 状态接口 / WebUI status interface
 export interface WebUIStatus {
@@ -65,6 +66,8 @@ export interface ElectronBridgeAPI {
   collectFeedbackLogs?: () => Promise<{ filename: string; data: number[] } | null>;
   // Feedback screenshot capture / 反馈截图
   captureFeedbackScreenshot?: () => Promise<{ filename: string; data: number[] } | null>;
+  // Submit user-triggered diagnostics to Chain Liaoning cloud-api.
+  submitFeedbackReport?: (request: DesktopDiagnosticSubmitRequest) => Promise<DesktopDiagnosticSubmitResult>;
   // Forward feedback diagnostics logs to the main process console / 转发反馈诊断日志到主进程控制台
   logFeedbackEvent?: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) => void;
   enterprise?: {
@@ -73,6 +76,7 @@ export interface ElectronBridgeAPI {
     completeRegistration: (openId: string) => Promise<EnterpriseIpcResult<EnterpriseUserContext>>;
     restoreSession: () => Promise<EnterpriseIpcResult<EnterpriseUserContext | null>>;
     clearSession: () => Promise<EnterpriseIpcResult<void>>;
+    copyPhone?: (phone: string) => Promise<EnterpriseIpcResult<void>>;
     request: (request: EnterpriseRequest) => Promise<EnterpriseIpcResult<EnterpriseResponse>>;
   };
   /** Main-process synchronization for the centrally managed default AI model. */
@@ -166,7 +170,6 @@ export interface BackendStartupFailureInfo {
   missingBackendBinary?: boolean;
   missingBundledAioncoreDir?: boolean;
   missingHubDir?: boolean;
-  missingPetStatesDir?: boolean;
   missingPwaDir?: boolean;
   reason: BackendStartupFailureReason;
   backendBoundaryCode?: string;

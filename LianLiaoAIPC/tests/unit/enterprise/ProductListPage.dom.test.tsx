@@ -382,6 +382,7 @@ describe('product detail', () => {
               companyName: 'Alpha Hydraulics',
               industry: 'Equipment',
               companyIndustry: 'Machinery',
+              contactName: '江庆博',
               phone: '1380000****',
               address: 'No. 8 Industry Road',
               summary: '<script>window.stolen=true</script><p><strong>High pressure</strong></p>',
@@ -393,17 +394,22 @@ describe('product detail', () => {
     expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
     expect(screen.getByText('enterprise.products.fields.companyIndustry')).toBeVisible();
     expect(screen.getByText('Machinery')).toBeVisible();
+    expect(screen.getByText('***')).toBeVisible();
+    expect(screen.queryByText('江庆博')).toBeNull();
     expect(screen.getByText('1380000****')).toBeVisible();
     expect(screen.getByText('High pressure').tagName).toBe('STRONG');
     expect(container).not.toHaveTextContent('window.stolen');
     expect(container.querySelector('.ll-ant-card')).toBeInTheDocument();
+    const hero = screen.getByRole('region', { name: 'Industrial pump' });
+    expect(within(hero).getByText('enterprise.productDetail.sections.contact')).toBeVisible();
     expect(container.querySelector('script')).toBeNull();
     expect(screen.queryByText('enterprise.productDetail.contactPermissionNote')).toBeNull();
     expect(screen.getByRole('link', { name: 'Alpha Hydraulics' })).toHaveAttribute('href', '/enterprise/companies/42');
     expect(container.querySelector("a[href^='tel:']")).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: '获取联系方式' }));
     expect(await screen.findByText('13800000000')).toBeVisible();
-    expect(screen.getByRole('button', { name: '拨打电话' })).toBeVisible();
+    expect(screen.getByText('江庆博')).toBeVisible();
+    expect(screen.queryByRole('button', { name: '拨打电话' })).toBeNull();
     expect(request).toHaveBeenCalledWith({
       operation: 'contact.acquire',
       payload: { resourceType: 'PRODUCT', resourceId: '9' },

@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { type FeedbackEventTags, submitFeedbackReport } from '@/renderer/services/feedback/submitFeedbackReport';
 
 const AIONUI_DOWNLOAD_URL = 'https://www.aionui.com/';
-const INSTALLATION_INTEGRITY_REPORT_FLUSH_TIMEOUT_MS = 2000;
 
 type InstallationIntegrityDialogKind = 'incomplete_installation' | 'data_migration' | 'local_data_repair';
 
@@ -110,9 +109,9 @@ export async function reportInstallationIntegrityDiagnostics(
     extra: {
       installation_integrity: diagnostics,
     },
-    flushTimeoutMs: INSTALLATION_INTEGRITY_REPORT_FLUSH_TIMEOUT_MS,
     module: 'installation-integrity',
     moduleLabel: getInstallationIntegrityTitle(t, diagnosticsKind),
+    reportType: diagnosticsKind === 'data_migration' ? 'DATA_MIGRATION' : 'STARTUP_FAILURE',
     tags: buildInstallationIntegrityTags(diagnostics),
   });
 

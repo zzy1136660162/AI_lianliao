@@ -228,7 +228,11 @@ async fn put_and_get_boolean_value() {
 async fn put_and_get_number_value() {
     let (app, db) = setup().await;
 
-    let req = json_request("PUT", "/api/settings/client", serde_json::json!({"pet.size": 360}));
+    let req = json_request(
+        "PUT",
+        "/api/settings/client",
+        serde_json::json!({"ui.fontSize.chat": 16}),
+    );
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
 
@@ -236,7 +240,7 @@ async fn put_and_get_number_value() {
 
     let resp = app2.oneshot(get_request("/api/settings/client")).await.unwrap();
     let json = body_json(resp).await;
-    assert_eq!(json["data"]["pet.size"], 360);
+    assert_eq!(json["data"]["ui.fontSize.chat"], 16);
 }
 
 #[tokio::test]

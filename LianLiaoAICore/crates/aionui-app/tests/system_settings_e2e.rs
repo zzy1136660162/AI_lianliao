@@ -86,7 +86,7 @@ async fn client_prefs_empty_then_write_with_auth() {
     let req = json_with_token(
         "PUT",
         "/api/settings/client",
-        json!({"theme": "dark", "pet.size": 360, "system.closeToTray": true}),
+        json!({"theme": "dark", "ui.fontSize.chat": 16, "system.closeToTray": true}),
         &token,
         &csrf,
     );
@@ -100,7 +100,7 @@ async fn client_prefs_empty_then_write_with_auth() {
         .unwrap();
     let json = body_json(resp).await;
     assert_eq!(json["data"]["theme"], "dark");
-    assert_eq!(json["data"]["pet.size"], 360);
+    assert_eq!(json["data"]["ui.fontSize.chat"], 16);
     assert_eq!(json["data"]["system.closeToTray"], true);
 
     let req = json_with_token("PUT", "/api/settings/client", json!({"theme": null}), &token, &csrf);
@@ -113,7 +113,7 @@ async fn client_prefs_empty_then_write_with_auth() {
         .unwrap();
     let json = body_json(resp).await;
     assert!(json["data"].get("theme").is_none());
-    assert_eq!(json["data"]["pet.size"], 360);
+    assert_eq!(json["data"]["ui.fontSize.chat"], 16);
 }
 
 #[tokio::test]

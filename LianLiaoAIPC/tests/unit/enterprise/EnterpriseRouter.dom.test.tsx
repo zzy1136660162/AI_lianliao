@@ -14,6 +14,7 @@ const routerMocks = vi.hoisted(() => ({
   enterpriseStatus: 'authenticated' as EnterpriseAuthContextValue['status'],
   logout: vi.fn<EnterpriseAuthContextValue['logout']>(async () => true),
   roleId: undefined as string | undefined,
+  customerServiceStaff: undefined as boolean | undefined,
 }));
 
 // Ant Design's CSS-in-JS modules make the first lazy enterprise chunk slower to
@@ -52,6 +53,7 @@ vi.mock('@/renderer/hooks/context/EnterpriseAuthContext', () => ({
       companyName: '辽宁测试企业',
       userName: '测试用户',
       roleId: routerMocks.roleId,
+      customerServiceStaff: routerMocks.customerServiceStaff,
     },
     loginSession: null,
     registrationOpenId: null,
@@ -119,6 +121,7 @@ describe('enterprise desktop routing', () => {
     routerMocks.desktop = true;
     routerMocks.enterpriseStatus = 'authenticated';
     routerMocks.roleId = undefined;
+    routerMocks.customerServiceStaff = undefined;
     routerMocks.logout.mockReset();
     routerMocks.logout.mockResolvedValue(true);
   });
@@ -223,8 +226,9 @@ describe('enterprise desktop routing', () => {
     expect(within(navigation).queryByRole('link', { name: 'enterprise.navigation.customerService' })).toBeNull();
   });
 
-  it('shows customer-service reception only to roleId 19 agents', async () => {
+  it('shows customer-service reception only with the Cloud aggregate permission', async () => {
     routerMocks.roleId = '19';
+    routerMocks.customerServiceStaff = true;
     renderAt('/enterprise/dashboard');
 
     const navigation = await screen.findByRole(
@@ -236,13 +240,30 @@ describe('enterprise desktop routing', () => {
     expect(within(navigation).queryByRole('link', { name: 'enterprise.navigation.consultation' })).toBeNull();
   });
 
+  it('keeps a roleId 19 account in customer mode when any Cloud eligibility condition fails', async () => {
+    routerMocks.roleId = '19';
+    routerMocks.customerServiceStaff = false;
+    renderAt('/enterprise/dashboard');
+
+    const navigation = await screen.findByRole(
+      'navigation',
+      { name: 'enterprise.accessibility.primaryNavigation' },
+      ROUTE_WAIT_OPTIONS
+    );
+    expect(within(navigation).getByRole('link', { name: 'enterprise.navigation.consultation' })).toBeVisible();
+    expect(within(navigation).queryByRole('link', { name: 'enterprise.navigation.customerService' })).toBeNull();
+  });
+
   it('redirects direct conversation routes to the page allowed for the current role', async () => {
+    routerMocks.roleId = '19';
+    routerMocks.customerServiceStaff = false;
     renderAt('/enterprise/customer-service');
     await waitFor(() => expect(window.location.hash).toBe('#/enterprise/consultation'), ROUTE_WAIT_OPTIONS);
     expect(await screen.findByText('customer-consultation-page', undefined, ROUTE_WAIT_OPTIONS)).toBeVisible();
 
     cleanup();
     routerMocks.roleId = '19';
+    routerMocks.customerServiceStaff = true;
     renderAt('/enterprise/consultation');
     await waitFor(() => expect(window.location.hash).toBe('#/enterprise/customer-service'), ROUTE_WAIT_OPTIONS);
   });

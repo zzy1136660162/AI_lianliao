@@ -6,11 +6,16 @@ import styles from './catalog-layout.module.css';
 export const DetailHeroCard: React.FC<{
   media?: ReactNode;
   children: ReactNode;
+  aside?: ReactNode;
   ariaLabelledBy?: string;
-}> = ({ media, children, ariaLabelledBy }) => (
-  <section className={styles.detailHero} aria-labelledby={ariaLabelledBy}>
+}> = ({ media, children, aside, ariaLabelledBy }) => (
+  <section
+    className={[styles.detailHero, aside ? styles.detailHeroWithAside : ''].filter(Boolean).join(' ')}
+    aria-labelledby={ariaLabelledBy}
+  >
     {media ? <div className={styles.detailHeroMedia}>{media}</div> : null}
     <div className={styles.detailHeroContent}>{children}</div>
+    {aside ? <div className={styles.detailHeroAside}>{aside}</div> : null}
   </section>
 );
 

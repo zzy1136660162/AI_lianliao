@@ -20,6 +20,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { getLockedAsset } = require('../../../scripts/verifyAioncoreReleaseLock.js');
+const {
+  copyVerifiedManagedResourcesForLocalCore,
+  createManagedResourcesIntegrity,
+  verifyManagedResourcesIntegrity,
+} = require('./managed-aioncore-resources.js');
 const { verifyBundledAioncoreResources } = require('./verify-bundled-aioncore-resources.js');
 
 const GITHUB_OWNER = 'zzy1136660162';
@@ -219,8 +224,19 @@ function tryReusePreparedAioncore({
   const manifestBinarySha256 = normalizeSha256(manifest.binarySha256);
   if (manifestBinarySha256 && manifestBinarySha256 !== binarySha256.toLowerCase()) return null;
 
-  if (!manifestBinarySha256) {
-    writeJson(manifestPath, { ...manifest, binarySha256 });
+  let managedResourcesIntegrity = manifest.managedResourcesIntegrity;
+  try {
+    if (managedResourcesIntegrity) {
+      verifyManagedResourcesIntegrity(targetDir, managedResourcesIntegrity);
+    } else {
+      managedResourcesIntegrity = createManagedResourcesIntegrity(targetDir);
+    }
+  } catch {
+    return null;
+  }
+
+  if (!manifestBinarySha256 || !manifest.managedResourcesIntegrity) {
+    writeJson(manifestPath, { ...manifest, binarySha256, managedResourcesIntegrity });
   }
 
   return {
@@ -232,7 +248,7 @@ function tryReusePreparedAioncore({
   };
 }
 
-function tryTrustLocalPreparedAioncore({ targetDir, platform, enabled, isReleaseBuild }) {
+function tryTrustLocalPreparedAioncore({ targetDir, platform, arch, enabled, isReleaseBuild }) {
   if (!enabled || isReleaseBuild) return null;
 
   const binaryPath = path.join(targetDir, getBinaryName(platform));
@@ -240,12 +256,29 @@ function tryTrustLocalPreparedAioncore({ targetDir, platform, enabled, isRelease
   if (!fs.existsSync(binaryPath) || !fs.statSync(binaryPath).isFile()) return null;
   if (!fs.existsSync(managedResourcesDir) || !fs.statSync(managedResourcesDir).isDirectory()) return null;
 
+  const manifest = readJsonSafe(path.join(targetDir, 'manifest.json'));
+  if (!manifest?.managedResourcesIntegrity) return null;
+  const binarySha256 = sha256File(binaryPath);
+  if (normalizeSha256(manifest.binarySha256) !== binarySha256) return null;
+  try {
+    verifyManagedResourcesIntegrity(targetDir, manifest.managedResourcesIntegrity);
+  } catch {
+    return null;
+  }
+  const verification = verifyBundledAioncoreResources({
+    resourcesDir: path.resolve(targetDir, '..', '..'),
+    electronPlatformName: platform,
+    targetArch: arch,
+  });
+  if (verification.missing.length > 0) return null;
+
   return {
     prepared: true,
     cached: true,
     trustedLocal: true,
     dir: targetDir,
     sourceType: 'trusted-local-resources',
+    binarySha256,
   };
 }
 
@@ -685,12 +718,13 @@ function prepareAioncore(options) {
   const trustedLocalResult = tryTrustLocalPreparedAioncore({
     targetDir,
     platform,
+    arch,
     enabled: trustLocalPreparedResources,
     isReleaseBuild,
   });
   if (trustedLocalResult) {
     console.log(`Preparing LianLiaoAICore for ${runtimeKey} (trusted local resources)`);
-    console.log(`  Reusing local Core resources without Release or SHA256 validation: ${targetDir}`);
+    console.log(`  Reusing locally prepared Core after binary and managed-resource integrity validation: ${targetDir}`);
     return trustedLocalResult;
   }
   if (trustLocalPreparedResources) {
@@ -777,7 +811,40 @@ function prepareAioncore(options) {
   try {
     copyFileSafe(sourcePath, targetBinaryPath);
     ensureExecutableMode(targetBinaryPath);
-    const bundledManagedResourcesDir = prepareManagedResources(targetBinaryPath, stagingDir);
+    let managedResourcesIntegrity = null;
+    let reusedManagedResources = false;
+
+    // A changed local Core binary does not imply that the large Node/ACP tree changed.
+    // Reuse is allowed only after structural, dependency-lock and full tree-hash checks.
+    if (localBinaryPath && fs.existsSync(targetDir)) {
+      const existingVerification = verifyBundledAioncoreResources({
+        resourcesDir: path.resolve(targetDir, '..', '..'),
+        electronPlatformName: platform,
+        targetArch: arch,
+      });
+      if (existingVerification.missing.length === 0) {
+        try {
+          const existingManifest = readJsonSafe(path.join(targetDir, 'manifest.json'));
+          managedResourcesIntegrity = copyVerifiedManagedResourcesForLocalCore({
+            projectRoot,
+            targetDir,
+            stagingDir,
+            runtimeKey,
+            existingIntegrity: existingManifest?.managedResourcesIntegrity,
+          });
+          reusedManagedResources = true;
+          console.log(`  Reused verified managed resources from resources/bundled-aioncore/${runtimeKey}`);
+        } catch (error) {
+          removeDirectorySafe(path.join(stagingDir, 'managed-resources'));
+          console.warn(`  Existing managed resources were not reusable: ${error.message}`);
+        }
+      }
+    }
+
+    if (!reusedManagedResources) {
+      prepareManagedResources(targetBinaryPath, stagingDir);
+      managedResourcesIntegrity = createManagedResourcesIntegrity(stagingDir);
+    }
 
     const manifest = {
       platform,
@@ -787,19 +854,37 @@ function prepareAioncore(options) {
       binarySha256: sha256File(targetBinaryPath),
       sourceType,
       source: sourceDetail,
+      managedResourcesIntegrity,
       files: [binaryName, 'managed-resources/'],
     };
 
     writeJson(path.join(stagingDir, 'manifest.json'), manifest);
 
     const previousTargetDir = moveExistingDirectoryAside(targetDir);
-    fs.renameSync(stagingDir, targetDir);
-    if (previousTargetDir) removeDirectorySafe(previousTargetDir);
+    try {
+      fs.renameSync(stagingDir, targetDir);
+      verifyManagedResourcesIntegrity(targetDir, managedResourcesIntegrity);
+      const finalVerification = verifyBundledAioncoreResources({
+        resourcesDir: path.resolve(targetDir, '..', '..'),
+        electronPlatformName: platform,
+        targetArch: arch,
+      });
+      if (finalVerification.missing.length > 0) {
+        throw new Error(`Prepared Core resources are incomplete: ${finalVerification.missing.join(', ')}`);
+      }
+      if (previousTargetDir) removeDirectorySafe(previousTargetDir);
+    } catch (error) {
+      removeDirectorySafe(targetDir);
+      if (previousTargetDir && fs.existsSync(previousTargetDir)) fs.renameSync(previousTargetDir, targetDir);
+      throw error;
+    }
 
     console.log(
       `  Bundled aioncore prepared: resources/bundled-aioncore/${runtimeKey}/${binaryName} [source=${sourceType}]`
     );
-    console.log(`  Bundled managed resources prepared: ${bundledManagedResourcesDir}`);
+    console.log(
+      `  Bundled managed resources ${reusedManagedResources ? 'reused and verified' : 'prepared and verified'}: ${path.join(targetDir, 'managed-resources')}`
+    );
 
     if (tempDir) removeDirectorySafe(tempDir);
     return { prepared: true, dir: targetDir, sourceType };

@@ -21,11 +21,15 @@ import { enterpriseNormalizers } from './normalizers';
 import {
   catalogPlanResponseSchema,
   catalogRankResponseSchema,
+  catalogWorkflowPlanResponseSchema,
+  catalogWorkflowRankResponseSchema,
   enterpriseAssistantPlanResponseSchema,
 } from './catalog-assistant/schemas';
 import type {
   CatalogAssistantPlan,
   CatalogAssistantRankResult,
+  CatalogWorkflowPlan,
+  CatalogWorkflowRankResult,
   EnterpriseAssistantRoutePlan,
 } from './catalog-assistant/contracts';
 import { parseDemandContactAccess } from './demand-contact/schemas';
@@ -264,6 +268,15 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
         const envelope = enterpriseCompanyDetailEnvelopeRawSchema.parse(input);
         return { operation, data: normalizeCompany(envelope.company ?? envelope, operation) };
       }
+      case 'company.batchGet':
+        return {
+          operation,
+          data: z
+            .array(enterpriseCompanyRawSchema)
+            .max(100)
+            .parse(input)
+            .map((item) => normalizeCompany(item, operation)),
+        };
       case 'company.industries':
         return { operation, data: normalizeIndustryOptions(input) as EnterpriseIndustryOption[] };
       case 'product.list':
@@ -282,6 +295,16 @@ export const parseEnterpriseResponse = (operation: EnterpriseOperation, input: u
         return {
           operation,
           data: catalogRankResponseSchema.parse(input) as CatalogAssistantRankResult,
+        };
+      case 'catalogAssistant.workflowPlan':
+        return {
+          operation,
+          data: catalogWorkflowPlanResponseSchema.parse(input) as CatalogWorkflowPlan,
+        };
+      case 'catalogAssistant.workflowRank':
+        return {
+          operation,
+          data: catalogWorkflowRankResponseSchema.parse(input) as CatalogWorkflowRankResult,
         };
       case 'enterpriseAssistant.plan':
         return {

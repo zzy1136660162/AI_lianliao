@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EnterpriseResponse } from '@/common/enterprise/contracts';
 import EnterpriseAntdProvider from '@/renderer/pages/enterprise/layout/EnterpriseAntdProvider';
 import EnterpriseContactAccessPanel from '@/renderer/pages/enterprise/contact/EnterpriseContactAccessPanel';
-import { buildTelephoneUrl } from '@/renderer/pages/enterprise/contact/contactActions';
+import { buildTelephoneUrl, copyEnterprisePhone } from '@/renderer/pages/enterprise/contact/contactActions';
 import { EnterpriseRendererError, type EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 const createClient = (request: EnterpriseClient['request']): Pick<EnterpriseClient, 'request'> => ({ request });
@@ -18,12 +18,22 @@ describe('enterprise contact actions', () => {
     expect(buildTelephoneUrl('javascript:alert(1)')).toBeNull();
     expect(buildTelephoneUrl('1380000****')).toBeNull();
   });
+
+  it('routes packaged phone copies through the trusted main-process writer', async () => {
+    const copyInMainProcess = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(window, '__isPackaged', { configurable: true, value: true });
+
+    await expect(copyEnterprisePhone('13800000000', copyInMainProcess)).resolves.toBeUndefined();
+
+    expect(copyInMainProcess).toHaveBeenCalledExactlyOnceWith('13800000000');
+    Reflect.deleteProperty(window, '__isPackaged');
+  });
 });
 
 describe('EnterpriseContactAccessPanel', () => {
   afterEach(cleanup);
 
-  it('keeps the masked phone until the backend grants access and then exposes copy and dial actions', async () => {
+  it('keeps the masked phone until access and removes the dial action from company contacts', async () => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
       operation: 'contact.acquire',
       data: {
@@ -53,11 +63,36 @@ describe('EnterpriseContactAccessPanel', () => {
 
     expect(await screen.findByText('13800000000')).toBeVisible();
     expect(screen.getByRole('button', { name: '复制电话' })).toBeVisible();
-    expect(screen.getByRole('button', { name: '拨打电话' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: '拨打电话' })).toBeNull();
     expect(request).toHaveBeenCalledWith({
       operation: 'contact.acquire',
       payload: { resourceType: 'COMPANY', resourceId: '1807' },
     });
+  });
+
+  it('keeps copy available but removes the dial action from project contacts', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'contact.acquire',
+      data: {
+        allowed: true,
+        errType: 0,
+        message: '',
+        action: 'NONE',
+        phone: '13800000000',
+      },
+    } satisfies Extract<EnterpriseResponse, { operation: 'contact.acquire' }>);
+    const user = userEvent.setup();
+
+    render(
+      <EnterpriseAntdProvider>
+        <EnterpriseContactAccessPanel client={createClient(request)} resourceType='PROJECT' resourceId='2026' />
+      </EnterpriseAntdProvider>
+    );
+
+    await user.click(screen.getByRole('button', { name: '获取联系方式' }));
+
+    expect(await screen.findByRole('button', { name: '复制电话' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: '拨打电话' })).toBeNull();
   });
 
   it('offers the membership QR flow for the H5 membership limit error types', async () => {

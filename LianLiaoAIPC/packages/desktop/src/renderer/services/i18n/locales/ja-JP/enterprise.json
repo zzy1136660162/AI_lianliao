@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "産業検索アシスタント",
-    "capability": "企業情報、重点製品、建設中プロジェクトを検索できます",
+    "capability": "企業情報、重点製品、建設中プロジェクト、需給情報を検索できます",
     "exampleHint": "目的を入力するか、例から開始してください：",
-    "placeholder": "探している企業、製品、プロジェクトを入力",
+    "placeholder": "探している企業、製品、プロジェクト、需給情報を入力",
     "submit": "検索",
     "stop": "停止",
     "retry": "再試行",
@@ -146,6 +146,7 @@
     "viewCompany": "企業情報を見る",
     "viewProduct": "重点製品を見る",
     "viewProject": "プロジェクト詳細を見る",
+    "viewDemand": "需給情報の詳細を見る",
     "projectInvestment": "投資額 {{value}} 万元",
     "notProvided": "情報なし",
     "currentRequest": "今回の要望",
@@ -154,7 +155,10 @@
     "completed": "検索完了",
     "searchingCompanyPage": "企業情報を検索中、{{page}}/{{maxPages}} ページ",
     "searchingProductPage": "重点製品を検索中、{{page}}/{{maxPages}} ページ",
+    "linkingCompanies": "製品の所属企業を関連付けています",
+    "productEvidence": "一致した製品",
     "searchingProjectPage": "建設中プロジェクトを検索中、{{page}}/{{maxPages}} ページ",
+    "searchingDemandPage": "需給情報を検索中、{{page}}/{{maxPages}} ページ",
     "candidateCount": "候補 {{count}} 件",
     "ranking": "最適な結果を選択中",
     "clarificationTitle": "条件を追加してください",
@@ -177,6 +181,7 @@
       "company": "瀋陽の精密機械加工企業を探す",
       "product": "瀋北新区のステンレス加工製品を探す",
       "project": "瀋陽で機電設備を調達する建設中プロジェクトを探す",
+      "demand": "瀋陽の機械加工需要を探す",
       "service": "包装印刷サービス企業を探す"
     }
   },

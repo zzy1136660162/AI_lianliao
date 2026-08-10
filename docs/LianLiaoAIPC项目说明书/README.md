@@ -186,7 +186,6 @@ src/
 | `services/`  | 数据库迁移、企业云客户端、国际化、代理、更新服务                       |
 | `startup/`   | Core 启动错误分类、架构校验、退出清理、Windows PATH、OpenClaw 首次准备 |
 | `utils/`     | 存储、路径、托盘、深链、窗口大小、缩放、GPU 恢复、WebUI 配置           |
-| `pet/`       | 桌面宠物窗口和确认窗口                                                 |
 | `resources/` | 内置 MCP 服务入口                                                      |
 | `feedback/`  | 日志附件收集                                                           |
 
@@ -201,12 +200,6 @@ src/
 - 对企业登录、客服、通知、版本等 IPC 请求和响应进行 Zod 或严格结构校验；
 - 拒绝危险对象键、循环引用、异常原型和过大的复杂对象；
 - 把底层异常收敛成固定错误码，不向 Renderer 暴露主进程实现细节。
-
-桌面宠物使用独立的 preload：
-
-- `petPreload.ts`
-- `petHitPreload.ts`
-- `petConfirmPreload.ts`
 
 ### 6.4 `renderer`
 
@@ -301,7 +294,7 @@ sequenceDiagram
 
 | 模式       | 入口                                 | 行为                                            |
 | ---------- | ------------------------------------ | ----------------------------------------------- |
-| 桌面模式   | `bun run dev` 或安装后的程序         | 启动 Core、创建窗口、托盘、桌面宠物和可选 WebUI |
+| 桌面模式   | `bun run dev` 或安装后的程序         | 启动 Core、创建窗口、托盘和可选 WebUI           |
 | WebUI 模式 | `bun run webui` 或 `--webui`         | 启动/复用 Core，启动静态服务器，不创建主窗口    |
 | 重置密码   | `bun run resetpass` 或 `--resetpass` | 启动 Core，执行管理账号密码重置后退出           |
 
@@ -394,7 +387,6 @@ Renderer 入口是 `packages/desktop/src/renderer/main.tsx`。
 - `/settings/capabilities`
 - `/settings/appearance`
 - `/settings/webui`
-- `/settings/pet`
 - `/settings/system`
 - `/settings/ext/:tabId`
 

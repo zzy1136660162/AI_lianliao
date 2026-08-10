@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "产业检索助手",
-    "capability": "可查询企业码、重点产品和在建项目",
+    "capability": "可查询企业码、重点产品、在建项目和供需信息",
     "exampleHint": "可以直接描述目标，也可以从示例开始：",
-    "placeholder": "描述您想查找的企业、产品或项目",
+    "placeholder": "描述您想查找的企业、产品、项目或供需信息",
     "submit": "开始检索",
     "stop": "停止检索",
     "retry": "重试",
@@ -146,6 +146,7 @@
     "viewCompany": "查看企业码",
     "viewProduct": "查看重点产品",
     "viewProject": "查看项目详情",
+    "viewDemand": "查看供需详情",
     "projectInvestment": "投资 {{value}} 万元",
     "notProvided": "暂未提供",
     "currentRequest": "本次需求",
@@ -154,7 +155,10 @@
     "completed": "检索完成",
     "searchingCompanyPage": "正在检索企业码，第 {{page}}/{{maxPages}} 页",
     "searchingProductPage": "正在检索重点产品，第 {{page}}/{{maxPages}} 页",
+    "linkingCompanies": "正在关联产品所属企业",
+    "productEvidence": "匹配产品",
     "searchingProjectPage": "正在检索在建项目，第 {{page}}/{{maxPages}} 页",
+    "searchingDemandPage": "正在检索供需信息，第 {{page}}/{{maxPages}} 页",
     "candidateCount": "已收集 {{count}} 条候选",
     "ranking": "正在筛选最匹配结果",
     "clarificationTitle": "请补充说明",
@@ -177,6 +181,7 @@
       "company": "找沈阳做精密机械加工的企业",
       "product": "查沈北新区的不锈钢加工产品",
       "project": "找沈阳近期采购机电设备的在建项目",
+      "demand": "查找沈阳的机械加工需求",
       "service": "找能够提供包装印刷服务的企业"
     }
   },
@@ -616,7 +621,7 @@
     "actions": {
       "search": "查询项目",
       "reset": "重置筛选",
-      "viewDetails": "查看项目详情",
+      "viewDetails": "看详情",
       "closeQuickView": "关闭项目预览"
     },
     "columns": {

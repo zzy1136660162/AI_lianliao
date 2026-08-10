@@ -14,6 +14,7 @@ import { EnterpriseApiError } from '@/process/services/enterprise/enterpriseApiC
 
 const electronMocks = vi.hoisted(() => ({
   browserWindows: new Map<object, unknown>(),
+  clipboardWriteText: vi.fn(),
   fromWebContents: vi.fn(),
   getPath: vi.fn(() => 'C:/safe-user-data'),
   isPackaged: false,
@@ -34,6 +35,7 @@ vi.mock('electron', () => ({
     },
   },
   BrowserWindow: { fromWebContents: electronMocks.fromWebContents },
+  clipboard: { writeText: electronMocks.clipboardWriteText },
   contextBridge: {
     exposeInMainWorld: vi.fn((name: string, value: unknown) => electronMocks.exposed.set(name, value)),
   },
@@ -182,6 +184,32 @@ describe('enterprise bridge', () => {
     electronMocks.browserWindows.clear();
     electronMocks.fromWebContents.mockImplementation((sender: object) => electronMocks.browserWindows.get(sender));
     electronMocks.exposed.clear();
+  });
+
+  it('copies only a validated phone through the trusted main-process clipboard', async () => {
+    electronMocks.clipboardWriteText.mockReturnValue(undefined);
+    const { handlers } = await initializeBridge();
+
+    await expect(invokeHandler(handlers, 'enterprise:contact:copy-phone', ' 13800000000 ')).resolves.toBeUndefined();
+    expect(electronMocks.clipboardWriteText).toHaveBeenCalledExactlyOnceWith('13800000000');
+
+    await expect(invokeHandler(handlers, 'enterprise:contact:copy-phone', '1380000****')).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+    });
+  });
+
+  it('returns a fixed error when the main-process clipboard write fails', async () => {
+    electronMocks.clipboardWriteText.mockImplementationOnce(() => {
+      throw new Error(`${OPEN_ID} clipboard detail`);
+    });
+    const { handlers } = await initializeBridge();
+
+    await expect(invokeRawHandler(handlers, {}, 'enterprise:contact:copy-phone', '13800000000')).resolves.toMatchObject(
+      {
+        ok: false,
+        error: { code: 'REQUEST_FAILED' },
+      }
+    );
   });
 
   it('returns strict success and sanitized failure envelopes from direct handlers', async () => {
@@ -360,7 +388,7 @@ describe('enterprise bridge', () => {
     });
   });
 
-  it('removes all six handlers before registering the exact fixed channel set', async () => {
+  it('removes all handlers before registering the exact fixed channel set', async () => {
     const { callOrder, handlers } = await initializeBridge();
     const channels = Object.values(ENTERPRISE_IPC_CHANNELS);
 
@@ -377,8 +405,8 @@ describe('enterprise bridge', () => {
 
     initEnterpriseBridge({ apiClient, ipcMain: first.ipcMain, sessionStore, senderGuard: () => true });
 
-    expect(first.ipcMain.removeHandler).toHaveBeenCalledTimes(12);
-    expect(first.ipcMain.handle).toHaveBeenCalledTimes(12);
+    expect(first.ipcMain.removeHandler).toHaveBeenCalledTimes(Object.keys(ENTERPRISE_IPC_CHANNELS).length * 2);
+    expect(first.ipcMain.handle).toHaveBeenCalledTimes(Object.keys(ENTERPRISE_IPC_CHANNELS).length * 2);
   });
 
   it('lazily reuses one default session store across bridge initialization', async () => {
@@ -1556,7 +1584,7 @@ describe('enterprise preload surface', () => {
     return electronAPI.enterprise;
   };
 
-  it('exposes only the six typed enterprise methods on fixed channels', async () => {
+  it('exposes only the seven typed enterprise methods on fixed channels', async () => {
     electronMocks.invoke.mockResolvedValue({ ok: true, data: null });
     const enterprise = await loadEnterprisePreloadApi();
 
@@ -1566,6 +1594,7 @@ describe('enterprise preload surface', () => {
       'completeRegistration',
       'restoreSession',
       'clearSession',
+      'copyPhone',
       'request',
     ]);
 
@@ -1575,6 +1604,7 @@ describe('enterprise preload surface', () => {
     await expect(enterprise.completeRegistration(OPEN_ID)).resolves.toEqual({ ok: true, data: null });
     await expect(enterprise.restoreSession()).resolves.toEqual({ ok: true, data: null });
     await expect(enterprise.clearSession()).resolves.toEqual({ ok: true, data: null });
+    await expect(enterprise.copyPhone('13800000000')).resolves.toEqual({ ok: true, data: null });
     await expect(enterprise.request(request)).resolves.toEqual({ ok: true, data: null });
 
     expect(electronMocks.invoke.mock.calls).toEqual([
@@ -1583,6 +1613,7 @@ describe('enterprise preload surface', () => {
       [ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, OPEN_ID],
       [ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE],
       [ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR],
+      [ENTERPRISE_IPC_CHANNELS.CONTACT_COPY_PHONE, '13800000000'],
       [ENTERPRISE_IPC_CHANNELS.REQUEST, request],
     ]);
   });

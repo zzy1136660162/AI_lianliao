@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "Endüstri arama yardımcısı",
-    "capability": "Şirketleri, öne çıkan ürünleri ve inşaat projelerini arayın",
+    "capability": "Şirketleri, öne çıkan ürünleri, inşaat projelerini ve arz-talep ilanlarını arayın",
     "exampleHint": "Hedefinizi açıklayın veya bir örnek seçin:",
-    "placeholder": "Aradığınız şirketi, ürünü veya projeyi açıklayın",
+    "placeholder": "Aradığınız şirketi, ürünü, projeyi veya arz-talep ilanını açıklayın",
     "submit": "Ara",
     "stop": "Durdur",
     "retry": "Yeniden dene",
@@ -146,6 +146,7 @@
     "viewCompany": "Şirket profilini aç",
     "viewProduct": "Öne çıkan ürünü aç",
     "viewProject": "Proje ayrıntılarını aç",
+    "viewDemand": "İlan ayrıntılarını aç",
     "projectInvestment": "{{value}} × 10.000 RMB yatırım",
     "notProvided": "Bilgi yok",
     "currentRequest": "Geçerli istek",
@@ -154,7 +155,10 @@
     "completed": "Arama tamamlandı",
     "searchingCompanyPage": "Şirketler aranıyor, sayfa {{page}}/{{maxPages}}",
     "searchingProductPage": "Ürünler aranıyor, sayfa {{page}}/{{maxPages}}",
+    "linkingCompanies": "Ürünler şirketlerle eşleştiriliyor",
+    "productEvidence": "Eşleşen ürünler",
     "searchingProjectPage": "İnşaat projeleri aranıyor, sayfa {{page}}/{{maxPages}}",
+    "searchingDemandPage": "Arz-talep ilanları aranıyor, sayfa {{page}}/{{maxPages}}",
     "candidateCount": "{{count}} aday toplandı",
     "ranking": "En iyi eşleşmeler seçiliyor",
     "clarificationTitle": "Lütfen ayrıntı verin",
@@ -177,6 +181,7 @@
       "company": "Shenyang'da hassas işleme şirketleri bul",
       "product": "Shenbei'de paslanmaz çelik ürünleri bul",
       "project": "Shenyang'da elektromekanik ekipman satın alan projeleri bul",
+      "demand": "Shenyang'daki mekanik işleme taleplerini bul",
       "service": "Ambalaj ve baskı şirketleri bul"
     }
   },

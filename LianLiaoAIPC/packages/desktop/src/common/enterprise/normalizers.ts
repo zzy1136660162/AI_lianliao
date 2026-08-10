@@ -276,16 +276,21 @@ const normalizeUserContextRaw = (raw: z.infer<typeof userContextRawSchema>): Ent
     raw.PAY_RES_NUM
   );
   setIdentifier(result, 'roleId', operation, raw.roleId, raw.ROLE_ID);
+  setBoolean(result, 'customerServiceStaff', raw.customerServiceStaff, raw.CUSTOMER_SERVICE_STAFF);
   return result;
 };
 
-const normalizeCompany = (input: unknown, operation: 'company.list' | 'company.detail'): EnterpriseCompanyDetail => {
+const normalizeCompany = (
+  input: unknown,
+  operation: 'company.list' | 'company.detail' | 'company.batchGet'
+): EnterpriseCompanyDetail => {
   const raw = enterpriseCompanyRawSchema.parse(input);
   const result: EnterpriseCompanyDetail = {
     companyId: requiredIdentifier(operation, 'companyId', raw.companyId, raw.COMPANY_ID, raw.id, raw.ID),
     name: requiredText(operation, 'name', raw.name, raw.NAME, raw.companyName, raw.COMPANY_NAME),
   };
   setText(result, 'shortName', raw.shortName, raw.SHORT_NAME);
+  setNumber(result, 'sort', raw.sort, raw.SORT);
   setText(result, 'industry', raw.industry, raw.INDUSTRY);
   setText(result, 'province', raw.province, raw.PROVINCE);
   setText(result, 'city', raw.city, raw.CITY);
@@ -396,6 +401,7 @@ const normalizeProduct = (input: unknown, operation: 'product.list' | 'product.d
     ),
     companyId: requiredIdentifier(operation, 'companyId', raw.companyId, raw.COMPANY_ID),
   };
+  setNumber(result, 'sort', raw.sort, raw.SORT);
   setText(result, 'imageUrl', raw.imageUrl, raw.IMAGE_URL, raw.tempPic, raw.TEMP_PIC);
   setText(result, 'summary', raw.summary, raw.SUMMARY, raw.productAbs, raw.PRODUCT_ABS);
   setText(result, 'industry', raw.industry, raw.INDUSTRY);

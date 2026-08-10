@@ -11,6 +11,7 @@ import type { EnterpriseClient } from '@/renderer/services/enterprise/enterprise
 import { getCatalogResourceAdapter } from './adapters/catalogAdapterRegistry';
 import type { CatalogAdapterRuntime, CatalogBusinessItem } from './adapters/types';
 import { buildDeterministicCatalogPlan } from './deterministicCatalogPlanner';
+import { executeCatalogWorkflow } from './workflow/catalogWorkflowExecutor';
 
 const MAX_PAGES = 5;
 const MAX_CANDIDATES = 100;
@@ -109,6 +110,12 @@ const needsEnterpriseRoutePlanning = (message: string): boolean => {
   return !catalogLookup;
 };
 
+const needsCrossResourceWorkflow = (message: string): boolean =>
+  /企业|公司|厂家/u.test(message) && /做|生产|制造|加工|供应|提供|销售/u.test(message);
+
+const needsDemandWorkflow = (message: string): boolean =>
+  /找|查|检索|看看|哪些|有没有|推荐/u.test(message) && /需求|供需|订单|外包|闲置资源|岗位/u.test(message);
+
 const appendUnique = (
   target: Map<string, CatalogBusinessItem>,
   items: CatalogBusinessItem[],
@@ -126,7 +133,7 @@ const appendUnique = (
 /**
  * Runs plan → registered resource adapter → rank. The model can select only
  * IDs already returned by an allowlisted business API and can never replace
- * the trusted company, product or project fields rendered by the desktop app.
+ * the trusted company, product, project or public demand fields rendered by the desktop app.
  */
 export const runCatalogAssistant = async (
   client: EnterpriseClient,
@@ -149,6 +156,40 @@ export const runCatalogAssistant = async (
         results: [],
         fallback: false,
       };
+    }
+  }
+
+  if (!input.resume && (needsCrossResourceWorkflow(input.message) || needsDemandWorkflow(input.message))) {
+    emit(input, {
+      stage: 'PLANNING',
+      messageKey: 'enterprise.catalogAssistant.planning',
+    });
+    try {
+      const workflowResponse = await client.request({
+        operation: 'catalogAssistant.workflowPlan',
+        payload: { message: input.message, context: input.context },
+      });
+      assertActive(input.requestId, input.signal, input.isCurrent);
+      if (workflowResponse.operation !== 'catalogAssistant.workflowPlan') {
+        throw new Error('unexpected workflow planning operation');
+      }
+      // Follow-up scope semantics remain on the mature single-resource path in v1.
+      // New searches use the graph executor, including product -> company linking.
+      if (!['REFINE_CURRENT', 'NEXT_BATCH'].includes(workflowResponse.data.mode)) {
+        return await executeCatalogWorkflow({
+          client,
+          message: input.message,
+          plan: workflowResponse.data,
+          assertActive: () => assertActive(input.requestId, input.signal, input.isCurrent),
+          onProgress: (progress) => emit(input, progress),
+        });
+      }
+    } catch (error) {
+      if (error instanceof CatalogAssistantCancelledError || error instanceof CatalogAssistantExecutionError)
+        throw error;
+      // A rolling deployment may still expose only plan/rank. The established
+      // planner below remains the compatibility path and keeps single-resource
+      // searches available until cloud-api is upgraded.
     }
   }
 

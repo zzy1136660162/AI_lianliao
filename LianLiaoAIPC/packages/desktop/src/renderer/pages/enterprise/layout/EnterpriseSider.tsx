@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 import enterpriseBrandMark from '@renderer/assets/logos/brand/app-mark.png';
+import { isCustomerServiceStaff } from '@/common/enterprise/customer-service/permissions';
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 
 const navigationGroups = [
@@ -42,13 +43,13 @@ const navigationGroups = [
         path: '/enterprise/consultation',
         labelKey: 'enterprise.navigation.consultation',
         Icon: HeadsetOne,
-        excludedRoleId: '19',
+        customerServiceAudience: 'customer',
       },
       {
         path: '/enterprise/customer-service',
         labelKey: 'enterprise.navigation.customerService',
         Icon: HeadsetOne,
-        requiredRoleId: '19',
+        customerServiceAudience: 'staff',
       },
     ],
   },
@@ -59,6 +60,7 @@ const EnterpriseSider: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { logout, user } = useEnterpriseAuth();
+  const customerServiceStaff = isCustomerServiceStaff(user);
   const [logoutPending, setLogoutPending] = useState(false);
   const [logoutFailed, setLogoutFailed] = useState(false);
 
@@ -102,15 +104,10 @@ const EnterpriseSider: React.FC = () => {
             </p>
             <div className='enterprise-sider__nav-group-items'>
               {items
-                .filter(
-                  (item) =>
-                    (!('requiredRoleId' in item) ||
-                      item.requiredRoleId === undefined ||
-                      user?.roleId === item.requiredRoleId) &&
-                    (!('excludedRoleId' in item) ||
-                      item.excludedRoleId === undefined ||
-                      user?.roleId !== item.excludedRoleId)
-                )
+                .filter((item) => {
+                  if (!('customerServiceAudience' in item)) return true;
+                  return item.customerServiceAudience === (customerServiceStaff ? 'staff' : 'customer');
+                })
                 .map(({ path, labelKey, Icon }) => (
                   <NavLink
                     key={path}

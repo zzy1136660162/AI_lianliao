@@ -1,5 +1,5 @@
 import { Refresh, Search } from '@icon-park/react';
-import { Button, Form, Input, InputNumber, Select } from 'antd';
+import { Button, Form, Input, Select } from 'antd';
 import React, { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -26,6 +26,7 @@ const MATERIAL_FILTER_DIMENSIONS: EnterpriseProjectFilterDimension[] = [
   'materialShortName',
   'materialName',
 ];
+const MIN_VISIBLE_CATEGORY_L2_PROJECT_COUNT = 50;
 
 const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) => {
   const { t } = useTranslation();
@@ -54,7 +55,16 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
   };
   const applyFilters = () => {
     clearPreviewAndFocus(catalogSectionRef.current);
-    catalog.applyFilters(draftFilters);
+    // Only submit filters that remain visible in the desktop workspace. This also
+    // prevents stale city or investment values from surviving a development hot reload.
+    catalog.applyFilters({
+      keyword: draftFilters.keyword,
+      province: draftFilters.province,
+      categoryL1: draftFilters.categoryL1,
+      categoryL2: draftFilters.categoryL2,
+      materialShortName: draftFilters.materialShortName,
+      materialName: draftFilters.materialName,
+    });
   };
   const resetFilters = () => {
     setDraftFilters({});
@@ -81,19 +91,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
       next.materialShortName = undefined;
       next.materialName = undefined;
       filterOptions.clear(['city', ...MATERIAL_FILTER_DIMENSIONS]);
-      if (value) void filterOptions.load({ dimension: 'city', province: value });
       void filterOptions.load({ dimension: 'categoryL1', province: value });
-    } else if (field === 'city') {
-      next.categoryL1 = undefined;
-      next.categoryL2 = undefined;
-      next.materialShortName = undefined;
-      next.materialName = undefined;
-      filterOptions.clear(MATERIAL_FILTER_DIMENSIONS);
-      void filterOptions.load({
-        dimension: 'categoryL1',
-        province: next.province,
-        city: value,
-      });
     } else if (field === 'categoryL1') {
       next.categoryL2 = undefined;
       next.materialShortName = undefined;
@@ -103,7 +101,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
         void filterOptions.load({
           dimension: 'categoryL2',
           province: next.province,
-          city: next.city,
           categoryL1: value,
         });
       }
@@ -115,7 +112,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
         void filterOptions.load({
           dimension: 'materialShortName',
           province: next.province,
-          city: next.city,
           categoryL1: next.categoryL1,
           categoryL2: value,
         });
@@ -127,7 +123,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
         void filterOptions.load({
           dimension: 'materialName',
           province: next.province,
-          city: next.city,
           categoryL1: next.categoryL1,
           categoryL2: next.categoryL2,
           materialShortName: value,
@@ -210,14 +205,49 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
     );
   };
 
-  const databaseFields: EnterpriseProjectFilterDimension[] = [
-    'province',
-    'city',
+  const linkedDatabaseFields: EnterpriseProjectFilterDimension[] = [
     'categoryL1',
     'categoryL2',
     'materialShortName',
     'materialName',
   ];
+
+  const renderDatabaseFilter = (field: EnterpriseProjectFilterDimension) => {
+    const state = filterOptions.states[field];
+    const visibleOptions =
+      field === 'categoryL2'
+        ? state.options.filter((option) => option.projectCount > MIN_VISIBLE_CATEGORY_L2_PROJECT_COUNT)
+        : state.options;
+    const disabled =
+      (field === 'categoryL2' && !draftFilters.categoryL1) ||
+      (field === 'materialShortName' && !draftFilters.categoryL2) ||
+      (field === 'materialName' && !draftFilters.materialShortName);
+    const notFoundContent = state.loading
+      ? t('enterprise.projects.filters.optionsLoading')
+      : state.failed
+        ? t('enterprise.projects.filters.optionsError')
+        : t('enterprise.projects.filters.optionsEmpty');
+    return (
+      <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
+        <Select
+          value={draftFilters[field]}
+          aria-label={t(`enterprise.projects.filters.${field}Label`)}
+          allowClear
+          showSearch
+          loading={state.loading}
+          disabled={disabled}
+          optionFilterProp='label'
+          notFoundContent={<span className={styles.optionState}>{notFoundContent}</span>}
+          options={visibleOptions.map((option) => ({
+            value: option.value,
+            label: `${option.label} (${option.projectCount})`,
+          }))}
+          placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
+          onChange={(selected) => changeDatabaseFilter(field, selected)}
+        />
+      </Form.Item>
+    );
+  };
 
   return (
     <section className={styles.page} aria-labelledby='project-page-title'>
@@ -231,7 +261,8 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
       </header>
 
       <Form className={styles.filterForm} layout='vertical' onFinish={applyFilters}>
-        <Form.Item label={t('enterprise.projects.filters.keywordLabel')}>
+        <div className={styles.linkedFilterRow}>{linkedDatabaseFields.map(renderDatabaseFilter)}</div>
+        <Form.Item className={styles.keywordFilter} label={t('enterprise.projects.filters.keywordLabel')}>
           <Input
             value={draftFilters.keyword}
             maxLength={100}
@@ -240,54 +271,7 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
             onChange={(event) => setDraftFilters((current) => ({ ...current, keyword: event.target.value }))}
           />
         </Form.Item>
-        {databaseFields.map((field) => {
-          const state = filterOptions.states[field];
-          const disabled =
-            (field === 'city' && !draftFilters.province) ||
-            (field === 'categoryL2' && !draftFilters.categoryL1) ||
-            (field === 'materialShortName' && !draftFilters.categoryL2) ||
-            (field === 'materialName' && !draftFilters.materialShortName);
-          const notFoundContent = state.loading
-            ? t('enterprise.projects.filters.optionsLoading')
-            : state.failed
-              ? t('enterprise.projects.filters.optionsError')
-              : t('enterprise.projects.filters.optionsEmpty');
-          return (
-            <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
-              <Select
-                value={draftFilters[field]}
-                aria-label={t(`enterprise.projects.filters.${field}Label`)}
-                allowClear
-                showSearch
-                loading={state.loading}
-                disabled={disabled}
-                optionFilterProp='label'
-                notFoundContent={<span className={styles.optionState}>{notFoundContent}</span>}
-                options={state.options.map((option) => ({
-                  value: option.value,
-                  label: `${option.label} (${option.projectCount})`,
-                }))}
-                placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
-                onChange={(selected) => changeDatabaseFilter(field, selected)}
-              />
-            </Form.Item>
-          );
-        })}
-        {(['minInvestment', 'maxInvestment'] as const).map((field) => (
-          <Form.Item key={field} label={t(`enterprise.projects.filters.${field}Label`)}>
-            <InputNumber
-              value={draftFilters[field]}
-              min={0}
-              max={1_000_000_000_000}
-              aria-valuemax={1_000_000_000_000}
-              precision={2}
-              placeholder={t(`enterprise.projects.filters.${field}Placeholder`)}
-              onChange={(value) =>
-                setDraftFilters((current) => ({ ...current, [field]: typeof value === 'number' ? value : undefined }))
-              }
-            />
-          </Form.Item>
-        ))}
+        <div className={styles.provinceFilter}>{renderDatabaseFilter('province')}</div>
         <div className={styles.filterActions}>
           <Button htmlType='submit' type='primary' icon={<Search />}>
             {t('enterprise.projects.actions.search')}

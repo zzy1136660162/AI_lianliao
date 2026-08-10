@@ -1,4 +1,5 @@
 import type { CompanyListQuery, ProductListQuery } from '@/common/enterprise/contracts';
+import { isEnterpriseEntityId } from '@/common/enterprise/entityId';
 
 export type CompanyCatalogReturn = {
   kind: 'companies';
@@ -18,6 +19,16 @@ export type ProductCatalogReturn = {
 
 export type CatalogReturn = CompanyCatalogReturn | ProductCatalogReturn;
 export type CatalogRouteState = { catalogReturn: CatalogReturn };
+
+export type ProductDetailCompanyReturn = {
+  kind: 'company-detail';
+  companyId: string;
+  catalogReturn?: CompanyCatalogReturn;
+};
+
+export type ProductDetailRouteState = {
+  productDetailReturn: ProductDetailCompanyReturn;
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -68,6 +79,32 @@ const readProductQuery = (value: unknown): ProductListQuery | null => {
 };
 
 export const createCatalogReturnState = (catalogReturn: CatalogReturn): CatalogRouteState => ({ catalogReturn });
+
+/** Preserves the originating enterprise detail and its optional list state across a product drill-down. */
+export const createProductDetailCompanyReturnState = (
+  companyId: string,
+  catalogReturn?: CompanyCatalogReturn | null
+): ProductDetailRouteState => ({
+  productDetailReturn: {
+    kind: 'company-detail',
+    companyId,
+    ...(catalogReturn ? { catalogReturn } : {}),
+  },
+});
+
+/** Accepts only a signed entity id and a previously validated company-list return state. */
+export const readProductDetailCompanyReturnState = (value: unknown): ProductDetailCompanyReturn | null => {
+  if (!isRecord(value) || !isRecord(value.productDetailReturn)) return null;
+  const candidate = value.productDetailReturn;
+  if (candidate.kind !== 'company-detail' || !isEnterpriseEntityId(candidate.companyId, 31)) return null;
+
+  if (candidate.catalogReturn === undefined) {
+    return { kind: 'company-detail', companyId: candidate.companyId };
+  }
+  const catalogReturn = readCatalogReturnState({ catalogReturn: candidate.catalogReturn }, 'companies');
+  if (!catalogReturn) return null;
+  return { kind: 'company-detail', companyId: candidate.companyId, catalogReturn };
+};
 
 export function readCatalogReturnState(value: unknown, expectedKind: 'companies'): CompanyCatalogReturn | null;
 export function readCatalogReturnState(value: unknown, expectedKind: 'products'): ProductCatalogReturn | null;

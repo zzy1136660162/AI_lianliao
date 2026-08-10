@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DesktopVersionApiClient } from '@process/services/enterprise/desktop-version/desktopVersionApiClient';
 import type { DesktopVersionApiError } from '@process/services/enterprise/desktop-version/desktopVersionApiClient';
+
+const { electronNetFetch } = vi.hoisted(() => ({ electronNetFetch: vi.fn() }));
+
+vi.mock('electron', () => ({ net: { fetch: electronNetFetch } }));
 
 const response = {
   code: 2000,
@@ -15,6 +19,7 @@ const response = {
       versionName: '2.1.28',
       releaseNotes: 'Desktop release notes',
       forceUpdate: false,
+      status: 'PUBLISHED',
       publishedAt: 1_700_000_000_000,
     },
     package: {
@@ -29,6 +34,10 @@ const response = {
 };
 
 describe('DesktopVersionApiClient', () => {
+  beforeEach(() => {
+    electronNetFetch.mockReset();
+  });
+
   it('checks the fixed local API origin with the main-process OpenID and runtime selection', async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(response), { status: 200 }));
     const client = new DesktopVersionApiClient({ baseUrl: 'http://127.0.0.1:12580/', fetchImpl });
@@ -37,9 +46,21 @@ describe('DesktopVersionApiClient', () => {
 
     expect(release?.version.versionName).toBe('2.1.28');
     expect(release?.packageInfo.downloadUrl).toContain('downloads.example.com');
-    const [url, options] = fetchImpl.mock.calls[0] as [URL, RequestInit];
-    expect(url.toString()).toBe('http://127.0.0.1:12580/cloud-api/DesktopVersionController/getLatest');
+    const [url, options] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://127.0.0.1:12580/cloud-api/DesktopVersionController/getLatest');
     expect(options.body).toBe(JSON.stringify({ openId: 'desktop-open-id', platform: 'WINDOWS', architecture: 'X64' }));
+  });
+
+  it('uses Electron net.fetch by default so version checks inherit the application proxy', async () => {
+    electronNetFetch.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    const client = new DesktopVersionApiClient({ baseUrl: 'https://cloud.lslnii.com/' });
+
+    await expect(client.getLatest('desktop-open-id', 'WINDOWS', 'X64')).resolves.toBeTruthy();
+
+    expect(electronNetFetch).toHaveBeenCalledWith(
+      'https://cloud.lslnii.com/cloud-api/DesktopVersionController/getLatest',
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 
   it('rejects a successful envelope that omits package metadata', async () => {

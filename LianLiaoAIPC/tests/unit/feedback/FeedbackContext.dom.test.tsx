@@ -19,7 +19,7 @@ vi.mock('react-i18next', () => ({
 }));
 
 // Capture props the provider passes to the modal so we can assert prefill wiring
-// without pulling the whole Upload/Sentry stack into the DOM.
+// without pulling the whole upload/cloud-diagnostic stack into the DOM.
 const modalSpy = vi.fn();
 vi.mock('@/renderer/components/settings/SettingsModal/contents/FeedbackReportModal', () => ({
   __esModule: true,

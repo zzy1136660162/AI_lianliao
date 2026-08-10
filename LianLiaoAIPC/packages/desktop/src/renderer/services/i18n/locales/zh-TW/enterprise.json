@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "產業檢索助手",
-    "capability": "可查詢企業碼、重點產品和在建項目",
+    "capability": "可查詢企業碼、重點產品、在建項目和供需資訊",
     "exampleHint": "可以直接描述目標，也可以從範例開始：",
-    "placeholder": "描述您想查找的企業、產品或項目",
+    "placeholder": "描述您想查找的企業、產品、項目或供需資訊",
     "submit": "開始檢索",
     "stop": "停止檢索",
     "retry": "重試",
@@ -146,6 +146,7 @@
     "viewCompany": "查看企業碼",
     "viewProduct": "查看重點產品",
     "viewProject": "查看項目詳情",
+    "viewDemand": "查看供需詳情",
     "projectInvestment": "投資 {{value}} 萬元",
     "notProvided": "暫未提供",
     "currentRequest": "本次需求",
@@ -154,7 +155,10 @@
     "completed": "檢索完成",
     "searchingCompanyPage": "正在檢索企業碼，第 {{page}}/{{maxPages}} 頁",
     "searchingProductPage": "正在檢索重點產品，第 {{page}}/{{maxPages}} 頁",
+    "linkingCompanies": "正在關聯產品所屬企業",
+    "productEvidence": "匹配產品",
     "searchingProjectPage": "正在檢索在建項目，第 {{page}}/{{maxPages}} 頁",
+    "searchingDemandPage": "正在檢索供需資訊，第 {{page}}/{{maxPages}} 頁",
     "candidateCount": "已收集 {{count}} 條候選",
     "ranking": "正在篩選最匹配結果",
     "clarificationTitle": "請補充說明",
@@ -177,6 +181,7 @@
       "company": "找瀋陽做精密機械加工的企業",
       "product": "查瀋北新區的不鏽鋼加工產品",
       "project": "找瀋陽近期採購機電設備的在建項目",
+      "demand": "查找瀋陽的機械加工需求",
       "service": "找能夠提供包裝印刷服務的企業"
     }
   },

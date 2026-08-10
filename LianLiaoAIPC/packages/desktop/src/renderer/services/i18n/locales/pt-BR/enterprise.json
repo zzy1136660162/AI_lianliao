@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "Assistente de busca industrial",
-    "capability": "Pesquise empresas, produtos em destaque e projetos de construção",
+    "capability": "Pesquise empresas, produtos em destaque, projetos de construção e ofertas e demandas",
     "exampleHint": "Descreva seu objetivo ou use um exemplo:",
-    "placeholder": "Descreva a empresa, produto ou projeto desejado",
+    "placeholder": "Descreva a empresa, produto, projeto ou oferta e demanda desejada",
     "submit": "Pesquisar",
     "stop": "Parar",
     "retry": "Tentar novamente",
@@ -146,6 +146,7 @@
     "viewCompany": "Ver perfil da empresa",
     "viewProduct": "Ver produto em destaque",
     "viewProject": "Ver detalhes do projeto",
+    "viewDemand": "Ver detalhes da oferta ou demanda",
     "projectInvestment": "Investimento de {{value}} × 10.000 RMB",
     "notProvided": "Não informado",
     "currentRequest": "Solicitação atual",
@@ -154,7 +155,10 @@
     "completed": "Pesquisa concluída",
     "searchingCompanyPage": "Pesquisando empresas, página {{page}}/{{maxPages}}",
     "searchingProductPage": "Pesquisando produtos, página {{page}}/{{maxPages}}",
+    "linkingCompanies": "Vinculando produtos às empresas",
+    "productEvidence": "Produtos correspondentes",
     "searchingProjectPage": "Pesquisando projetos de construção, página {{page}}/{{maxPages}}",
+    "searchingDemandPage": "Pesquisando ofertas e demandas, página {{page}}/{{maxPages}}",
     "candidateCount": "{{count}} candidatos coletados",
     "ranking": "Selecionando os melhores resultados",
     "clarificationTitle": "Especifique melhor",
@@ -177,6 +181,7 @@
       "company": "Encontrar empresas de usinagem de precisão em Shenyang",
       "product": "Encontrar produtos de aço inoxidável em Shenbei",
       "project": "Encontrar projetos em Shenyang que comprem equipamentos eletromecânicos",
+      "demand": "Encontrar demandas de usinagem em Shenyang",
       "service": "Encontrar empresas de embalagem e impressão"
     }
   },

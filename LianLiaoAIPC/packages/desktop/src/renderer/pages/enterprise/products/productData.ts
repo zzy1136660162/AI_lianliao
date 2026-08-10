@@ -47,6 +47,7 @@ const PRODUCT_FIELD_RULES = [
   ['companyId', 'string', true, true],
   ['imageUrl', 'string'],
   ['summary', 'string'],
+  ['sort', 'finiteNumber'],
   ['industry', 'string'],
   ['companyName', 'string'],
   ['companyIndustry', 'string'],

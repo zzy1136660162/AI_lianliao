@@ -118,16 +118,16 @@ mod tests {
     #[tokio::test]
     async fn upsert_and_get_all() {
         let (repo, _db) = setup().await;
-        repo.upsert_batch(&[("theme", "\"dark\""), ("pet.size", "360")])
+        repo.upsert_batch(&[("theme", "\"dark\""), ("ui.fontSize.chat", "16")])
             .await
             .unwrap();
 
         let prefs = repo.get_all().await.unwrap();
         assert_eq!(prefs.len(), 2);
-        assert_eq!(prefs[0].key, "pet.size");
-        assert_eq!(prefs[0].value, "360");
-        assert_eq!(prefs[1].key, "theme");
-        assert_eq!(prefs[1].value, "\"dark\"");
+        assert_eq!(prefs[0].key, "theme");
+        assert_eq!(prefs[0].value, "\"dark\"");
+        assert_eq!(prefs[1].key, "ui.fontSize.chat");
+        assert_eq!(prefs[1].value, "16");
     }
 
     #[tokio::test]

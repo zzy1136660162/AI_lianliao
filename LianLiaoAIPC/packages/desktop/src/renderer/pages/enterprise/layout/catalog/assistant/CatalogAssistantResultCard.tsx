@@ -1,4 +1,4 @@
-import { BuildingOne, CubeFive, EngineeringBrand } from '@icon-park/react';
+import { BuildingOne, CubeFive, EngineeringBrand, ExchangeFour } from '@icon-park/react';
 import { Button } from 'antd';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -50,6 +50,27 @@ export const CatalogAssistantResultCard: React.FC<{
           </span>
           {item.businessSummary ? <p className={styles.resultDescription}>{item.businessSummary}</p> : null}
           <p className={styles.reason}>{translateMarker(result.reason, t)}</p>
+          {result.evidenceProducts?.length ? (
+            <div className={styles.productEvidence}>
+              <span className={styles.productEvidenceLabel}>{t('enterprise.catalogAssistant.productEvidence')}</span>
+              {result.evidenceProducts.map((product) => {
+                const productImage = parseSafeProductImageUrl(product.imageUrl);
+                return (
+                  <button
+                    key={product.id}
+                    type='button'
+                    className={styles.productEvidenceItem}
+                    onClick={() => void navigate(`/enterprise/products/${product.id}`)}
+                  >
+                    <span className={styles.productEvidenceImage}>
+                      {productImage ? <img src={productImage} alt='' /> : <CubeFive size={14} aria-hidden='true' />}
+                    </span>
+                    <span>{product.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <Button
             type='link'
             size='small'
@@ -90,6 +111,37 @@ export const CatalogAssistantResultCard: React.FC<{
             onClick={() => void navigate(`/enterprise/products/${item.productId}`)}
           >
             {t('enterprise.catalogAssistant.viewProduct')}
+          </Button>
+        </div>
+      </article>
+    );
+  }
+
+  if (result.entityType === 'DEMAND') {
+    const item = result.item;
+    return (
+      <article className={styles.resultCard}>
+        <div className={styles.resultImage}>
+          <ExchangeFour size={26} aria-hidden='true' />
+        </div>
+        <div className={styles.resultBody}>
+          <strong className={styles.resultTitle}>{item.title}</strong>
+          {item.summary ? <p className={styles.resultDescription}>{item.summary}</p> : null}
+          {item.primaryTags.length ? (
+            <span className={styles.resultMeta}>{item.primaryTags.slice(0, 4).join(' / ')}</span>
+          ) : null}
+          <p className={styles.reason}>{translateMarker(result.reason, t)}</p>
+          <Button
+            type='link'
+            size='small'
+            className={styles.resultAction}
+            onClick={() =>
+              void navigate(
+                `/enterprise/supply-demand/${encodeURIComponent(String(item.typeId))}/${encodeURIComponent(item.demandId)}`
+              )
+            }
+          >
+            {t('enterprise.catalogAssistant.viewDemand')}
           </Button>
         </div>
       </article>

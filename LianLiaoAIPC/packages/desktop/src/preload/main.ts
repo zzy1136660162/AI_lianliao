@@ -13,6 +13,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { z } from 'zod';
 import { exposeRuntimeEnvironment } from './runtimeEnvironment';
 import { ADAPTER_BRIDGE_EVENT_KEY } from '../common/adapter/constant';
+import type { DesktopDiagnosticSubmitRequest } from '../common/types/desktopDiagnostic';
 import {
   CUSTOMER_CONSULTATION_IPC_CHANNELS,
   CUSTOMER_CONSULTATION_NAVIGATE_CHANNEL,
@@ -415,6 +416,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   collectFeedbackLogs: () => ipcRenderer.invoke('feedback:collect-logs'),
   // Feedback: capture a screenshot of the current window
   captureFeedbackScreenshot: () => ipcRenderer.invoke('feedback:capture-screenshot'),
+  // Feedback: persist the report and its attachments through Chain Liaoning cloud-api.
+  submitFeedbackReport: (request: DesktopDiagnosticSubmitRequest) =>
+    ipcRenderer.invoke('feedback:submit-report', request),
   // Feedback: forward diagnostics logs to the main process console
   logFeedbackEvent: (payload: { details?: unknown; level: 'info' | 'warn' | 'error'; message: string }) =>
     ipcRenderer.send('feedback:renderer-log', payload),
@@ -426,6 +430,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       invokeEnterprise<EnterpriseUserContext>(ENTERPRISE_IPC_CHANNELS.AUTH_COMPLETE_REGISTRATION, openId),
     restoreSession: () => invokeEnterprise<EnterpriseUserContext | null>(ENTERPRISE_IPC_CHANNELS.AUTH_RESTORE),
     clearSession: () => invokeEnterprise<void>(ENTERPRISE_IPC_CHANNELS.AUTH_CLEAR),
+    copyPhone: (phone: string) => invokeEnterprise<void>(ENTERPRISE_IPC_CHANNELS.CONTACT_COPY_PHONE, phone),
     request: (request: EnterpriseRequest) =>
       invokeEnterprise<EnterpriseResponse>(ENTERPRISE_IPC_CHANNELS.REQUEST, request),
   },

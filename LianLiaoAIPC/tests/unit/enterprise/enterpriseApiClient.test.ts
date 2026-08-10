@@ -166,11 +166,14 @@ describe('enterprise API routes', () => {
     expect(ENTERPRISE_API_ROUTES).toEqual({
       'company.list': 'cloud-api/CompanyController/getQiYeMaCompanyCatalogList',
       'company.detail': 'cloud-api/CompanyController/getDetailcompany',
+      'company.batchGet': 'cloud-api/CompanyController/getQiYeMaCompanyBatch',
       'company.industries': 'cloud-api/CompanyController/getQiYeMaIndustryOptions',
       'product.list': 'cloud-api/CompanyController/getFindProducts',
       'product.detail': 'cloud-api/CompanyController/FindProduct',
       'catalogAssistant.plan': 'cloud-api/CatalogAiAssistantController/plan',
       'catalogAssistant.rank': 'cloud-api/CatalogAiAssistantController/rank',
+      'catalogAssistant.workflowPlan': 'cloud-api/CatalogAiAssistantController/workflow-plan',
+      'catalogAssistant.workflowRank': 'cloud-api/CatalogAiAssistantController/workflow-rank',
       'enterpriseAssistant.plan': 'cloud-api/EnterpriseAiAssistantController/plan',
       'desktopAi.defaultConfig': 'cloud-api/DesktopAiModelController/defaultConfig',
       'project.dashboard': 'cloud-api/OpportunityController/getAiMaterialDashboard',
@@ -220,6 +223,35 @@ describe('enterprise API routes', () => {
 });
 
 describe('EnterpriseApiClient behavior logs', () => {
+  it('records desktop page visits with the PC tool log type', async () => {
+    const calls: Array<{ url: string; init: RequestInit }> = [];
+    const client = new EnterpriseApiClient({
+      transport: async (url, init) => {
+        calls.push({ url, init });
+        return jsonResponse({ success: true, data: JSON.parse(String(init.body)) });
+      },
+    });
+
+    await client.request(
+      {
+        operation: 'behavior.log',
+        payload: {
+          eventType: 'PAGE_VIEW',
+          moduleName: '链辽AI桌面端-企业码',
+          title: '访问企业码列表',
+          pagePath: '/enterprise/companies',
+        },
+      },
+      REGISTERED_CONTEXT
+    );
+
+    expect(JSON.parse(String(calls[0]?.init.body))).toMatchObject({
+      type: 'PC端工具',
+      newsTitle: '访问企业码列表',
+      newsUrl: 'lianliao://desktop/enterprise/companies',
+    });
+  });
+
   it('writes the H5-compatible log envelope with trusted session identity', async () => {
     const calls: Array<{ url: string; init: RequestInit }> = [];
     const client = new EnterpriseApiClient({
@@ -1144,6 +1176,7 @@ describe('EnterpriseApiClient contact access', () => {
           errType: 0,
           message: 'Entitlement confirmed',
           action: 'NONE',
+          phone: null,
         },
       });
     };

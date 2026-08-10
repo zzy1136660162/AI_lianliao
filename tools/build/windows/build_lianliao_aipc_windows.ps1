@@ -162,16 +162,18 @@ $bunCommand = Get-Command bun -CommandType Application -ErrorAction SilentlyCont
 if (-not $bunCommand) {
     throw "未找到 bun。请先安装 Bun，并重新打开 PowerShell。"
 }
-$cargoCommand = $null
+$cargoExecutable = $null
 if (-not $Fast -and -not $corePathWasProvided) {
     $cargoCommand = Get-Command cargo -CommandType Application -ErrorAction SilentlyContinue
-    if (-not $cargoCommand) {
+    if ($cargoCommand) {
+        $cargoExecutable = $cargoCommand.Source
+    } else {
         $userCargo = Join-Path ([Environment]::GetFolderPath("UserProfile")) ".cargo\bin\cargo.exe"
         if (Test-Path -LiteralPath $userCargo -PathType Leaf) {
-            $cargoCommand = Get-Item -LiteralPath $userCargo
+            $cargoExecutable = $userCargo
         }
     }
-    if (-not $cargoCommand) {
+    if (-not $cargoExecutable) {
         throw "未找到 cargo。完整构建需要先增量编译 LianLiaoAICore，请安装 Rust 工具链并重新打开 PowerShell。"
     }
 }
@@ -217,7 +219,7 @@ try {
         Write-Host "正在增量编译本地 Core（Release / x86_64-pc-windows-msvc）..." -ForegroundColor Cyan
         Push-Location $coreRoot
         try {
-            Invoke-NativeCommand $cargoCommand.Source @(
+            Invoke-NativeCommand $cargoExecutable @(
                 "build",
                 "--locked",
                 "--release",
@@ -247,10 +249,12 @@ try {
             throw "快速构建缺少托管资源，请先运行完整构建脚本：$managedResources"
         }
 
-        $newestCoreInput = Get-NewestCoreBuildInput -CoreRoot $coreRoot
-        $coreBinary = Get-Item -LiteralPath $CorePath
-        if ($null -ne $newestCoreInput -and $newestCoreInput.LastWriteTimeUtc -gt $coreBinary.LastWriteTimeUtc) {
-            throw "Core 源码或资源晚于本地二进制（最新：$($newestCoreInput.FullName)）。请先运行 tools\build\windows\build_lianliao_aipc_windows.ps1 完整构建。"
+        if (-not $corePathWasProvided) {
+            $newestCoreInput = Get-NewestCoreBuildInput -CoreRoot $coreRoot
+            $coreBinary = Get-Item -LiteralPath $CorePath
+            if ($null -ne $newestCoreInput -and $newestCoreInput.LastWriteTimeUtc -gt $coreBinary.LastWriteTimeUtc) {
+                throw "Core 源码或资源晚于本地二进制（最新：$($newestCoreInput.FullName)）。请先运行 tools\build\windows\build_lianliao_aipc_windows.ps1 完整构建。"
+            }
         }
 
         $sourceCoreSha256 = Get-FileSha256 $CorePath
@@ -268,7 +272,7 @@ try {
         Set-ProcessEnvironment "LIANLIAO_AICORE_LOCAL_BINARY" $CorePath
         Set-ProcessEnvironment "LIANLIAO_AICORE_VERIFY" "1"
         Set-ProcessEnvironment "LIANLIAO_AICORE_TRUST_PREPARED" $null
-        Write-Host "完整构建：将重新注入本地 Core、准备托管资源并生成 Windows x64 安装包。" -ForegroundColor Cyan
+        Write-Host "完整构建：将重新注入本地 Core；已验证的托管资源会自动复用，否则重新准备，然后生成 Windows x64 安装包。" -ForegroundColor Cyan
     }
 
     if ($NoProxy) {

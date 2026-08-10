@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "산업 검색 도우미",
-    "capability": "기업 정보, 중점 제품 및 건설 프로젝트를 검색합니다",
+    "capability": "기업 정보, 중점 제품, 건설 프로젝트 및 수급 정보를 검색합니다",
     "exampleHint": "목표를 설명하거나 예시로 시작하세요:",
-    "placeholder": "찾는 기업, 제품 또는 프로젝트를 설명하세요",
+    "placeholder": "찾는 기업, 제품, 프로젝트 또는 수급 정보를 설명하세요",
     "submit": "검색",
     "stop": "중지",
     "retry": "다시 시도",
@@ -146,6 +146,7 @@
     "viewCompany": "기업 정보 보기",
     "viewProduct": "중점 제품 보기",
     "viewProject": "프로젝트 상세 보기",
+    "viewDemand": "수급 정보 상세 보기",
     "projectInvestment": "투자액 {{value}}만 위안",
     "notProvided": "정보 없음",
     "currentRequest": "현재 요청",
@@ -154,7 +155,10 @@
     "completed": "검색 완료",
     "searchingCompanyPage": "기업 검색 중, {{page}}/{{maxPages}} 페이지",
     "searchingProductPage": "제품 검색 중, {{page}}/{{maxPages}} 페이지",
+    "linkingCompanies": "제품과 소속 기업을 연결하는 중",
+    "productEvidence": "일치 제품",
     "searchingProjectPage": "건설 프로젝트 검색 중, {{page}}/{{maxPages}} 페이지",
+    "searchingDemandPage": "수급 정보 검색 중, {{page}}/{{maxPages}} 페이지",
     "candidateCount": "후보 {{count}}개 수집",
     "ranking": "가장 적합한 결과를 선택하는 중",
     "clarificationTitle": "조건을 추가해 주세요",
@@ -177,6 +181,7 @@
       "company": "선양의 정밀 기계 가공 기업 찾기",
       "product": "선베이 신구의 스테인리스 가공 제품 찾기",
       "project": "선양에서 기전 설비를 구매하는 건설 프로젝트 찾기",
+      "demand": "선양의 기계 가공 수요 찾기",
       "service": "포장 인쇄 서비스 기업 찾기"
     }
   },

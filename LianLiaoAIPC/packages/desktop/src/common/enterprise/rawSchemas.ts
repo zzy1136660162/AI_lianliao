@@ -8,6 +8,8 @@ import {
 import {
   catalogPlanPayloadSchema,
   catalogRankPayloadSchema,
+  catalogWorkflowPlanPayloadSchema,
+  catalogWorkflowRankPayloadSchema,
   enterpriseAssistantPlanPayloadSchema,
 } from './catalog-assistant/schemas';
 import { UNIFIED_RESOURCE_TYPES } from './unified-search/contracts';
@@ -212,6 +214,8 @@ export const enterpriseCompanyRawSchema = passthroughRawSchema({
     'REGISTERED_CAPITAL',
     'featuredProductCount',
     'FEATURED_PRODUCT_COUNT',
+    'sort',
+    'SORT',
   ] as const,
   booleans: ['vip', 'VIP', 'payVip', 'PAY_VIP', 'isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
 });
@@ -296,7 +300,7 @@ export const enterpriseProductRawSchema = passthroughRawSchema({
     'companyId',
     'COMPANY_ID',
   ] as const,
-  numbers: ['comLevel', 'COM_LEVEL', 'companyLevel', 'COMPANY_LEVEL'] as const,
+  numbers: ['comLevel', 'COM_LEVEL', 'companyLevel', 'COMPANY_LEVEL', 'sort', 'SORT'] as const,
   booleans: ['vip', 'VIP', 'payVip', 'PAY_VIP', 'isCollect', 'IS_COLLECT', 'collected', 'COLLECTED'] as const,
 });
 
@@ -641,7 +645,7 @@ export const userContextRawSchema = passthroughRawSchema({
     'payResNum',
     'PAY_RES_NUM',
   ] as const,
-  booleans: ['registered', 'REGISTERED'] as const,
+  booleans: ['registered', 'REGISTERED', 'customerServiceStaff', 'CUSTOMER_SERVICE_STAFF'] as const,
 });
 
 const companyListQuerySchema = guardedObject(
@@ -741,6 +745,17 @@ const projectListQuerySchema = guardedObject(
 const companyDetailPayloadSchema = guardedObject(z.object({ companyId: requestIdentifierSchema }).strict(), [
   'companyId',
 ]);
+const companyBatchPayloadSchema = guardedObject(
+  z
+    .object({
+      companyIds: z
+        .array(z.string().refine((value) => isEnterpriseEntityId(value, 31)))
+        .min(1)
+        .max(100),
+    })
+    .strict(),
+  ['companyIds']
+);
 const productDetailPayloadSchema = guardedObject(z.object({ productId: requestIdentifierSchema }).strict(), [
   'productId',
 ]);
@@ -956,6 +971,7 @@ const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
       payload: companyDetailPayloadSchema,
     })
     .strict(),
+  z.object({ operation: z.literal('company.batchGet'), payload: companyBatchPayloadSchema }).strict(),
   z.object({ operation: z.literal('company.industries'), payload: companyIndustriesPayloadSchema }).strict(),
   z.object({ operation: z.literal('product.list'), payload: productListQuerySchema }).strict(),
   z
@@ -974,6 +990,18 @@ const enterpriseRequestUnionSchema = z.discriminatedUnion('operation', [
     .object({
       operation: z.literal('catalogAssistant.rank'),
       payload: guardedObject(catalogRankPayloadSchema, ['message', 'plan', 'candidates']),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('catalogAssistant.workflowPlan'),
+      payload: guardedObject(catalogWorkflowPlanPayloadSchema, ['message']),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('catalogAssistant.workflowRank'),
+      payload: guardedObject(catalogWorkflowRankPayloadSchema, ['message', 'plan', 'candidates']),
     })
     .strict(),
   z

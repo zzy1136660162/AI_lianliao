@@ -151,7 +151,7 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
         )
       ).filter((item): item is FeedbackAttachment => item !== null);
 
-      await submitFeedbackReport({
+      const result = await submitFeedbackReport({
         attachments,
         collectLogs: true,
         description,
@@ -161,7 +161,13 @@ const FeedbackReportModal: React.FC<FeedbackReportModalProps> = ({
         tags: feedbackTags,
       });
 
-      Message.success(t('settings.bugReportSuccess'));
+      if (result.status === 'PARTIAL') {
+        Message.warning(
+          t('settings.bugReportPartialSuccess', { reportNo: result.reportNo, failedCount: result.failedCount })
+        );
+      } else {
+        Message.success(t('settings.bugReportSuccessWithNo', { reportNo: result.reportNo }));
+      }
       resetForm();
       onCancel();
     } catch {

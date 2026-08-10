@@ -265,6 +265,14 @@ const serializeCompanyDetail = (
   };
 };
 
+const serializeCompanyBatchGet = (
+  request: Extract<EnterpriseRequest, { operation: 'company.batchGet' }>,
+  context: EnterpriseUserContext
+): EnterpriseRequestBody => {
+  requireCompanyIdentity(context);
+  return { companyIds: request.payload.companyIds };
+};
+
 const serializeProductList = (
   request: Extract<EnterpriseRequest, { operation: 'product.list' }>,
   context: EnterpriseUserContext
@@ -457,7 +465,8 @@ const serializeUnifiedRequest = (
 };
 
 const BEHAVIOR_TYPE_LABELS = Object.freeze({
-  PAGE_VIEW: '页面访问',
+  // 桌面工具访问与 H5 页面访问使用不同类型，便于后台按终端来源统计。
+  PAGE_VIEW: 'PC端工具',
   CONTACT_ACQUIRE: '获取联系方式',
   PHONE_DIAL: '拨打电话',
   DEMAND_PUBLISH: '发布需求',
@@ -501,6 +510,8 @@ const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserCon
       return serializeCompanyList(request, context);
     case 'company.detail':
       return serializeCompanyDetail(request, context);
+    case 'company.batchGet':
+      return serializeCompanyBatchGet(request, context);
     case 'company.industries':
       requireCompanyIdentity(context);
       return {};
@@ -510,6 +521,8 @@ const serializeRequest = (request: EnterpriseRequest, context: EnterpriseUserCon
       return serializeProductDetail(request, context);
     case 'catalogAssistant.plan':
     case 'catalogAssistant.rank':
+    case 'catalogAssistant.workflowPlan':
+    case 'catalogAssistant.workflowRank':
     case 'enterpriseAssistant.plan':
       return serializeCatalogAssistantRequest(request, context);
     case 'project.dashboard':

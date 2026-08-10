@@ -155,6 +155,7 @@ describe('company catalog response boundaries', () => {
       legalRepresentative: 'Zhang',
       registeredCapital: '5000万元人民币',
       companyType: 'Limited company',
+      sort: 120,
       establishedAt: '2014-02-21',
       featuredProducts: [
         {
@@ -162,6 +163,7 @@ describe('company catalog response boundaries', () => {
           companyId: '42',
           name: 'Precision pump',
           imageUrl: 'https://cloud.lslnii.com/product/pump.png',
+          sort: 90,
         },
       ],
       featuredProductCount: 4,
@@ -209,6 +211,7 @@ describe('company catalog response boundaries', () => {
     ['legalRepresentative', 7],
     ['registeredCapital', 5000],
     ['companyType', false],
+    ['sort', '120'],
     ['companyLevel', '3'],
     ['vip', 'true'],
     ['establishedAt', 7],
@@ -442,6 +445,7 @@ describe('company catalog response boundaries', () => {
   it.each([
     ['imageUrl', 7],
     ['summary', false],
+    ['sort', '90'],
     ['industry', 7],
     ['companyName', false],
     ['companyIndustry', 7],

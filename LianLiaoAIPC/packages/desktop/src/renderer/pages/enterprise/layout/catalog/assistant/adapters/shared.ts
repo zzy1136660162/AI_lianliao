@@ -46,6 +46,19 @@ export const trustedResultText = (result: CatalogAssistantTrustedResult): string
       .filter(Boolean)
       .join(' ');
   }
+  if (result.entityType === 'DEMAND') {
+    return [
+      result.item.title,
+      result.item.typeName,
+      result.item.city,
+      result.item.district,
+      result.item.budget,
+      result.item.summary,
+      ...result.item.primaryTags,
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
   return [
     result.item.projectName,
     result.item.constructionUnit,
@@ -66,11 +79,16 @@ export const matchesCommonCurrentResult = (
   filters: CatalogAssistantFilters
 ): boolean => {
   const normalized = normalizeCatalogRegionFilters(filters);
-  const item = result.item;
-  if (result.entityType !== 'PROJECT' && normalized.province && normalized.province !== '辽宁省') return false;
-  if (normalized.province && result.entityType === 'PROJECT' && item.province !== normalized.province) return false;
-  if (!matchesCatalogRegion(item.city, normalized.city)) return false;
-  if ('district' in item && !matchesCatalogRegion(item.district, normalized.district)) return false;
+  if (
+    (result.entityType === 'COMPANY' || result.entityType === 'PRODUCT') &&
+    normalized.province &&
+    normalized.province !== '辽宁省'
+  )
+    return false;
+  if (normalized.province && result.entityType === 'PROJECT' && result.item.province !== normalized.province)
+    return false;
+  if (!matchesCatalogRegion(result.item.city, normalized.city)) return false;
+  if ('district' in result.item && !matchesCatalogRegion(result.item.district, normalized.district)) return false;
   const haystack = trustedResultText(result).toLocaleLowerCase();
   if (normalized.keyword && !haystack.includes(normalized.keyword.toLocaleLowerCase())) return false;
   if (normalized.industry && !haystack.includes(normalized.industry.toLocaleLowerCase())) return false;

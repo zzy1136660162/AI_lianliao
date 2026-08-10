@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 type FeedbackButtonProps = {
   /** Pre-selects the module in the feedback modal (see FEEDBACK_MODULES tags). */
   module?: string;
-  /** Extra Sentry tags attached to the feedback event. */
+  /** Extra searchable tags persisted with the cloud diagnostic report. */
   feedbackTags?: Record<string, string>;
   /** Extra structured context attached to the feedback event. */
   feedbackExtra?: Record<string, unknown>;

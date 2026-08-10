@@ -63,7 +63,7 @@
 
 .filterForm {
   display: grid;
-  grid-template-columns: repeat(5, minmax(128px, 1fr));
+  grid-template-columns: minmax(240px, 1.5fr) minmax(190px, 1fr) minmax(220px, auto);
   gap: 10px;
   align-items: end;
   padding: 14px;
@@ -82,12 +82,25 @@
   font-size: 11px;
 }
 
-.filterForm :global(.ll-ant-input-number) {
+.filterForm :global(.ll-ant-select) {
   width: 100%;
 }
 
-.filterForm :global(.ll-ant-select) {
-  width: 100%;
+.keywordFilter,
+.provinceFilter {
+  min-width: 0;
+}
+
+.provinceFilter > :global(.ll-ant-form-item) {
+  margin: 0;
+}
+
+.linkedFilterRow {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 10px;
 }
 
 .optionState {
@@ -97,7 +110,7 @@
 
 .filterActions {
   display: flex;
-  grid-column: 1 / -1;
+  align-self: end;
   justify-content: flex-end;
   gap: 8px;
 }
@@ -528,7 +541,7 @@
 
 @media (max-width: 1180px) {
   .filterForm {
-    grid-template-columns: repeat(3, minmax(140px, 1fr));
+    grid-template-columns: minmax(220px, 1.4fr) minmax(180px, 1fr) auto;
   }
 
   .metricGrid {
@@ -562,6 +575,14 @@
   .insightGrid,
   .detailColumns {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .linkedFilterRow {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+
+  .filterActions {
+    grid-column: 1 / -1;
   }
 
   .catalogWithPreview {

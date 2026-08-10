@@ -8,6 +8,13 @@ import type { DesktopVersionArchitecture, DesktopVersionPlatform } from '@/commo
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
+export type DesktopVersionApiTransport = (url: string, init: RequestInit) => Promise<Response>;
+
+const defaultTransport: DesktopVersionApiTransport = async (url, init) => {
+  const { net } = await import('electron');
+  return net.fetch(url, init);
+};
+
 const apiPackageSchema = z
   .object({
     id: z.string().regex(/^-?[1-9][0-9]{0,18}$/),
@@ -26,6 +33,8 @@ const apiVersionSchema = z
     versionName: z.string().min(1).max(64),
     releaseNotes: z.string().max(20_000).nullable(),
     forceUpdate: z.boolean(),
+    // The release endpoint includes the persisted status even though it is not exposed to the renderer.
+    status: z.literal('PUBLISHED').optional(),
     publishedAt: z.number().int().nonnegative().safe().nullable(),
   })
   .strict();
@@ -52,7 +61,7 @@ export type DesktopVersionRemoteRelease = {
 
 export type DesktopVersionApiClientOptions = {
   baseUrl: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl?: DesktopVersionApiTransport;
 };
 
 /** Typed error keeps transport details inside the main process IPC boundary. */
@@ -74,11 +83,11 @@ export const resolveDesktopVersionApiClientOptions = (isPackaged: boolean): Desk
 /** Main-process HTTP client for a single platform-specific release lookup. */
 export class DesktopVersionApiClient {
   private readonly baseUrl: string;
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: DesktopVersionApiTransport;
 
   constructor(options: DesktopVersionApiClientOptions) {
     this.baseUrl = new URL(options.baseUrl).toString();
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? defaultTransport;
   }
 
   async getLatest(
@@ -95,10 +104,12 @@ export class DesktopVersionApiClient {
   private async post(action: string, body: Record<string, string>): Promise<z.infer<typeof apiResultSchema>['data']> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const startedAt = Date.now();
+    const url = new URL(`${DESKTOP_VERSION_CONTROLLER_PATH}${action}`, this.baseUrl).toString();
     try {
       let response: Response;
       try {
-        response = await this.fetchImpl(new URL(`${DESKTOP_VERSION_CONTROLLER_PATH}${action}`, this.baseUrl), {
+        response = await this.fetchImpl(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -119,6 +130,18 @@ export class DesktopVersionApiClient {
       if (!parsed.success) throw new DesktopVersionApiError('INVALID_RESPONSE', response.status);
       if (!parsed.data.success) throw new DesktopVersionApiError('API_FAILURE', response.status);
       return parsed.data.data;
+    } catch (error) {
+      const code = error instanceof DesktopVersionApiError ? error.code : 'NETWORK';
+      const status = error instanceof DesktopVersionApiError ? error.status : 0;
+      // Log only routing and failure metadata; OpenID and response bodies must never reach diagnostics.
+      console.error('[desktop-version] request failed', {
+        operation: action,
+        endpoint: new URL(url).pathname,
+        code,
+        status,
+        durationMs: Math.max(0, Date.now() - startedAt),
+      });
+      throw error;
     } finally {
       clearTimeout(timeout);
     }

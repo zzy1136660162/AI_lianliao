@@ -26,6 +26,7 @@ export const ENTERPRISE_IPC_CHANNELS = Object.freeze({
   AUTH_COMPLETE_REGISTRATION: 'enterprise:auth:complete-registration',
   AUTH_RESTORE: 'enterprise:auth:restore',
   AUTH_CLEAR: 'enterprise:auth:clear',
+  CONTACT_COPY_PHONE: 'enterprise:contact:copy-phone',
   REQUEST: 'enterprise:request',
 } as const);
 

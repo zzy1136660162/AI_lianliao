@@ -244,13 +244,13 @@ mod tests {
     fn test_client_preferences_response_mixed_types() {
         let mut resp: ClientPreferencesResponse = HashMap::new();
         resp.insert("system.closeToTray".into(), json!(false));
-        resp.insert("pet.size".into(), json!(280));
+        resp.insert("ui.fontSize.chat".into(), json!(16));
         resp.insert("theme".into(), json!("dark"));
         resp.insert("ui.zoomFactor".into(), json!(1.0));
 
         let json = serde_json::to_value(&resp).unwrap();
         assert_eq!(json["system.closeToTray"], false);
-        assert_eq!(json["pet.size"], 280);
+        assert_eq!(json["ui.fontSize.chat"], 16);
         assert_eq!(json["theme"], "dark");
         assert_eq!(json["ui.zoomFactor"], 1.0);
     }
@@ -259,10 +259,10 @@ mod tests {
     fn test_update_client_preferences_with_null_delete() {
         let raw = json!({
             "theme": null,
-            "pet.size": 360
+            "ui.fontSize.chat": 16
         });
         let req: UpdateClientPreferencesRequest = serde_json::from_value(raw).unwrap();
         assert!(req["theme"].is_null());
-        assert_eq!(req["pet.size"], 360);
+        assert_eq!(req["ui.fontSize.chat"], 16);
     }
 }

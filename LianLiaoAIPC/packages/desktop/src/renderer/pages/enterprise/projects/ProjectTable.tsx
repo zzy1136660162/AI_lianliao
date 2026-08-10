@@ -1,4 +1,4 @@
-import { Button, Pagination, Table, Tag, type TableColumnsType } from 'antd';
+import { Button, Pagination, Table, type TableColumnsType } from 'antd';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -56,16 +56,6 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
         render: (value) => (typeof value === 'number' ? t('enterprise.projects.investmentWan', { value }) : missing),
       },
       {
-        title: t('enterprise.projects.columns.nature'),
-        width: 120,
-        render: (_value, project) =>
-          project.constructionNature || project.projectNature ? (
-            <Tag>{project.constructionNature || project.projectNature}</Tag>
-          ) : (
-            missing
-          ),
-      },
-      {
         title: t('enterprise.projects.columns.procurement'),
         dataIndex: 'procurementSummary',
         width: 280,
@@ -107,7 +97,7 @@ const ProjectTable: React.FC<ProjectTableProps> = ({
         dataSource={page.list}
         pagination={false}
         loading={loading}
-        scroll={{ x: 1160 }}
+        scroll={{ x: 1040 }}
         rowClassName={(project) => (selected?.hpInfoId === project.hpInfoId ? styles.selectedRow : '')}
         onRow={(project) => ({
           tabIndex: 0,

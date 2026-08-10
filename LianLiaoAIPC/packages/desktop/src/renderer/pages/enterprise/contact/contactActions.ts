@@ -1,4 +1,5 @@
 import { openExternalUrl } from '@/renderer/utils/platform';
+import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { copyText } from '@/renderer/utils/ui/clipboard';
 
 /**
@@ -18,8 +19,18 @@ export const buildTelephoneUrl = (phone: string): string | null => {
   return `tel:${normalized}`;
 };
 
-/** Copies a phone number without granting it to any additional process. */
-export const copyEnterprisePhone = async (phone: string): Promise<void> => {
+export type EnterprisePhoneClipboardWriter = (phone: string) => Promise<void>;
+
+/** Uses the narrow main-process writer in packaged builds while retaining browser copy during development. */
+export const copyEnterprisePhone = async (
+  phone: string,
+  copyInMainProcess: EnterprisePhoneClipboardWriter | undefined = enterpriseClient.copyPhone
+): Promise<void> => {
+  if (typeof window !== 'undefined' && window.__isPackaged === true) {
+    if (!copyInMainProcess) throw new Error('ENTERPRISE_CLIPBOARD_UNAVAILABLE');
+    await copyInMainProcess(phone);
+    return;
+  }
   await copyText(phone);
 };
 

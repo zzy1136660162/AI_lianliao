@@ -38,6 +38,8 @@ export type EnterpriseUserContext = {
   companyLevel?: number;
   remainingDemandQuota?: number;
   roleId?: string;
+  /** Cloud-authoritative aggregate permission; absent values fail closed to customer mode. */
+  customerServiceStaff?: boolean;
 };
 
 /** User actions persisted through the existing H5 `addgzhLogs`/J_CONTENT_LOGS pipeline. */
@@ -87,6 +89,8 @@ export type EnterprisePage<T> = {
 
 export type EnterpriseCompanySummary = {
   companyId: string;
+  /** Business-defined priority; larger values appear first inside the same semantic tier. */
+  sort?: number;
   name: string;
   shortName?: string;
   logoUrl?: string;
@@ -120,6 +124,8 @@ export type EnterpriseCompanyDetail = EnterpriseCompanySummary & {
 
 export type EnterpriseProductSummary = {
   productId: string;
+  /** Business-defined priority; larger values appear first inside the same semantic tier. */
+  sort?: number;
   name: string;
   companyId: string;
   imageUrl?: string;
@@ -488,6 +494,7 @@ export type DemandListQuery = {
 export type EnterpriseRequest =
   | { operation: 'company.list'; payload: CompanyListQuery }
   | { operation: 'company.detail'; payload: { companyId: string } }
+  | { operation: 'company.batchGet'; payload: { companyIds: string[] } }
   | { operation: 'company.industries'; payload: Record<string, never> }
   | { operation: 'product.list'; payload: ProductListQuery }
   | { operation: 'product.detail'; payload: { productId: string } }
@@ -501,6 +508,18 @@ export type EnterpriseRequest =
         message: string;
         plan: CatalogAssistantPlan;
         candidates: CatalogAssistantCandidate[];
+      };
+    }
+  | {
+      operation: 'catalogAssistant.workflowPlan';
+      payload: { message: string; context?: CatalogAssistantContext };
+    }
+  | {
+      operation: 'catalogAssistant.workflowRank';
+      payload: {
+        message: string;
+        plan: CatalogWorkflowPlan;
+        candidates: CatalogWorkflowCandidate[];
       };
     }
   | {
@@ -596,11 +615,14 @@ export type EnterpriseRequest =
 export type EnterpriseResponse =
   | { operation: 'company.list'; data: EnterprisePage<EnterpriseCompanySummary> }
   | { operation: 'company.detail'; data: EnterpriseCompanyDetail }
+  | { operation: 'company.batchGet'; data: EnterpriseCompanyDetail[] }
   | { operation: 'company.industries'; data: EnterpriseIndustryOption[] }
   | { operation: 'product.list'; data: EnterprisePage<EnterpriseProductSummary> }
   | { operation: 'product.detail'; data: EnterpriseProductDetail }
   | { operation: 'catalogAssistant.plan'; data: CatalogAssistantPlan }
   | { operation: 'catalogAssistant.rank'; data: CatalogAssistantRankResult }
+  | { operation: 'catalogAssistant.workflowPlan'; data: CatalogWorkflowPlan }
+  | { operation: 'catalogAssistant.workflowRank'; data: CatalogWorkflowRankResult }
   | { operation: 'enterpriseAssistant.plan'; data: EnterpriseAssistantRoutePlan }
   | { operation: 'project.dashboard'; data: EnterpriseProjectDashboard }
   | { operation: 'project.drill'; data: EnterpriseProjectDrillItem[] }
@@ -643,5 +665,8 @@ import type {
   CatalogAssistantContext,
   CatalogAssistantPlan,
   CatalogAssistantRankResult,
+  CatalogWorkflowCandidate,
+  CatalogWorkflowPlan,
+  CatalogWorkflowRankResult,
   EnterpriseAssistantRoutePlan,
 } from './catalog-assistant/contracts';

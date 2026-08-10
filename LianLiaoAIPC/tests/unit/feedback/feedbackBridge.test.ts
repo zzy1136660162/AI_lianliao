@@ -29,6 +29,12 @@ type FakeWindow = {
 
 let currentWindow: FakeWindow | null = null;
 
+const diagnosticMocks = vi.hoisted(() => ({
+  loadOpenId: vi.fn<() => Promise<string | null>>(),
+  submit: vi.fn(),
+  trustedSender: vi.fn(),
+}));
+
 vi.mock('electron', () => ({
   ipcMain: {
     handle: (channel: string, fn: (event: unknown, ...args: unknown[]) => unknown) => {
@@ -45,9 +51,30 @@ vi.mock('electron', () => ({
   },
 }));
 
+vi.mock('@/process/bridge/enterpriseBridge', () => ({
+  isTrustedEnterpriseSender: diagnosticMocks.trustedSender,
+}));
+
+vi.mock('@process/services/desktopDiagnosticClient', () => ({
+  DesktopDiagnosticClient: class {
+    submit = diagnosticMocks.submit;
+  },
+}));
+
+vi.mock('@process/services/enterprise/enterpriseSessionStore', () => ({
+  EnterpriseSessionStore: class {
+    loadOpenId = diagnosticMocks.loadOpenId;
+  },
+}));
+
 beforeEach(async () => {
   handlers.clear();
   currentWindow = null;
+  diagnosticMocks.loadOpenId.mockReset();
+  diagnosticMocks.loadOpenId.mockResolvedValue(null);
+  diagnosticMocks.submit.mockReset();
+  diagnosticMocks.trustedSender.mockReset();
+  diagnosticMocks.trustedSender.mockReturnValue(true);
   vi.resetModules();
   // Importing registers the ipcMain.handle callbacks into our map.
   await import('@/process/bridge/feedbackBridge');
@@ -166,7 +193,7 @@ describe('feedback logs', () => {
   it('collects the same recent three log days used by user feedback reports', () => {
     const logsDir = mkdtempSync(path.join(tmpdir(), 'aionui-feedback-logs-'));
     try {
-      writeFileSync(path.join(logsDir, '2026-05-25.log'), 'today frontend\n');
+      writeFileSync(path.join(logsDir, '2026-05-25.log'), 'today frontend token=my-secret\n');
       writeFileSync(path.join(logsDir, '2026-05-25.aioncore.log'), 'today backend\n');
       writeFileSync(path.join(logsDir, '2026-05-24.aionrs.log'), 'yesterday rust\n');
       writeFileSync(path.join(logsDir, '2026-05-23.log'), 'third day frontend\n');
@@ -180,6 +207,8 @@ describe('feedback logs', () => {
       expect(attachment!.contentType).toBe('application/gzip');
       const content = gunzipSync(attachment!.data).toString('utf8');
       expect(content).toContain('today frontend');
+      expect(content).toContain('token=[REDACTED]');
+      expect(content).not.toContain('my-secret');
       expect(content).toContain('today backend');
       expect(content).toContain('yesterday rust');
       expect(content).toContain('third day frontend');
@@ -188,5 +217,44 @@ describe('feedback logs', () => {
     } finally {
       rmSync(logsDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('feedback cloud submission', () => {
+  it('registers and forwards a trusted report with main-process runtime metadata', async () => {
+    diagnosticMocks.submit.mockResolvedValue({
+      reportNo: 'LAD20260806001',
+      status: 'SUBMITTED',
+      attachmentCount: 0,
+      uploadedCount: 0,
+      failedCount: 0,
+    });
+    const request = {
+      reportType: 'STARTUP_FAILURE' as const,
+      module: 'installation-integrity',
+      description: 'startup failed',
+    };
+
+    const handler = handlers.get('feedback:submit-report')!;
+    const event = { sender: {} };
+    const result = await handler(event, request);
+
+    expect(diagnosticMocks.trustedSender).toHaveBeenCalledWith(event);
+    expect(diagnosticMocks.submit).toHaveBeenCalledWith(
+      request,
+      expect.objectContaining({ appVersion: '0.0.0', platform: process.platform, arch: process.arch }),
+      null
+    );
+    expect(result).toEqual(expect.objectContaining({ reportNo: 'LAD20260806001', status: 'SUBMITTED' }));
+  });
+
+  it('rejects an untrusted renderer before any network submission', async () => {
+    diagnosticMocks.trustedSender.mockReturnValue(false);
+    const handler = handlers.get('feedback:submit-report')!;
+
+    await expect(
+      handler({ sender: {} }, { reportType: 'USER_FEEDBACK', module: 'feedback', description: 'untrusted' })
+    ).rejects.toThrow('Untrusted feedback sender.');
+    expect(diagnosticMocks.submit).not.toHaveBeenCalled();
   });
 });

@@ -9,11 +9,12 @@ import { useCatalogAssistant } from './CatalogAssistantProvider';
 import { getCatalogTrustedResultId } from './adapters/catalogAdapterRegistry';
 import styles from './catalog-ai-assistant.module.css';
 
-const runningStages = new Set(['PLANNING', 'SEARCHING', 'RANKING']);
+const runningStages = new Set(['PLANNING', 'SEARCHING', 'LINKING', 'RANKING']);
 
 const progressPercent = (stage: string, page?: number): number => {
   if (stage === 'PLANNING') return 12;
   if (stage === 'SEARCHING') return Math.min(72, 20 + (page ?? 1) * 10);
+  if (stage === 'LINKING') return 78;
   if (stage === 'RANKING') return 86;
   if (stage === 'COMPLETED') return 100;
   return 0;
@@ -39,6 +40,7 @@ export const CatalogAiAssistant: React.FC = () => {
       t('enterprise.catalogAssistant.examples.company'),
       t('enterprise.catalogAssistant.examples.product'),
       t('enterprise.catalogAssistant.examples.project'),
+      t('enterprise.catalogAssistant.examples.demand'),
       t('enterprise.catalogAssistant.examples.service'),
     ],
     [t]

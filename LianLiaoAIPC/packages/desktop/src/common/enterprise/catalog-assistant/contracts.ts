@@ -1,6 +1,11 @@
-import type { EnterpriseCompanyDetail, EnterpriseProductSummary, EnterpriseProjectSummary } from '../contracts';
+import type {
+  EnterpriseCompanyDetail,
+  EnterpriseDemandSummary,
+  EnterpriseProductSummary,
+  EnterpriseProjectSummary,
+} from '../contracts';
 
-export const CATALOG_ENTITY_TYPES = ['COMPANY', 'PRODUCT', 'PROJECT'] as const;
+export const CATALOG_ENTITY_TYPES = ['COMPANY', 'PRODUCT', 'PROJECT', 'DEMAND'] as const;
 export type CatalogEntityType = (typeof CATALOG_ENTITY_TYPES)[number];
 
 export const CATALOG_CONVERSATION_MODES = [
@@ -29,6 +34,8 @@ export type CatalogAssistantFilters = {
   publishedTo?: string;
   minInvestment?: string;
   maxInvestment?: string;
+  demandType?: string;
+  demandStatus?: 'OPEN' | 'CLOSED' | 'EXPIRED';
 };
 
 /** Public, contact-free facts retained for references such as “其中” or “这里面”. */
@@ -77,6 +84,71 @@ export type CatalogAssistantPlan = {
   summary: string;
 };
 
+export const CATALOG_WORKFLOW_TOOLS = [
+  'COMPANY_SEARCH',
+  'PRODUCT_SEARCH',
+  'PROJECT_SEARCH',
+  'COMPANY_BATCH_GET',
+  'DEMAND_SEARCH',
+] as const;
+export type CatalogWorkflowTool = (typeof CATALOG_WORKFLOW_TOOLS)[number];
+
+export const CATALOG_MATCH_LEVELS = ['EXACT', 'STRONG', 'RELATED', 'WEAK'] as const;
+export type CatalogMatchLevel = (typeof CATALOG_MATCH_LEVELS)[number];
+
+/**
+ * One server-planned operation. The renderer executes only registered tools;
+ * the only cross-resource binding allowed in v1 is product.companyId -> companyIds.
+ */
+export type CatalogWorkflowStep = {
+  stepId: string;
+  tool: CatalogWorkflowTool;
+  dependsOn: string[];
+  filters?: CatalogAssistantFilters;
+  binding?: {
+    fromStepId: string;
+    sourceField: 'companyId';
+    targetField: 'companyIds';
+  };
+};
+
+export type CatalogWorkflowPlan = {
+  version: 1;
+  mode: CatalogConversationMode;
+  targetEntityType?: CatalogEntityType;
+  baseScopeId?: string;
+  steps: CatalogWorkflowStep[];
+  resultLimit: number;
+  clarification?: string;
+  summary: string;
+};
+
+/** Public facts sent to the model. Contact fields are deliberately impossible here. */
+export type CatalogWorkflowCandidate = CatalogAssistantCandidate & {
+  entityType: CatalogEntityType;
+  companyId?: string;
+  sort: number;
+  evidenceProductIds?: string[];
+};
+
+export type CatalogWorkflowRankResult = {
+  summary: string;
+  items: Array<{
+    id: string;
+    matchLevel: CatalogMatchLevel;
+    reason: string;
+  }>;
+};
+
+export type CatalogProductEvidence = {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  industry?: string;
+  sort: number;
+  reason: string;
+};
+
 export const ENTERPRISE_ASSISTANT_INTENTS = ['CATALOG_SEARCH', 'DEMAND_PUBLISH', 'CLARIFY'] as const;
 export type EnterpriseAssistantIntent = (typeof ENTERPRISE_ASSISTANT_INTENTS)[number];
 
@@ -117,6 +189,7 @@ export type CatalogAssistantStage =
   | 'PLANNING'
   | 'CLARIFYING'
   | 'SEARCHING'
+  | 'LINKING'
   | 'RANKING'
   | 'COMPLETED'
   | 'FAILED'
@@ -135,6 +208,7 @@ export type CatalogAssistantTrustedResult =
       entityType: 'COMPANY';
       reason: string;
       item: EnterpriseCompanyDetail;
+      evidenceProducts?: CatalogProductEvidence[];
     }
   | {
       entityType: 'PRODUCT';
@@ -145,6 +219,11 @@ export type CatalogAssistantTrustedResult =
       entityType: 'PROJECT';
       reason: string;
       item: EnterpriseProjectSummary;
+    }
+  | {
+      entityType: 'DEMAND';
+      reason: string;
+      item: EnterpriseDemandSummary;
     };
 
 export type CatalogAssistantRunResult = {

@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { types as nodeTypes } from 'node:util';
 
-import { app, BrowserWindow, ipcMain as electronIpcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain as electronIpcMain, shell } from 'electron';
 import type { IpcMainInvokeEvent } from 'electron';
 import { z } from 'zod';
 
@@ -747,6 +747,14 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
     };
   };
 
+  const copyPhoneSchema = z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .refine((value) => /^\+?[\d\s()-]+$/u.test(value))
+    .refine((value) => /^\+?\d{5,20}$/u.test(value.replace(/[\s()-]/gu, '')));
+
   const handlers: ReadonlyArray<readonly [string, EnterpriseIpcHandler]> = [
     [
       ENTERPRISE_IPC_CHANNELS.AUTH_CREATE,
@@ -801,6 +809,14 @@ export function initEnterpriseBridge(dependencies: EnterpriseBridgeDependencies 
       wrapHandler('SESSION_CLEAR_FAILED', async () => {
         await clearSessionState();
         assertCurrentLifecycle();
+      }),
+    ],
+    [
+      ENTERPRISE_IPC_CHANNELS.CONTACT_COPY_PHONE,
+      wrapHandler('REQUEST_FAILED', async (_event, phone) => {
+        const parsedPhone = copyPhoneSchema.safeParse(phone);
+        if (!parsedPhone.success) throw bridgeError('INVALID_REQUEST');
+        clipboard.writeText(parsedPhone.data);
       }),
     ],
     [

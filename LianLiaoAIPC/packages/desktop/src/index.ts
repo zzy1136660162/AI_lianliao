@@ -849,25 +849,6 @@ const handleAppReady = async (): Promise<void> => {
     appReadyDone = true;
     mark('createWindow');
 
-    // Initialize desktop pet (delayed to not block main window)
-    setTimeout(() => {
-      void (async () => {
-        try {
-          const petEnabled = await ProcessConfig.get('pet.enabled');
-          if (petEnabled === true) {
-            // Read pet sub-settings before creating the pet so flags are honored
-            // on the first createPetWindow() call (which is sync).
-            const confirmEnabled = (await ProcessConfig.get('pet.confirmEnabled')) ?? true;
-            const { createPetWindow, setPetConfirmEnabled } = await import('./process/pet/petManager');
-            setPetConfirmEnabled(confirmEnabled);
-            createPetWindow();
-          }
-        } catch (error) {
-          console.error('[Pet] Failed to initialize:', error);
-        }
-      })();
-    }, 3000);
-
     // 读取语言设置并初始化主进程 i18n，然后刷新托盘菜单
     // Read language setting and initialize main process i18n, then refresh tray menu
     try {
@@ -998,10 +979,6 @@ installQuitCleanup({
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).
   stopBackend: () => backendManager.stop(),
-  destroyPetWindow: async () => {
-    const { destroyPetWindow } = await import('./process/pet/petManager');
-    destroyPetWindow();
-  },
   logInfo: console.log,
   logWarn: console.warn,
   logError: console.error,

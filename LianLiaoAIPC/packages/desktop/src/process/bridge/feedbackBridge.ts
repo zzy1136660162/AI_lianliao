@@ -11,7 +11,13 @@
 
 import { ipcMain, app, BrowserWindow } from 'electron';
 import * as path from 'path';
+import packageJson from '../../../../../package.json';
+import type { DesktopDiagnosticSubmitRequest } from '@/common/types/desktopDiagnostic';
 import { collectFeedbackLogAttachment } from '../feedback/logs';
+import { EnterpriseApiClient } from '@process/services/enterprise/enterpriseApiClient';
+import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
+import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
+import { DesktopDiagnosticClient } from '@process/services/desktopDiagnosticClient';
 
 type RendererFeedbackLogPayload = {
   details?: unknown;
@@ -94,5 +100,57 @@ ipcMain.handle('feedback:capture-screenshot', async (event) => {
   } catch (error) {
     console.error('[feedbackBridge] Failed to capture screenshot:', error);
     return null;
+  }
+});
+
+const diagnosticClient = new DesktopDiagnosticClient(
+  resolveEnterpriseApiClientOptions(app.isPackaged).baseUrl ?? 'https://cloud.lslnii.com/'
+);
+
+const loadDiagnosticIdentity = async () => {
+  try {
+    const openId = await new EnterpriseSessionStore(app.getPath('userData')).loadOpenId();
+    if (!openId) return null;
+    return await new EnterpriseApiClient(resolveEnterpriseApiClientOptions(app.isPackaged)).getUserContext(openId);
+  } catch {
+    // Startup diagnostics remain available before login and during enterprise API failures.
+    return null;
+  }
+};
+
+ipcMain.handle('feedback:submit-report', async (event, request: DesktopDiagnosticSubmitRequest) => {
+  // Keep the large enterprise bridge out of the startup/screenshot path. It is
+  // loaded only when a report is submitted, while still reusing the canonical
+  // renderer trust check instead of maintaining a second security boundary.
+  const { isTrustedEnterpriseSender } = await import('./enterpriseBridge');
+  if (!isTrustedEnterpriseSender(event)) {
+    throw new Error('Untrusted feedback sender.');
+  }
+  const identity = await loadDiagnosticIdentity();
+  const startedAt = Date.now();
+  try {
+    const result = await diagnosticClient.submit(
+      request,
+      {
+        appVersion: app.getVersion(),
+        coreVersion: packageJson.aioncoreVersion,
+        platform: process.platform,
+        arch: process.arch,
+      },
+      identity
+    );
+    console.info('[feedbackBridge] Diagnostic report submitted', {
+      reportNo: result.reportNo,
+      status: result.status,
+      attachmentCount: result.attachmentCount,
+      durationMs: Date.now() - startedAt,
+    });
+    return result;
+  } catch (error) {
+    console.error('[feedbackBridge] Diagnostic report submission failed', {
+      code: error instanceof Error && 'code' in error ? String(error.code) : 'UNKNOWN',
+      durationMs: Date.now() - startedAt,
+    });
+    throw error;
   }
 });

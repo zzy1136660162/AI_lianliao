@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type {
   EnterpriseCompanySummary,
+  EnterpriseDemandSummary,
   EnterpriseProductSummary,
   EnterpriseProjectSummary,
   EnterpriseRequest,
@@ -47,6 +48,20 @@ const project = (id: string): EnterpriseProjectSummary => ({
   publishedAt: '2026-07-28',
 });
 
+const demand = (id: string): EnterpriseDemandSummary => ({
+  demandId: id,
+  typeId: 12,
+  typeName: '机加外包',
+  title: `机械加工需求 ${id}`,
+  city: '沈阳市',
+  district: '沈北新区',
+  budget: '面议',
+  summary: '采购一批精密机械加工件',
+  publishedAt: '2026-08-08',
+  status: 0,
+  primaryTags: ['机械加工', '采购'],
+});
+
 const createClient = (request: (input: EnterpriseRequest) => Promise<EnterpriseResponse>): EnterpriseClient =>
   ({
     createLoginSession: vi.fn(),
@@ -60,13 +75,350 @@ const createClient = (request: (input: EnterpriseRequest) => Promise<EnterpriseR
 const run = (client: EnterpriseClient, signal = new AbortController().signal) =>
   runCatalogAssistant(client, {
     requestId: 'request-1',
-    message: '找沈阳做精密机械加工的企业',
+    message: '查询沈阳精密机械企业',
     signal,
     isCurrent: (requestId) => requestId === 'request-1',
     onProgress: vi.fn(),
   });
 
 describe('catalog assistant orchestrator', () => {
+  it('links product results to trusted company cards and applies sort inside the same match tier', async () => {
+    const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
+      if (input.operation === 'catalogAssistant.workflowPlan') {
+        return {
+          operation: input.operation,
+          data: {
+            version: 1,
+            mode: 'NEW_SEARCH',
+            targetEntityType: 'COMPANY',
+            steps: [
+              {
+                stepId: 'products',
+                tool: 'PRODUCT_SEARCH',
+                dependsOn: [],
+                filters: { keyword: '航空箱', province: '辽宁省', city: '沈阳市' },
+              },
+              {
+                stepId: 'companies',
+                tool: 'COMPANY_BATCH_GET',
+                dependsOn: ['products'],
+                binding: { fromStepId: 'products', sourceField: 'companyId', targetField: 'companyIds' },
+              },
+            ],
+            resultLimit: 6,
+            summary: '检索航空箱产品并关联所属企业',
+          },
+        };
+      }
+      if (input.operation === 'product.list') {
+        return {
+          operation: input.operation,
+          data: {
+            list: [
+              { ...product('-101'), companyId: '-8', name: '航空运输箱', sort: 80 },
+              { ...product('-102'), companyId: '-9', name: '铝合金航空箱', sort: 95 },
+            ],
+            pageNum: 1,
+            pageSize: 20,
+            pages: 1,
+            total: 2,
+          },
+        };
+      }
+      if (input.operation === 'company.batchGet') {
+        expect(input.payload.companyIds).toEqual(['-8', '-9']);
+        return {
+          operation: input.operation,
+          data: [
+            { ...company('-8'), sort: 100, logoUrl: 'https://www.lslnii.com/company-8.png' },
+            { ...company('-9'), sort: 20 },
+          ],
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowRank') {
+        return {
+          operation: input.operation,
+          data: {
+            summary: '找到两家提供航空箱的企业',
+            items: [
+              { id: '-9', matchLevel: 'EXACT', reason: '重点产品包含航空箱' },
+              { id: '-8', matchLevel: 'EXACT', reason: '重点产品包含航空运输箱' },
+            ],
+          },
+        };
+      }
+      throw new Error(`unexpected operation ${input.operation}`);
+    });
+
+    const result = await runCatalogAssistant(createClient(request), {
+      requestId: 'product-company-workflow',
+      message: '沈阳做航空箱的企业有哪些',
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      onProgress: vi.fn(),
+    });
+
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual([
+      'catalogAssistant.workflowPlan',
+      'product.list',
+      'company.batchGet',
+      'catalogAssistant.workflowRank',
+    ]);
+    expect(result.results.map((entry) => entry.item.companyId)).toEqual(['-8', '-9']);
+    expect(result.results[0]).toMatchObject({
+      entityType: 'COMPANY',
+      evidenceProducts: [{ id: '-101', name: '航空运输箱', sort: 80 }],
+    });
+  });
+
+  it('queries approved demand listings through the allowlisted workflow and resolves the public type id', async () => {
+    const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
+      if (input.operation === 'enterpriseAssistant.plan') {
+        return {
+          operation: input.operation,
+          data: {
+            intent: 'CATALOG_SEARCH',
+            confidence: 0.98,
+            requiresConfirmation: false,
+            reason: '用户希望查询公开供需信息',
+            initialMessage: input.payload.message,
+          },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowPlan') {
+        return {
+          operation: input.operation,
+          data: {
+            version: 1,
+            mode: 'NEW_SEARCH',
+            targetEntityType: 'DEMAND',
+            steps: [
+              {
+                stepId: 'demands',
+                tool: 'DEMAND_SEARCH',
+                dependsOn: [],
+                filters: {
+                  keyword: '机械加工',
+                  city: '沈阳市',
+                  demandType: '机加外包',
+                  demandStatus: 'OPEN',
+                },
+              },
+            ],
+            resultLimit: 6,
+            summary: '查询沈阳机械加工需求',
+          },
+        };
+      }
+      if (input.operation === 'demand.types') {
+        return {
+          operation: input.operation,
+          data: [
+            { typeId: 11, typeName: '闲置资源' },
+            { typeId: 12, typeName: '机加外包' },
+          ],
+        };
+      }
+      if (input.operation === 'demand.list') {
+        expect(input.payload).toMatchObject({
+          keyword: '机械加工',
+          typeId: 12,
+          city: '沈阳市',
+          status: 0,
+          pageNum: 1,
+          pageSize: 20,
+        });
+        return {
+          operation: input.operation,
+          data: { list: [demand('-301')], pageNum: 1, pageSize: 20, pages: 1, total: 1 },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowRank') {
+        expect(input.payload.candidates).toEqual([
+          expect.objectContaining({
+            id: '-301',
+            entityType: 'DEMAND',
+            industry: '机加外包',
+            nature: 'OPEN',
+          }),
+        ]);
+        expect(input.payload.candidates[0]).not.toHaveProperty('grabCount');
+        expect(input.payload.candidates[0]).not.toHaveProperty('remainingGrabCount');
+        expect(input.payload.candidates[0]).not.toHaveProperty('contactName');
+        expect(input.payload.candidates[0]).not.toHaveProperty('phone');
+        return {
+          operation: input.operation,
+          data: {
+            summary: '找到一条公开机械加工需求',
+            items: [{ id: '-301', matchLevel: 'EXACT', reason: '类型、地区和状态匹配' }],
+          },
+        };
+      }
+      throw new Error(`unexpected operation ${input.operation}`);
+    });
+
+    const result = await runCatalogAssistant(createClient(request), {
+      requestId: 'demand-workflow',
+      message: '查找沈阳进行中的机械加工需求',
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      onProgress: vi.fn(),
+    });
+
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual([
+      'enterpriseAssistant.plan',
+      'catalogAssistant.workflowPlan',
+      'demand.types',
+      'demand.list',
+      'catalogAssistant.workflowRank',
+    ]);
+    expect(result).toMatchObject({
+      fallback: false,
+      results: [
+        {
+          entityType: 'DEMAND',
+          reason: '类型、地区和状态匹配',
+          item: { demandId: '-301', typeId: 12, status: 0 },
+        },
+      ],
+    });
+  });
+
+  it('does not guess an ambiguous demand type id', async () => {
+    const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
+      if (input.operation === 'enterpriseAssistant.plan') {
+        return {
+          operation: input.operation,
+          data: {
+            intent: 'CATALOG_SEARCH',
+            confidence: 0.98,
+            requiresConfirmation: false,
+            reason: '查询供需',
+            initialMessage: input.payload.message,
+          },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowPlan') {
+        return {
+          operation: input.operation,
+          data: {
+            version: 1,
+            mode: 'NEW_SEARCH',
+            targetEntityType: 'DEMAND',
+            steps: [
+              {
+                stepId: 'demands',
+                tool: 'DEMAND_SEARCH',
+                dependsOn: [],
+                filters: { keyword: '加工', demandType: '加工' },
+              },
+            ],
+            resultLimit: 6,
+            summary: '查询加工需求',
+          },
+        };
+      }
+      if (input.operation === 'demand.types') {
+        return {
+          operation: input.operation,
+          data: [
+            { typeId: 12, typeName: '机械加工' },
+            { typeId: 13, typeName: '来料加工' },
+          ],
+        };
+      }
+      if (input.operation === 'demand.list') {
+        expect(input.payload.typeId).toBeUndefined();
+        return {
+          operation: input.operation,
+          data: { list: [demand('-302')], pageNum: 1, pageSize: 20, pages: 1, total: 1 },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowRank') {
+        return {
+          operation: input.operation,
+          data: {
+            summary: '找到加工需求',
+            items: [{ id: '-302', matchLevel: 'RELATED', reason: '关键词匹配' }],
+          },
+        };
+      }
+      throw new Error(`unexpected operation ${input.operation}`);
+    });
+
+    const result = await runCatalogAssistant(createClient(request), {
+      requestId: 'ambiguous-demand-type',
+      message: '查找加工需求',
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      onProgress: vi.fn(),
+    });
+
+    expect(result.results[0]).toMatchObject({ entityType: 'DEMAND', item: { demandId: '-302' } });
+  });
+
+  it('keeps public demand search usable when type lookup and model ranking are unavailable', async () => {
+    const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
+      if (input.operation === 'enterpriseAssistant.plan') {
+        return {
+          operation: input.operation,
+          data: {
+            intent: 'CATALOG_SEARCH',
+            confidence: 0.98,
+            requiresConfirmation: false,
+            reason: '查询供需',
+            initialMessage: input.payload.message,
+          },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowPlan') {
+        return {
+          operation: input.operation,
+          data: {
+            version: 1,
+            mode: 'NEW_SEARCH',
+            targetEntityType: 'DEMAND',
+            steps: [
+              {
+                stepId: 'demands',
+                tool: 'DEMAND_SEARCH',
+                dependsOn: [],
+                filters: { keyword: '机械加工', demandType: '机加外包' },
+              },
+            ],
+            resultLimit: 6,
+            summary: '查询机械加工需求',
+          },
+        };
+      }
+      if (input.operation === 'demand.types') throw new Error('type service unavailable');
+      if (input.operation === 'demand.list') {
+        expect(input.payload.typeId).toBeUndefined();
+        return {
+          operation: input.operation,
+          data: { list: [demand('-303')], pageNum: 1, pageSize: 20, pages: 1, total: 1 },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowRank') throw new Error('ranking unavailable');
+      throw new Error(`unexpected operation ${input.operation}`);
+    });
+
+    const result = await runCatalogAssistant(createClient(request), {
+      requestId: 'demand-service-fallback',
+      message: '查找机械加工需求',
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      onProgress: vi.fn(),
+    });
+
+    expect(result.fallback).toBe(true);
+    expect(result.results[0]).toMatchObject({
+      entityType: 'DEMAND',
+      reason: 'enterprise.catalogAssistant.fallbackReason',
+      item: { demandId: '-303' },
+    });
+  });
+
   it('converts an explicit recent Shenyang project request into a deterministic fallback plan', () => {
     const plan = buildDeterministicCatalogPlan(
       '找沈阳近期采购机电设备的在建项目',

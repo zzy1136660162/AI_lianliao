@@ -8,13 +8,18 @@ import type {
 } from '@/common/enterprise/catalog-assistant/contracts';
 import type {
   EnterpriseCompanySummary,
+  EnterpriseDemandSummary,
   EnterprisePage,
   EnterpriseProductSummary,
   EnterpriseProjectSummary,
 } from '@/common/enterprise/contracts';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
-export type CatalogBusinessItem = EnterpriseCompanySummary | EnterpriseProductSummary | EnterpriseProjectSummary;
+export type CatalogBusinessItem =
+  | EnterpriseCompanySummary
+  | EnterpriseDemandSummary
+  | EnterpriseProductSummary
+  | EnterpriseProjectSummary;
 
 export type CatalogAdapterRuntime = {
   client: EnterpriseClient;

@@ -1,10 +1,10 @@
-import { Copy, PhoneTelephone } from '@icon-park/react';
+import { Copy } from '@icon-park/react';
 import { Alert, Button, Space } from 'antd';
 import React, { useState } from 'react';
 
 import { ENTERPRISE_CERTIFICATION_URL, ENTERPRISE_REGISTRATION_URL } from '@/common/enterprise/constants';
 import type { EnterpriseContactResourceType } from '@/common/enterprise/contact-access/contracts';
-import { maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
+import { maskEnterpriseContactName, maskEnterprisePhone } from '@/common/enterprise/phonePrivacy';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import {
   getCurrentEnterprisePagePath,
@@ -12,7 +12,7 @@ import {
 } from '@/renderer/services/enterprise/enterpriseBehaviorLog';
 import { openExternalUrl } from '@/renderer/utils/platform';
 
-import { copyEnterprisePhone, dialEnterprisePhone } from './contactActions';
+import { copyEnterprisePhone } from './contactActions';
 import MembershipUpgradeModal from './MembershipUpgradeModal';
 import styles from './contact-access.module.css';
 
@@ -23,6 +23,8 @@ export type EnterpriseContactAccessPanelProps = {
   resourceTitle?: string;
   toCompanyId?: string;
   toCompanyName?: string;
+  contactName?: string;
+  contactNameLabel?: string;
   maskedPhone?: string;
 };
 
@@ -40,6 +42,8 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
   resourceTitle,
   toCompanyId,
   toCompanyName,
+  contactName,
+  contactNameLabel = '联系人',
   maskedPhone,
 }) => {
   const [phone, setPhone] = useState<string>();
@@ -52,6 +56,7 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
       ? maskedPhone
       : maskEnterprisePhone(maskedPhone)
     : undefined;
+  const protectedContactName = maskEnterpriseContactName(contactName);
 
   const acquire = async () => {
     setLoading(true);
@@ -134,44 +139,14 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
     }
   };
 
-  const dialPhone = async () => {
-    if (!phone) return;
-    try {
-      const opened = await dialEnterprisePhone(phone);
-      void recordEnterpriseBehavior(
-        {
-          eventType: 'PHONE_DIAL',
-          moduleName: `链辽AI桌面端-${resourceType === 'COMPANY' ? '企业码' : resourceType === 'PRODUCT' ? '重点产品' : '在建项目'}`,
-          title: `拨打${resourceTitle || resourceId}联系电话`,
-          pagePath: getCurrentEnterprisePagePath(),
-          targetId: resourceId,
-          ...(toCompanyId ? { toCompanyId } : {}),
-          ...(toCompanyName ? { toCompanyName } : {}),
-          params: { resourceType, opened },
-        },
-        client
-      );
-      setNoticeType(opened ? 'success' : 'warning');
-      setNotice(opened ? '已调用系统拨号应用。' : '该号码格式不支持直接拨打，请先复制号码。');
-    } catch {
-      void recordEnterpriseBehavior(
-        {
-          eventType: 'PHONE_DIAL',
-          moduleName: `链辽AI桌面端-${resourceType === 'COMPANY' ? '企业码' : resourceType === 'PRODUCT' ? '重点产品' : '在建项目'}`,
-          title: `拨打${resourceTitle || resourceId}联系电话`,
-          pagePath: getCurrentEnterprisePagePath(),
-          targetId: resourceId,
-          params: { resourceType, opened: false },
-        },
-        client
-      );
-      setNoticeType('error');
-      setNotice('系统拨号应用暂时无法打开，请先复制号码。');
-    }
-  };
-
   return (
     <div className={styles.panel}>
+      {contactName ? (
+        <div className={styles.phoneRow}>
+          <span className={styles.phoneLabel}>{contactNameLabel}</span>
+          <strong>{phone ? contactName : protectedContactName}</strong>
+        </div>
+      ) : null}
       <div className={styles.phoneRow}>
         <span className={styles.phoneLabel}>联系电话</span>
         <strong>{phone || protectedPhone || '验证会员权限后可查看'}</strong>
@@ -185,9 +160,6 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
           <>
             <Button icon={<Copy />} onClick={() => void copyPhone()}>
               复制电话
-            </Button>
-            <Button type='primary' icon={<PhoneTelephone />} onClick={() => void dialPhone()}>
-              拨打电话
             </Button>
           </>
         )}

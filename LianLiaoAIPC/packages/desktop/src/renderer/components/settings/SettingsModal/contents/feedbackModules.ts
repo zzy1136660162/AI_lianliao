@@ -6,7 +6,7 @@
 
 /**
  * Feedback module options for the bug report form.
- * Each entry maps a user-visible i18n key to a Sentry tag value.
+ * Each entry maps a user-visible i18n key to a stable cloud diagnostic module code.
  */
 
 export type FeedbackModule = {

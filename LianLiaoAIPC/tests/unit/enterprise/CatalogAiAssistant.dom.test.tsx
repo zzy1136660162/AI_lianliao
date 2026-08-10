@@ -209,6 +209,91 @@ describe('CatalogAiAssistant', () => {
     expect(screen.getByLabelText('location')).toHaveTextContent('/enterprise/projects/-901');
   });
 
+  it('renders a trusted demand card and opens the existing supply-demand detail route', async () => {
+    const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
+      if (input.operation === 'enterpriseAssistant.plan') {
+        return {
+          operation: input.operation,
+          data: {
+            intent: 'CATALOG_SEARCH',
+            confidence: 0.98,
+            requiresConfirmation: false,
+            reason: '查询公开供需信息',
+            initialMessage: input.payload.message,
+          },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowPlan') {
+        return {
+          operation: input.operation,
+          data: {
+            version: 1,
+            mode: 'NEW_SEARCH',
+            targetEntityType: 'DEMAND',
+            steps: [
+              {
+                stepId: 'demands',
+                tool: 'DEMAND_SEARCH',
+                dependsOn: [],
+                filters: { keyword: '机械加工', demandStatus: 'OPEN' },
+              },
+            ],
+            resultLimit: 6,
+            summary: '查询机械加工需求',
+          },
+        };
+      }
+      if (input.operation === 'demand.list') {
+        return {
+          operation: input.operation,
+          data: {
+            list: [
+              {
+                demandId: '-301',
+                typeId: 12,
+                typeName: '机加外包',
+                title: '沈阳精密机械加工需求',
+                city: '沈阳市',
+                district: '沈北新区',
+                budget: '面议',
+                summary: '采购一批精密机械加工件',
+                status: 0,
+                primaryTags: ['机械加工'],
+              },
+            ],
+            pageNum: 1,
+            pageSize: 20,
+            pages: 1,
+            total: 1,
+          },
+        };
+      }
+      if (input.operation === 'catalogAssistant.workflowRank') {
+        return {
+          operation: input.operation,
+          data: {
+            summary: '已找到匹配需求',
+            items: [{ id: '-301', matchLevel: 'EXACT', reason: '需求内容匹配' }],
+          },
+        };
+      }
+      throw new Error(`unexpected operation ${input.operation}`);
+    });
+    const user = userEvent.setup();
+    renderAssistant(createClient(request));
+
+    const input = screen.getByPlaceholderText('enterprise.catalogAssistant.placeholder');
+    await user.type(input, '查找沈阳机械加工需求{Enter}');
+
+    expect(await screen.findByText('沈阳精密机械加工需求')).toBeVisible();
+    expect(screen.getByText('采购一批精密机械加工件')).toBeVisible();
+    expect(screen.queryByText(/机加外包.*沈阳市.*面议/u)).not.toBeInTheDocument();
+    expect(screen.queryByText(/enterprise\.supplyDemand\.status\.open/u)).not.toBeInTheDocument();
+    expect(screen.queryByText(/联系人|联系电话|13800000000/u)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'enterprise.catalogAssistant.viewDemand' }));
+    expect(screen.getByLabelText('location')).toHaveTextContent('/enterprise/supply-demand/12/-301');
+  });
+
   it('submits with Enter, shows clarification without catalog paging, and clears the session', async () => {
     const request = vi.fn(
       async (): Promise<EnterpriseResponse> => ({

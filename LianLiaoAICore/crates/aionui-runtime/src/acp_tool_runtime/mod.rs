@@ -1,3 +1,4 @@
+mod package_lock;
 mod types;
 
 #[cfg(test)]
@@ -389,6 +390,9 @@ fn validate_tool_root(
 
     let spec = platform_spec()?;
     validate_platform_binary(tool, root, spec)?;
+    if tool == ManagedAcpToolId::CodexAcp {
+        package_lock::validate_codex_artifact(root, spec.manifest_key)?;
+    }
 
     let env_path_entries = manifest
         .path_entries
@@ -493,27 +497,56 @@ async fn prepare_local_tool_source_to_root(
     fs::create_dir_all(&npm_cache_dir).map_err(ManagedAcpToolError::io)?;
 
     write_dev_package_json(&project_dir)?;
-    run_npm_prepare_step(
-        node_runtime,
-        &project_dir,
-        &npm_cache_dir,
-        [
-            "install",
-            "--package-lock-only",
-            "--ignore-scripts",
-            "--include=optional",
-            "--fund=false",
-            "--audit=false",
-            "--save-exact",
-            "--os",
-            spec.npm_os,
-            "--cpu",
-            spec.npm_cpu,
-            &format!("{}@{}", tool.package_name(), tool.version()),
-        ],
-        "generate managed ACP local lockfile",
-    )
-    .await?;
+    let tool_install_spec = format!("{}@{}", tool.package_name(), tool.version());
+    if tool == ManagedAcpToolId::CodexAcp {
+        let [bridge_install_spec, codex_install_spec] = package_lock::codex_install_specs()?;
+        debug_assert_eq!(bridge_install_spec, tool_install_spec);
+        run_npm_prepare_step(
+            node_runtime,
+            &project_dir,
+            &npm_cache_dir,
+            [
+                "install",
+                "--package-lock-only",
+                "--ignore-scripts",
+                "--include=optional",
+                "--fund=false",
+                "--audit=false",
+                "--save-exact",
+                "--os",
+                spec.npm_os,
+                "--cpu",
+                spec.npm_cpu,
+                &bridge_install_spec,
+                &codex_install_spec,
+            ],
+            "generate managed ACP local lockfile",
+        )
+        .await?;
+        package_lock::validate_codex_package_lock(&project_dir, spec.manifest_key)?;
+    } else {
+        run_npm_prepare_step(
+            node_runtime,
+            &project_dir,
+            &npm_cache_dir,
+            [
+                "install",
+                "--package-lock-only",
+                "--ignore-scripts",
+                "--include=optional",
+                "--fund=false",
+                "--audit=false",
+                "--save-exact",
+                "--os",
+                spec.npm_os,
+                "--cpu",
+                spec.npm_cpu,
+                &tool_install_spec,
+            ],
+            "generate managed ACP local lockfile",
+        )
+        .await?;
+    }
     run_npm_prepare_step(
         node_runtime,
         &project_dir,
@@ -537,6 +570,9 @@ async fn prepare_local_tool_source_to_root(
     let manifest = build_local_artifact_manifest(tool, &project_dir)?;
     validate_bridge_entrypoint(&project_dir, &manifest)?;
     validate_platform_binary(tool, &project_dir, spec)?;
+    if tool == ManagedAcpToolId::CodexAcp {
+        package_lock::validate_codex_artifact(&project_dir, spec.manifest_key)?;
+    }
     validate_dependency_tree(node_runtime, &project_dir, &npm_cache_dir, tool).await?;
     validate_package_smoke(node_runtime, &project_dir, tool).await?;
 
@@ -682,31 +718,7 @@ fn platform_binary_relative_path(tool: ManagedAcpToolId, spec: PlatformSpec) -> 
 }
 
 fn codex_platform_binary_relative_path(spec: PlatformSpec) -> Result<PathBuf, ManagedAcpToolError> {
-    let vendor_triple = match spec.manifest_key {
-        "darwin-arm64" => "aarch64-apple-darwin",
-        "darwin-x64" => "x86_64-apple-darwin",
-        "linux-arm64" => "aarch64-unknown-linux-musl",
-        "linux-x64" => "x86_64-unknown-linux-musl",
-        "win32-arm64" => "aarch64-pc-windows-msvc",
-        "win32-x64" => "x86_64-pc-windows-msvc",
-        _ => {
-            return Err(ManagedAcpToolError::invalid(format!(
-                "unsupported Codex ACP platform {}",
-                spec.manifest_key
-            )));
-        }
-    };
-
-    let mut path = PathBuf::from("node_modules")
-        .join(format!("@openai/codex-{}", spec.manifest_key))
-        .join("vendor")
-        .join(vendor_triple)
-        .join("bin")
-        .join("codex");
-    if spec.manifest_key.starts_with("win32-") {
-        path.set_extension("exe");
-    }
-    Ok(path)
+    package_lock::codex_platform_executable(spec.manifest_key)
 }
 
 pub fn managed_acp_tool_contract_for_export(

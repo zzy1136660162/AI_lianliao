@@ -33,7 +33,7 @@ async function initActiveTheme(): Promise<Theme> {
     } catch {
       /* noop */
     }
-    // Seed the main-process relay so other surfaces (markdown shadow DOM, pet windows) can pull it.
+    // Seed the main-process relay so other renderer surfaces can pull it.
     void ipcBridge.theme.setActive.invoke(resolved).catch(() => {});
     return resolved;
   } catch (e) {

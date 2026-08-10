@@ -124,11 +124,7 @@
 
 .titleCell strong {
   font-size: 14px;
-}
-
-.titleCell span {
-  color: var(--text-secondary);
-  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
 .progressCell {
@@ -180,6 +176,12 @@ a.rowAction {
 .paginationBar > span {
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.paginationBar :global(.ll-ant-pagination) {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .quickView {
@@ -361,6 +363,15 @@ a.rowAction {
 
   .paginationBar,
   .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .tablePanel {
+    padding: 12px;
+  }
+
+  .rowActions {
     align-items: flex-start;
     flex-direction: column;
   }

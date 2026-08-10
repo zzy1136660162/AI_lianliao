@@ -27,6 +27,8 @@
 - 版本、Release tag、平台资产和 SHA256 由 `LianLiaoAIPC/aioncore-release-lock.json` 统一锁定。
 - SHA256 缺失或不匹配必须使构建失败，不得降级为警告。
 - 本地 Core 只能通过 `LIANLIAO_AICORE_LOCAL_BINARY` 显式启用；`LIANLIAO_RELEASE_BUILD=1` 时必须拒绝。
+- Codex ACP、Codex CLI 和平台 npm 包的精确版本与 SHA-512 固定在 `LianLiaoAICore/managed-acp-lock.json`；不得恢复为 `^0.144.0` 等浮动根依赖，版本或完整性不匹配必须使 Core 准备失败。
+- 本地 Core 更新可以复用已有托管资源，但必须先通过结构契约、Codex 依赖锁和完整资源树 SHA-256 校验，并在 staging 中再次校验后原子切换；正式 Release 不得复用本地托管资源。
 - 根目录 `.github/workflows/lianliao-aicore-release.yml` 是当前仓库有效的 Core 发布工作流。
 - GitHub Actions 必须统一放在仓库根目录 `.github/workflows`；不得在 `LianLiaoAICore` 或 `LianLiaoAIPC` 子目录维护看似可执行但实际无效的 workflow。
 

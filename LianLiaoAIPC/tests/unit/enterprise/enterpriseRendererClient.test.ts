@@ -54,6 +54,7 @@ const makeRawBridge = (): EnterpriseRawBridge => ({
   completeRegistration: vi.fn(async () => success(USER_CONTEXT)),
   restoreSession: vi.fn(async () => success(USER_CONTEXT)),
   clearSession: vi.fn(async () => success(undefined)),
+  copyPhone: vi.fn(async () => success(undefined)),
   request: vi.fn(async () => success(RESPONSE)),
 });
 
@@ -68,7 +69,7 @@ const getRendererError = async (operation: () => Promise<unknown>): Promise<Ente
 };
 
 describe('enterprise renderer client', () => {
-  it('unwraps structured-cloned success envelopes for all six typed methods', async () => {
+  it('unwraps structured-cloned success envelopes for all seven typed methods', async () => {
     const rawBridge = makeRawBridge();
     const client = createEnterpriseClient(() => rawBridge);
 
@@ -77,9 +78,11 @@ describe('enterprise renderer client', () => {
     await expect(client.completeRegistration(USER_CONTEXT.openId)).resolves.toEqual(USER_CONTEXT);
     await expect(client.restoreSession()).resolves.toEqual(USER_CONTEXT);
     await expect(client.clearSession()).resolves.toBeUndefined();
+    await expect(client.copyPhone?.('13800000000')).resolves.toBeUndefined();
     await expect(client.request(REQUEST)).resolves.toEqual(RESPONSE);
     expect(rawBridge.pollLoginSession).toHaveBeenCalledWith(LOGIN_SESSION.loginKey);
     expect(rawBridge.completeRegistration).toHaveBeenCalledWith(USER_CONTEXT.openId);
+    expect(rawBridge.copyPhone).toHaveBeenCalledWith('13800000000');
     expect(rawBridge.request).toHaveBeenCalledWith(REQUEST);
   });
 

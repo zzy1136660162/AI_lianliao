@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
+const { createManagedResourcesIntegrity } = require('../../../packages/shared-scripts/src/managed-aioncore-resources');
+
 const {
   cleanupGeneratedRuntimeDirectories,
   moveExistingDirectoryAside,
@@ -145,16 +147,23 @@ describe('prepareAioncore cleanup', () => {
     expect(manifest.binarySha256).toBe(sha256File(binaryPath));
   });
 
-  it('trusts local prepared resources without reading a Release manifest or SHA256', () => {
+  it('trusts local prepared resources only after binary and managed-resource integrity checks', () => {
     const root = mkdtempSync(join(tmpdir(), 'aionui-aioncore-trusted-local-'));
     temporaryRoots.push(root);
-    const targetDir = join(root, 'resources', 'bundled-aioncore', 'win32-x64');
-    writeFile(join(targetDir, 'aioncore.exe'), 'local-core');
-    mkdirSync(join(targetDir, 'managed-resources'), { recursive: true });
+    const { targetDir, binaryPath } = createPreparedCache(root);
+    const manifestPath = join(targetDir, 'manifest.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    writeJson(manifestPath, {
+      ...manifest,
+      sourceType: 'local-development',
+      binarySha256: sha256File(binaryPath),
+      managedResourcesIntegrity: createManagedResourcesIntegrity(targetDir),
+    });
 
     const result = tryTrustLocalPreparedAioncore({
       targetDir,
       platform: 'win32',
+      arch: 'x64',
       enabled: true,
       isReleaseBuild: false,
     });
@@ -171,6 +180,7 @@ describe('prepareAioncore cleanup', () => {
     const result = tryTrustLocalPreparedAioncore({
       targetDir,
       platform: 'win32',
+      arch: 'x64',
       enabled: true,
       isReleaseBuild: false,
     });

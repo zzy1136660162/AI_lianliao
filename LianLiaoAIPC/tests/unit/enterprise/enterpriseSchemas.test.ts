@@ -168,6 +168,7 @@ describe('enterprise schemas', () => {
       companyName: 'Demo Company',
       comLevel: 3,
       roleId: 40004,
+      customerServiceStaff: true,
     });
 
     expect(context).toEqual({
@@ -179,7 +180,20 @@ describe('enterprise schemas', () => {
       companyName: 'Demo Company',
       companyLevel: 3,
       roleId: '40004',
+      customerServiceStaff: true,
     });
+  });
+
+  it('fails closed when the Cloud customer-service aggregate permission is absent', () => {
+    const context = enterpriseUserContextSchema.parse({
+      registered: true,
+      openId: 'openid-1',
+      userId: '-60',
+      companyId: '-8',
+      roleId: '19',
+    });
+
+    expect(context.customerServiceStaff).toBeUndefined();
   });
 
   it('rejects an unsafe numeric value in an optional identifier field', () => {
@@ -1432,6 +1446,89 @@ describe('enterprise schemas', () => {
     });
   });
 
+  it('accepts demand catalog plans and restricts status to the public status allowlist', () => {
+    expect(
+      parseEnterpriseResponse('catalogAssistant.plan', {
+        entityType: 'DEMAND',
+        filters: {
+          keyword: '机械加工',
+          demandType: '机加外包',
+          demandStatus: 'OPEN',
+          city: '沈阳市',
+        },
+        resultLimit: 6,
+        summary: '查询公开供需信息',
+      })
+    ).toMatchObject({
+      operation: 'catalogAssistant.plan',
+      data: {
+        entityType: 'DEMAND',
+        filters: { demandType: '机加外包', demandStatus: 'OPEN' },
+      },
+    });
+
+    expect(
+      parseEnterpriseResponse('catalogAssistant.workflowPlan', {
+        version: 1,
+        mode: 'NEW_SEARCH',
+        targetEntityType: 'DEMAND',
+        steps: [
+          {
+            stepId: 'demands',
+            tool: 'DEMAND_SEARCH',
+            dependsOn: [],
+            filters: { demandStatus: 'CLOSED' },
+          },
+        ],
+        resultLimit: 6,
+        summary: '查询已结束供需信息',
+      })
+    ).toMatchObject({
+      operation: 'catalogAssistant.workflowPlan',
+      data: { targetEntityType: 'DEMAND', steps: [{ tool: 'DEMAND_SEARCH' }] },
+    });
+
+    expect(() =>
+      parseEnterpriseResponse('catalogAssistant.plan', {
+        entityType: 'DEMAND',
+        filters: { demandStatus: 'DRAFT' },
+        resultLimit: 6,
+        summary: '非法状态',
+      })
+    ).toThrow(/catalogAssistant\.plan/i);
+
+    expect(() =>
+      parseEnterpriseResponse('catalogAssistant.workflowPlan', {
+        version: 1,
+        mode: 'NEW_SEARCH',
+        targetEntityType: 'DEMAND',
+        steps: [{ stepId: 'projects', tool: 'PROJECT_SEARCH', dependsOn: [], filters: {} }],
+        resultLimit: 6,
+        summary: '目标与工具不匹配',
+      })
+    ).toThrow(/catalogAssistant\.workflowPlan/i);
+
+    expect(() =>
+      parseEnterpriseResponse('catalogAssistant.workflowPlan', {
+        version: 1,
+        mode: 'NEW_SEARCH',
+        targetEntityType: 'DEMAND',
+        steps: [
+          { stepId: 'products', tool: 'PRODUCT_SEARCH', dependsOn: [], filters: { keyword: '加工' } },
+          {
+            stepId: 'demands',
+            tool: 'DEMAND_SEARCH',
+            dependsOn: ['products'],
+            binding: { fromStepId: 'products', sourceField: 'companyId', targetField: 'companyIds' },
+            filters: { keyword: '加工' },
+          },
+        ],
+        resultLimit: 6,
+        summary: '供需工具不允许绑定',
+      })
+    ).toThrow(/catalogAssistant\.workflowPlan/i);
+  });
+
   it('rejects catalog assistant extra fields and more than one hundred candidates', () => {
     expect(
       enterpriseRequestSchema.safeParse({
@@ -1485,5 +1582,84 @@ describe('enterprise schemas', () => {
         items: [{ id: ' ', reason: '匹配' }],
       })
     ).toThrow(/catalogAssistant\.rank/i);
+  });
+
+  it('normalizes an explicit null binding from Cloud into an unbound search step', () => {
+    const response = parseEnterpriseResponse('catalogAssistant.workflowPlan', {
+      version: 1,
+      mode: 'NEW_SEARCH',
+      targetEntityType: 'COMPANY',
+      steps: [
+        {
+          stepId: 'products',
+          tool: 'PRODUCT_SEARCH',
+          dependsOn: [],
+          filters: { keyword: '航空箱', province: '辽宁省', city: '沈阳市' },
+          binding: null,
+        },
+        {
+          stepId: 'companies',
+          tool: 'COMPANY_BATCH_GET',
+          dependsOn: ['products'],
+          binding: { fromStepId: 'products', sourceField: 'companyId', targetField: 'companyIds' },
+        },
+      ],
+      resultLimit: 6,
+      summary: '检索航空箱产品并关联企业',
+    });
+
+    expect(response.operation).toBe('catalogAssistant.workflowPlan');
+    if (response.operation !== 'catalogAssistant.workflowPlan') throw new Error('unexpected operation');
+    expect(response.data.steps[0]).not.toHaveProperty('binding');
+    expect(response.data.steps[1]?.binding?.fromStepId).toBe('products');
+  });
+
+  it('accepts signed non-zero workflow ids and rejects unsafe workflow topology', () => {
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'company.batchGet',
+        payload: { companyIds: ['-8', '1807'] },
+      }).success
+    ).toBe(true);
+    expect(
+      enterpriseRequestSchema.safeParse({
+        operation: 'company.batchGet',
+        payload: { companyIds: ['0'] },
+      }).success
+    ).toBe(false);
+
+    expect(() =>
+      parseEnterpriseResponse('catalogAssistant.workflowPlan', {
+        version: 1,
+        mode: 'NEW_SEARCH',
+        targetEntityType: 'COMPANY',
+        steps: [
+          {
+            stepId: 'companies',
+            tool: 'COMPANY_BATCH_GET',
+            dependsOn: ['products'],
+            binding: { fromStepId: 'products', sourceField: 'companyId', targetField: 'companyIds' },
+          },
+        ],
+        resultLimit: 6,
+        summary: '非法未来依赖',
+      })
+    ).toThrow(/catalogAssistant\.workflowPlan/i);
+
+    expect(
+      parseEnterpriseResponse('catalogAssistant.workflowRank', {
+        summary: '已排序',
+        items: [{ id: '-8', matchLevel: 'EXACT', reason: '产品证据匹配' }],
+      })
+    ).toMatchObject({ operation: 'catalogAssistant.workflowRank' });
+
+    const batch = parseEnterpriseResponse('company.batchGet', [
+      { ID: -8, NAME: '沈阳示例企业', SORT: 20, PHONE: '13800000000' },
+    ]);
+    expect(batch).toMatchObject({
+      operation: 'company.batchGet',
+      data: [{ companyId: '-8', name: '沈阳示例企业', sort: 20 }],
+    });
+    if (batch.operation === 'company.batchGet') expect(batch.data[0]).not.toHaveProperty('phone');
   });
 });

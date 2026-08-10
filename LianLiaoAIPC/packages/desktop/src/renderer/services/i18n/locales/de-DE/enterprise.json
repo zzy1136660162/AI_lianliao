@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "Industriesuche",
-    "capability": "Unternehmen, Schwerpunktprodukte und Bauprojekte durchsuchen",
+    "capability": "Unternehmen, Schwerpunktprodukte, Bauprojekte sowie Angebots- und Nachfrageeinträge durchsuchen",
     "exampleHint": "Beschreiben Sie Ihr Ziel oder wählen Sie ein Beispiel:",
-    "placeholder": "Gesuchtes Unternehmen, Produkt oder Projekt beschreiben",
+    "placeholder": "Gesuchtes Unternehmen, Produkt, Projekt oder Angebots- und Nachfrageeintrag beschreiben",
     "submit": "Suchen",
     "stop": "Stoppen",
     "retry": "Erneut versuchen",
@@ -146,6 +146,7 @@
     "viewCompany": "Unternehmensprofil öffnen",
     "viewProduct": "Schwerpunktprodukt öffnen",
     "viewProject": "Projektdetails öffnen",
+    "viewDemand": "Eintragsdetails öffnen",
     "projectInvestment": "Investition {{value}} × 10.000 RMB",
     "notProvided": "Nicht angegeben",
     "currentRequest": "Aktuelle Anfrage",
@@ -154,7 +155,10 @@
     "completed": "Suche abgeschlossen",
     "searchingCompanyPage": "Unternehmen werden durchsucht, Seite {{page}}/{{maxPages}}",
     "searchingProductPage": "Produkte werden durchsucht, Seite {{page}}/{{maxPages}}",
+    "linkingCompanies": "Produkte werden Unternehmen zugeordnet",
+    "productEvidence": "Passende Produkte",
     "searchingProjectPage": "Bauprojekte werden durchsucht, Seite {{page}}/{{maxPages}}",
+    "searchingDemandPage": "Angebots- und Nachfrageeinträge werden durchsucht, Seite {{page}}/{{maxPages}}",
     "candidateCount": "{{count}} Kandidaten gesammelt",
     "ranking": "Beste Treffer werden ausgewählt",
     "clarificationTitle": "Bitte präzisieren",
@@ -177,6 +181,7 @@
       "company": "Präzisionsbearbeiter in Shenyang finden",
       "product": "Edelstahlprodukte im Bezirk Shenbei finden",
       "project": "Bauprojekte mit Bedarf an elektromechanischer Ausrüstung in Shenyang finden",
+      "demand": "Nachfrage nach mechanischer Bearbeitung in Shenyang finden",
       "service": "Anbieter für Verpackung und Druck finden"
     }
   },

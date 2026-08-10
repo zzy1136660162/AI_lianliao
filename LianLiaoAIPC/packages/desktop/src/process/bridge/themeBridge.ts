@@ -47,6 +47,6 @@ export function initThemeBridge(): void {
     listeners.forEach((l) => l(resolved));
   });
 
-  // A freshly-loaded window (e.g. pet) pulls the current theme on load.
+  // A freshly-loaded auxiliary window pulls the current theme on load.
   ipcBridge.theme.requestCurrent.provider(async () => cachedTheme);
 }

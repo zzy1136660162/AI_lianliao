@@ -35,6 +35,7 @@ const product = {
   address: 'No. 8 Industry Road',
   summary: '<strong>High pressure</strong>',
   imageUrl: 'https://cloud.lslnii.com/product/pump.png',
+  sort: 90,
   phone: '1380000****',
 };
 
@@ -84,6 +85,7 @@ describe('product list boundary', () => {
     ['invalid product identity', { list: [{ ...product, productId: 'product-9' }] }],
     ['invalid company identity', { list: [{ ...product, companyId: '../42' }] }],
     ['wrong optional field type', { list: [{ ...product, companyName: 42 }] }],
+    ['wrong sort type', { list: [{ ...product, sort: '90' }] }],
   ])('rejects %s', async (_name, data) => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({ operation: 'product.list', data });
     await expectCode(loadProductList(createClient(request), query, new AbortController().signal), 'INVALID_RESPONSE');

@@ -29,19 +29,6 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }));
 
-const sentryMocks = vi.hoisted(() => {
-  const setTag = vi.fn();
-  return {
-    setTag,
-    captureEvent: vi.fn(),
-    withScope: vi.fn((callback: (scope: { setTag: typeof setTag }) => void) => {
-      callback({ setTag });
-    }),
-  };
-});
-
-vi.mock('@sentry/electron/renderer', () => sentryMocks);
-
 import FeedbackReportModal, {
   type PrefilledScreenshot,
 } from '@/renderer/components/settings/SettingsModal/contents/FeedbackReportModal';
@@ -58,9 +45,6 @@ describe('FeedbackReportModal — prefill', () => {
   beforeEach(() => {
     // Ensure no leftover global electronAPI from other tests interferes.
     (window as unknown as { electronAPI?: unknown }).electronAPI = undefined;
-    sentryMocks.setTag.mockClear();
-    sentryMocks.captureEvent.mockClear();
-    sentryMocks.withScope.mockClear();
   });
 
   afterEach(() => {
@@ -148,9 +132,21 @@ describe('FeedbackReportModal — prefill', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('submits feedback tags and extra context to Sentry', async () => {
+  it('submits feedback tags and extra context to Chain Liaoning cloud diagnostics', async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
+    const submitCloudReport = vi.fn().mockResolvedValue({
+      reportNo: 'LAD20260806001',
+      status: 'SUBMITTED',
+      attachmentCount: 0,
+      uploadedCount: 0,
+      failedCount: 0,
+    });
+    (window as unknown as { electronAPI?: unknown }).electronAPI = {
+      collectFeedbackLogs: vi.fn().mockResolvedValue(null),
+      submitFeedbackReport: submitCloudReport,
+      logFeedbackEvent: vi.fn(),
+    };
     renderModal(
       <FeedbackReportModal
         visible={true}
@@ -173,24 +169,29 @@ describe('FeedbackReportModal — prefill', () => {
     await user.click(screen.getByText('settings.bugReportSubmit'));
 
     await waitFor(() => {
-      expect(sentryMocks.captureEvent).toHaveBeenCalledTimes(1);
+      expect(submitCloudReport).toHaveBeenCalledTimes(1);
     });
 
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('type', 'user-feedback');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('module', 'conversation-session');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('agent_error_code', 'USER_LLM_PROVIDER_AUTH_FAILED');
-    expect(sentryMocks.setTag).toHaveBeenCalledWith('agent_error_ownership', 'user_llm_provider');
-    expect(sentryMocks.captureEvent).toHaveBeenCalledWith(
+    expect(submitCloudReport).toHaveBeenCalledWith(
       expect.objectContaining({
-        extra: {
-          description: 'provider failed',
-          agent_error: {
-            code: 'USER_LLM_PROVIDER_AUTH_FAILED',
-            ownership: 'user_llm_provider',
+        module: 'conversation-session',
+        description: 'provider failed',
+        diagnostic: {
+          moduleLabel: 'settings.bugReportModuleChat',
+          tags: {
+            agent_error_code: 'USER_LLM_PROVIDER_AUTH_FAILED',
+            agent_error_ownership: 'user_llm_provider',
           },
+          extra: {
+            agent_error: {
+              code: 'USER_LLM_PROVIDER_AUTH_FAILED',
+              ownership: 'user_llm_provider',
+            },
+          },
+          logAttachmentStatus: 'empty',
         },
-      }),
-      expect.objectContaining({ attachments: [] })
+        attachments: [],
+      })
     );
     expect(onCancel).toHaveBeenCalledTimes(1);
   });

@@ -44,9 +44,7 @@ fn build_agent_process_env(
         // starts. A login shell may contain stale proxy values, so keep the
         // inherited value authoritative for both upper- and lowercase forms.
         // Proxy values remain shell-derived when Core inherited no value.
-        if proxy_env_key(name.as_os_str())
-            .is_some_and(|key| current_proxy_keys.contains(key))
-        {
+        if proxy_env_key(name.as_os_str()).is_some_and(|key| current_proxy_keys.contains(key)) {
             continue;
         }
         merged.insert(name, value);
@@ -64,9 +62,7 @@ fn build_agent_process_env(
 fn proxy_env_key(name: &std::ffi::OsStr) -> Option<&'static str> {
     const PROXY_ENV_KEYS: [&str; 4] = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"];
     let name = name.to_string_lossy();
-    PROXY_ENV_KEYS
-        .into_iter()
-        .find(|key| name.eq_ignore_ascii_case(key))
+    PROXY_ENV_KEYS.into_iter().find(|key| name.eq_ignore_ascii_case(key))
 }
 
 fn clean_agent_env(env: &mut BTreeMap<OsString, OsString>) {
@@ -244,23 +240,14 @@ mod tests {
             .iter()
             .map(|(key, value)| (OsString::from(*key), OsString::from(*value)))
             .collect();
-        current_env.push((
-            OsString::from("AIONUI_OVERLAY"),
-            OsString::from("from-current"),
-        ));
+        current_env.push((OsString::from("AIONUI_OVERLAY"), OsString::from("from-current")));
         let mut shell_env: Vec<_> = current_proxy_env
             .iter()
             .map(|(key, _)| (OsString::from(*key), OsString::from("from-shell")))
             .collect();
         shell_env.extend([
-            (
-                OsString::from("AIONUI_OVERLAY"),
-                OsString::from("from-shell"),
-            ),
-            (
-                OsString::from("AIONUI_SHELL_ONLY"),
-                OsString::from("from-shell"),
-            ),
+            (OsString::from("AIONUI_OVERLAY"), OsString::from("from-shell")),
+            (OsString::from("AIONUI_SHELL_ONLY"), OsString::from("from-shell")),
         ]);
 
         let env = build_agent_process_env(current_env, shell_env);
@@ -268,10 +255,7 @@ mod tests {
         for (key, expected) in current_proxy_env {
             assert_eq!(exact_env_value(&env, key).as_deref(), Some(expected));
         }
-        assert_eq!(
-            exact_env_value(&env, "AIONUI_OVERLAY").as_deref(),
-            Some("from-shell")
-        );
+        assert_eq!(exact_env_value(&env, "AIONUI_OVERLAY").as_deref(), Some("from-shell"));
         assert_eq!(
             exact_env_value(&env, "AIONUI_SHELL_ONLY").as_deref(),
             Some("from-shell")
@@ -280,23 +264,14 @@ mod tests {
 
     #[test]
     fn shell_proxy_env_is_used_only_when_current_process_has_no_matching_family() {
-        let current_env = vec![(
-            OsString::from("HTTP_PROXY"),
-            OsString::from("http://current-http:8080"),
-        )];
+        let current_env = vec![(OsString::from("HTTP_PROXY"), OsString::from("http://current-http:8080"))];
         let shell_env = vec![
             (
                 OsString::from("http_proxy"),
                 OsString::from("http://shell-http-lower:8081"),
             ),
-            (
-                OsString::from("HTTPS_PROXY"),
-                OsString::from("http://shell-https:8443"),
-            ),
-            (
-                OsString::from("AIONUI_SHELL_ONLY"),
-                OsString::from("from-shell"),
-            ),
+            (OsString::from("HTTPS_PROXY"), OsString::from("http://shell-https:8443")),
+            (OsString::from("AIONUI_SHELL_ONLY"), OsString::from("from-shell")),
         ];
 
         let env = build_agent_process_env(current_env, shell_env);

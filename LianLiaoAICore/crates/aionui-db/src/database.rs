@@ -7,7 +7,7 @@ use fs2::FileExt;
 use sqlx::migrate::Migrator;
 use sqlx::pool::PoolOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode};
-use sqlx::{Sqlite, SqlitePool};
+use sqlx::{Connection, Sqlite, SqlitePool};
 use tracing::{info, warn};
 
 use crate::error::DbError;
@@ -29,6 +29,20 @@ static DB_MIGRATOR: Migrator = sqlx::migrate!();
 // Historical special-case for the MCP schema reconciliation fallback.
 // Keep this pinned to migration version 7 even as newer migrations land.
 const MCP_SCHEMA_RECONCILIATION_MIGRATION_VERSION: i64 = 7;
+const INITIAL_SCHEMA_MIGRATION_VERSION: i64 = 1;
+// sqlx uses SHA-384 migration checksums. These are the only two historical
+// migration-1 variants Chain Liaoning shipped: the legacy Windows text rewrite
+// used CRLF plus an extra trailing newline; the canonical Git source uses LF.
+const INITIAL_SCHEMA_CRLF_CHECKSUM: [u8; 48] = [
+    0xd4, 0xdd, 0x44, 0x15, 0x8a, 0x52, 0xea, 0x3a, 0x14, 0x01, 0x89, 0xb5, 0xa7, 0x78, 0xaa, 0x85, 0x72, 0x8f, 0x00,
+    0x94, 0x55, 0xca, 0x5f, 0x76, 0x4b, 0xc7, 0xe6, 0xbf, 0x8e, 0x96, 0x82, 0xde, 0xae, 0x28, 0x5a, 0xb2, 0xb2, 0xa2,
+    0xf1, 0x5b, 0x61, 0x36, 0xff, 0x0b, 0x78, 0x79, 0x74, 0x0e,
+];
+const INITIAL_SCHEMA_CANONICAL_CHECKSUM: [u8; 48] = [
+    0xe1, 0x8a, 0x43, 0x94, 0x62, 0x74, 0x89, 0xc0, 0x83, 0x77, 0x81, 0x38, 0xa6, 0x95, 0xaa, 0xf9, 0x4d, 0xf3, 0xa8,
+    0x75, 0x4f, 0x34, 0xca, 0x0a, 0xab, 0x07, 0x9b, 0x4e, 0xc9, 0x27, 0x79, 0xdd, 0x70, 0xa8, 0x1f, 0xcf, 0x67, 0x47,
+    0x2c, 0x53, 0xe1, 0x8f, 0xc8, 0xbe, 0xc2, 0x51, 0x2c, 0x54,
+];
 const RECOVERABLE_DATABASE_CORRUPTION_STAGE: &str = "database.recoverable_corruption";
 
 /// Wraps a SQLite connection pool with lifecycle management.
@@ -392,6 +406,20 @@ async fn run_migrations_with_retry(conn: &mut sqlx::SqliteConnection) -> Result<
             warn!("Concurrent migrator detected (UNIQUE conflict on _sqlx_migrations); retrying");
             DB_MIGRATOR.run(&mut *conn).await.map_err(DbError::Migration)
         }
+        Err(sqlx::migrate::MigrateError::VersionMismatch(version)) if version == INITIAL_SCHEMA_MIGRATION_VERSION => {
+            if align_known_initial_schema_line_ending_checksum(&mut *conn).await? {
+                warn!(
+                    code = "BOOTSTRAP_MIGRATION_1_LINE_ENDING_RECONCILED",
+                    migration_version = INITIAL_SCHEMA_MIGRATION_VERSION,
+                    "Aligned the known CRLF migration checksum to the canonical LF checksum; retrying"
+                );
+                DB_MIGRATOR.run(&mut *conn).await.map_err(DbError::Migration)
+            } else {
+                Err(DbError::Migration(sqlx::migrate::MigrateError::VersionMismatch(
+                    version,
+                )))
+            }
+        }
         Err(sqlx::migrate::MigrateError::VersionMismatch(version))
             if version == MCP_SCHEMA_RECONCILIATION_MIGRATION_VERSION =>
         {
@@ -409,6 +437,57 @@ async fn run_migrations_with_retry(conn: &mut sqlx::SqliteConnection) -> Result<
         }
         Err(e) => Err(DbError::Migration(e)),
     }
+}
+
+/// Reconcile only the known line-ending-only migration-1 difference.
+///
+/// Unknown checksums, failed rows, or changed descriptions are rejected so a
+/// genuine migration edit can never be silently accepted as a line-ending fix.
+async fn align_known_initial_schema_line_ending_checksum(conn: &mut sqlx::SqliteConnection) -> Result<bool, DbError> {
+    let Some(migration) = DB_MIGRATOR
+        .iter()
+        .find(|migration| migration.version == INITIAL_SCHEMA_MIGRATION_VERSION)
+    else {
+        return Ok(false);
+    };
+    if migration.checksum.as_ref() != INITIAL_SCHEMA_CANONICAL_CHECKSUM {
+        return Ok(false);
+    }
+
+    let row: Option<(String, bool, Vec<u8>)> =
+        sqlx::query_as("SELECT description, success, checksum FROM _sqlx_migrations WHERE version = ?")
+            .bind(INITIAL_SCHEMA_MIGRATION_VERSION)
+            .fetch_optional(&mut *conn)
+            .await
+            .map_err(DbError::Query)?;
+    let Some((description, success, stored_checksum)) = row else {
+        return Ok(false);
+    };
+    if !success
+        || description != migration.description.as_ref()
+        || stored_checksum.as_slice() != INITIAL_SCHEMA_CRLF_CHECKSUM
+    {
+        return Ok(false);
+    }
+
+    let mut transaction = conn.begin().await.map_err(DbError::Query)?;
+    let updated = sqlx::query(
+        "UPDATE _sqlx_migrations SET checksum = ? \
+         WHERE version = ? AND description = ? AND success = TRUE AND checksum = ?",
+    )
+    .bind(INITIAL_SCHEMA_CANONICAL_CHECKSUM.as_slice())
+    .bind(INITIAL_SCHEMA_MIGRATION_VERSION)
+    .bind(migration.description.as_ref())
+    .bind(INITIAL_SCHEMA_CRLF_CHECKSUM.as_slice())
+    .execute(&mut *transaction)
+    .await
+    .map_err(DbError::Query)?;
+    if updated.rows_affected() != 1 {
+        transaction.rollback().await.map_err(DbError::Query)?;
+        return Ok(false);
+    }
+    transaction.commit().await.map_err(DbError::Query)?;
+    Ok(true)
 }
 
 /// Detect the specific "another process inserted this version first" error.
@@ -707,6 +786,78 @@ fn is_corruption_like_error(err: &DbError) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn connection_with_initial_migration_checksum(checksum: &[u8]) -> sqlx::SqliteConnection {
+        let mut conn = sqlx::SqliteConnection::connect("sqlite::memory:").await.unwrap();
+        sqlx::query(
+            "CREATE TABLE _sqlx_migrations (\
+                version BIGINT PRIMARY KEY, description TEXT NOT NULL, \
+                installed_on TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, \
+                success BOOLEAN NOT NULL, checksum BLOB NOT NULL, execution_time BIGINT NOT NULL)",
+        )
+        .execute(&mut conn)
+        .await
+        .unwrap();
+        let migration = DB_MIGRATOR
+            .iter()
+            .find(|migration| migration.version == INITIAL_SCHEMA_MIGRATION_VERSION)
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO _sqlx_migrations \
+             (version, description, success, checksum, execution_time) VALUES (?, ?, TRUE, ?, 0)",
+        )
+        .bind(INITIAL_SCHEMA_MIGRATION_VERSION)
+        .bind(migration.description.as_ref())
+        .bind(checksum)
+        .execute(&mut conn)
+        .await
+        .unwrap();
+        conn
+    }
+
+    #[test]
+    fn embedded_initial_schema_uses_canonical_lf_checksum() {
+        let migration = DB_MIGRATOR
+            .iter()
+            .find(|migration| migration.version == INITIAL_SCHEMA_MIGRATION_VERSION)
+            .unwrap();
+        assert_eq!(migration.checksum.as_ref(), INITIAL_SCHEMA_CANONICAL_CHECKSUM);
+    }
+
+    #[tokio::test]
+    async fn known_crlf_initial_schema_checksum_is_reconciled() {
+        let mut conn = connection_with_initial_migration_checksum(&INITIAL_SCHEMA_CRLF_CHECKSUM).await;
+
+        assert!(
+            align_known_initial_schema_line_ending_checksum(&mut conn)
+                .await
+                .unwrap()
+        );
+        let stored: Vec<u8> = sqlx::query_scalar("SELECT checksum FROM _sqlx_migrations WHERE version = ?")
+            .bind(INITIAL_SCHEMA_MIGRATION_VERSION)
+            .fetch_one(&mut conn)
+            .await
+            .unwrap();
+        assert_eq!(stored, INITIAL_SCHEMA_CANONICAL_CHECKSUM);
+    }
+
+    #[tokio::test]
+    async fn unknown_initial_schema_checksum_is_not_reconciled() {
+        let unknown = [0x5a; 48];
+        let mut conn = connection_with_initial_migration_checksum(&unknown).await;
+
+        assert!(
+            !align_known_initial_schema_line_ending_checksum(&mut conn)
+                .await
+                .unwrap()
+        );
+        let stored: Vec<u8> = sqlx::query_scalar("SELECT checksum FROM _sqlx_migrations WHERE version = ?")
+            .bind(INITIAL_SCHEMA_MIGRATION_VERSION)
+            .fetch_one(&mut conn)
+            .await
+            .unwrap();
+        assert_eq!(stored, unknown);
+    }
 
     #[test]
     fn recovery_skips_migration_version_mismatch() {

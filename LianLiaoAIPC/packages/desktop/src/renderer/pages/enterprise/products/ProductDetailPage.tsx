@@ -15,6 +15,7 @@ import {
 import {
   createCatalogReturnState,
   readCatalogReturnState,
+  readProductDetailCompanyReturnState,
 } from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
@@ -60,10 +61,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
   const location = useLocation();
   const navigate = useNavigate();
   const catalogReturn = useMemo(() => readCatalogReturnState(location.state, 'products'), [location.state]);
+  const companyReturn = useMemo(() => readProductDetailCompanyReturnState(location.state), [location.state]);
   const detail = useProductDetail(client, productId);
   const missing = t('enterprise.products.missing');
 
   const backToList = () => {
+    if (companyReturn) {
+      navigate(`/enterprise/companies/${encodeURIComponent(companyReturn.companyId)}`, {
+        state: companyReturn.catalogReturn ? createCatalogReturnState(companyReturn.catalogReturn) : undefined,
+      });
+      return;
+    }
     navigate(catalogReturn?.path ?? '/enterprise/products', {
       state: catalogReturn ? createCatalogReturnState(catalogReturn) : undefined,
     });
@@ -97,8 +105,23 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
     const region = [product.province, product.city, product.district].filter(Boolean).join(' / ') || missing;
     const displayIndustry = product.industry || product.companyIndustry;
     const showCompanyIndustry = Boolean(product.companyIndustry) && product.companyIndustry !== displayIndustry;
+    const contactCard = (
+      <DetailSectionCard title={t('enterprise.productDetail.sections.contact')}>
+        <EnterpriseContactAccessPanel
+          client={client}
+          resourceType='PRODUCT'
+          resourceId={product.productId}
+          resourceTitle={product.name}
+          toCompanyId={product.companyId}
+          toCompanyName={product.companyName}
+          contactName={product.contactName}
+          contactNameLabel={t('enterprise.products.fields.contactName')}
+          maskedPhone={product.phone}
+        />
+      </DetailSectionCard>
+    );
     const sidebar = (
-      <StickyDetailSidebar ariaLabel={t('enterprise.productDetail.sections.contact')}>
+      <StickyDetailSidebar ariaLabel={t('enterprise.products.fields.company')}>
         <DetailSectionCard title={t('enterprise.products.fields.company')}>
           <div className={styles.companySummary}>
             <BuildingFour size={28} aria-hidden='true' />
@@ -115,29 +138,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
             </div>
           </div>
         </DetailSectionCard>
-        <DetailSectionCard title={t('enterprise.productDetail.sections.contact')}>
-          <dl className={styles.detailFacts}>
-            <div>
-              <dt>{t('enterprise.products.fields.contactName')}</dt>
-              <dd>{product.contactName || missing}</dd>
-            </div>
-          </dl>
-          <EnterpriseContactAccessPanel
-            client={client}
-            resourceType='PRODUCT'
-            resourceId={product.productId}
-            resourceTitle={product.name}
-            toCompanyId={product.companyId}
-            toCompanyName={product.companyName}
-            maskedPhone={product.phone}
-          />
-        </DetailSectionCard>
       </StickyDetailSidebar>
     );
 
     return (
       <div className={styles.detailBody}>
-        <DetailHeroCard media={<DetailImage product={product} />} ariaLabelledBy='product-name'>
+        <DetailHeroCard media={<DetailImage product={product} />} aside={contactCard} ariaLabelledBy='product-name'>
           <div className={styles.detailIdentity}>
             <span className={styles.eyebrow}>{t('enterprise.productDetail.profileEyebrow')}</span>
             <h2 id='product-name'>{product.name}</h2>

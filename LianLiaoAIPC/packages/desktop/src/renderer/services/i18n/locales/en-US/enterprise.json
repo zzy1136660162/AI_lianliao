@@ -136,9 +136,9 @@
   },
   "catalogAssistant": {
     "title": "Industry Search Assistant",
-    "capability": "Search company profiles, featured products, and construction projects",
+    "capability": "Search company profiles, featured products, construction projects, and supply-demand listings",
     "exampleHint": "Describe your goal or start with an example:",
-    "placeholder": "Describe the company, product, or project you need",
+    "placeholder": "Describe the company, product, project, or supply-demand listing you need",
     "submit": "Search",
     "stop": "Stop",
     "retry": "Retry",
@@ -146,6 +146,7 @@
     "viewCompany": "View company profile",
     "viewProduct": "View featured product",
     "viewProject": "View project details",
+    "viewDemand": "View listing details",
     "projectInvestment": "Investment RMB {{value}}0,000",
     "notProvided": "Not provided",
     "currentRequest": "Current request",
@@ -154,7 +155,10 @@
     "completed": "Search complete",
     "searchingCompanyPage": "Searching company profiles, page {{page}}/{{maxPages}}",
     "searchingProductPage": "Searching featured products, page {{page}}/{{maxPages}}",
+    "linkingCompanies": "Linking products to their companies",
+    "productEvidence": "Matching products",
     "searchingProjectPage": "Searching construction projects, page {{page}}/{{maxPages}}",
+    "searchingDemandPage": "Searching supply-demand listings, page {{page}}/{{maxPages}}",
     "candidateCount": "{{count}} candidates collected",
     "ranking": "Selecting the best matches",
     "clarificationTitle": "Please clarify",
@@ -177,6 +181,7 @@
       "company": "Find precision machining companies in Shenyang",
       "product": "Find stainless-steel products in Shenbei New District",
       "project": "Find Shenyang construction projects purchasing electromechanical equipment",
+      "demand": "Find machining demand listings in Shenyang",
       "service": "Find companies that provide packaging and printing"
     }
   },
