@@ -86,7 +86,7 @@ function ensurePlaceholder(relativePath) {
 const originalExistsSync = fs.existsSync.bind(fs);
 const originalStatSync = fs.statSync.bind(fs);
 const originalRmSync = fs.rmSync.bind(fs);
-const windowsArtifactPattern = /LianLiaoAIPC-[^\\/]+-win-(?:x64|arm64)\.exe$/;
+const windowsArtifactPattern = /LianLiaoAIPC-[^\\/]+-win-(?:x64|arm64)[.]exe$/;
 const windowsUnpackedPattern = /[\\/]out[\\/]win(?:-[a-z0-9]+)?-unpacked$/i;
 
 fs.existsSync = function mockedExistsSync(targetPath) {

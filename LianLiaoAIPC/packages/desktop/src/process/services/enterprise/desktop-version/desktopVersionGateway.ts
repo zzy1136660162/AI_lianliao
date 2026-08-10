@@ -1,9 +1,11 @@
 import * as semver from 'semver';
+import * as path from 'node:path';
 
 import type {
   DesktopVersionCheckResult,
   DesktopVersionDownloadResult,
   DesktopVersionOpenDownloadedResult,
+  DesktopVersionInstallResult,
   DesktopVersionPlatform,
   DesktopVersionArchitecture,
   DesktopVersionRelease,
@@ -11,17 +13,19 @@ import type {
 
 import {
   DesktopVersionApiClient,
-  DesktopVersionApiError,
   resolveDesktopVersionApiClientOptions,
   type DesktopVersionRemoteRelease,
 } from './desktopVersionApiClient';
 import { downloadDesktopVersionInstaller, type DownloadedDesktopVersionInstaller } from './desktopVersionDownloader';
-
-export type DesktopVersionGatewaySessionStore = { loadOpenId: () => Promise<string | null> };
+import { createDesktopVersionPolicyStore, type DesktopVersionPolicyStore } from './desktopVersionPolicyStore';
+import {
+  inspectWindowsInstallerSignature,
+  type WindowsInstallerSignatureStatus,
+} from './desktopVersionSignatureVerifier';
 
 export type DesktopVersionGatewayApiClient = {
-  getLatest: (
-    openId: string,
+  getPolicy: (
+    currentVersion: string,
     platform: DesktopVersionPlatform,
     architecture: DesktopVersionArchitecture
   ) => Promise<DesktopVersionRemoteRelease | null>;
@@ -29,10 +33,11 @@ export type DesktopVersionGatewayApiClient = {
 
 export type DesktopVersionGatewayRuntime = {
   getVersion: () => string;
-  getPath: (name: 'downloads') => string;
+  getPath: (name: 'downloads' | 'userData') => string;
   platform: NodeJS.Platform;
   arch: string;
   openPath: (filePath: string) => Promise<string>;
+  quit: () => void;
 };
 
 export type DesktopVersionGatewayDownloader = (
@@ -40,16 +45,19 @@ export type DesktopVersionGatewayDownloader = (
 ) => Promise<DownloadedDesktopVersionInstaller>;
 
 export type DesktopVersionGatewayOptions = {
-  sessionStore: DesktopVersionGatewaySessionStore;
   runtime: DesktopVersionGatewayRuntime;
   apiClient?: DesktopVersionGatewayApiClient;
   downloader?: DesktopVersionGatewayDownloader;
+  policyStore?: DesktopVersionPolicyStore;
+  signatureVerifier?: (filePath: string) => Promise<WindowsInstallerSignatureStatus>;
   isPackaged?: boolean;
 };
 
 /** Errors that describe a trusted local decision rather than a cloud-api response. */
 export class DesktopVersionGatewayError extends Error {
-  constructor(readonly code: 'NO_UPDATE' | 'UNSUPPORTED_RUNTIME' | 'OPEN_FAILED') {
+  constructor(
+    readonly code: 'NO_UPDATE' | 'UNSUPPORTED_RUNTIME' | 'SIGNATURE_INVALID' | 'OPEN_FAILED' | 'INSTALL_FAILED'
+  ) {
     super(code);
     this.name = 'DesktopVersionGatewayError';
   }
@@ -57,29 +65,47 @@ export class DesktopVersionGatewayError extends Error {
 
 /** Main-process release state. The raw URL/hash stays private even after a successful update check. */
 export class DesktopVersionGateway {
-  private readonly sessionStore: DesktopVersionGatewaySessionStore;
   private readonly runtime: DesktopVersionGatewayRuntime;
   private readonly apiClient: DesktopVersionGatewayApiClient;
   private readonly downloader: DesktopVersionGatewayDownloader;
+  private readonly policyStore: DesktopVersionPolicyStore;
+  private readonly signatureVerifier: (filePath: string) => Promise<WindowsInstallerSignatureStatus>;
+  private readonly isPackaged: boolean;
   private cachedRemoteRelease: DesktopVersionRemoteRelease | null = null;
   private downloadedInstaller: DownloadedDesktopVersionInstaller | null = null;
 
   constructor(options: DesktopVersionGatewayOptions) {
-    this.sessionStore = options.sessionStore;
     this.runtime = options.runtime;
     this.apiClient =
       options.apiClient ??
       new DesktopVersionApiClient(resolveDesktopVersionApiClientOptions(options.isPackaged ?? false));
     this.downloader = options.downloader ?? downloadDesktopVersionInstaller;
+    this.policyStore = options.policyStore ?? createDesktopVersionPolicyStore(options.runtime.getPath('userData'));
+    this.signatureVerifier = options.signatureVerifier ?? inspectWindowsInstallerSignature;
+    this.isPackaged = options.isPackaged ?? false;
   }
 
   async check(): Promise<DesktopVersionCheckResult> {
-    const openId = await this.requireOpenId();
     const { platform, architecture } = this.resolveRuntime();
     const currentVersion = this.runtime.getVersion();
-    const remote = await this.apiClient.getLatest(openId, platform, architecture);
+    let remote: DesktopVersionRemoteRelease | null;
+    try {
+      remote = await this.apiClient.getPolicy(currentVersion, platform, architecture);
+      if (remote?.version.forceUpdate && isNewerVersion(remote.version.versionName, currentVersion)) {
+        await this.policyStore.saveMandatory(remote).catch((): undefined => undefined);
+      } else {
+        await this.policyStore.clearMandatory().catch((): undefined => undefined);
+      }
+    } catch (error) {
+      const cachedMandatory = await this.policyStore.loadMandatory();
+      if (!cachedMandatory || !isNewerVersion(cachedMandatory.version.versionName, currentVersion)) {
+        throw error;
+      }
+      remote = cachedMandatory;
+    }
     const updateAvailable = remote !== null && isNewerVersion(remote.version.versionName, currentVersion);
     this.cachedRemoteRelease = updateAvailable ? remote : null;
+    if (!updateAvailable) this.downloadedInstaller = null;
     return {
       currentVersion,
       checkedAt: Date.now(),
@@ -95,7 +121,7 @@ export class DesktopVersionGateway {
     const release = this.cachedRemoteRelease;
     if (!release) throw new DesktopVersionGatewayError('NO_UPDATE');
     const downloaded = await this.downloader({
-      downloadsDirectory: this.runtime.getPath('downloads'),
+      downloadsDirectory: path.join(this.runtime.getPath('userData'), 'updates'),
       release,
     });
     this.downloadedInstaller = downloaded;
@@ -104,19 +130,27 @@ export class DesktopVersionGateway {
 
   async openDownloadedInstaller(): Promise<DesktopVersionOpenDownloadedResult> {
     if (!this.downloadedInstaller) return { opened: false };
+    await this.verifyDownloadedInstaller();
     const error = await this.runtime.openPath(this.downloadedInstaller.filePath);
     if (error) throw new DesktopVersionGatewayError('OPEN_FAILED');
     return { opened: true };
   }
 
-  private async requireOpenId(): Promise<string> {
-    const openId = await this.sessionStore.loadOpenId();
-    if (typeof openId !== 'string') throw new DesktopVersionApiError('MISSING_ENTERPRISE_SESSION', 401);
-    const normalized = openId.trim();
-    if (!normalized || normalized.length > 256 || /\p{C}/u.test(normalized)) {
-      throw new DesktopVersionApiError('MISSING_ENTERPRISE_SESSION', 401);
+  async installRequiredUpdate(): Promise<DesktopVersionInstallResult> {
+    if (!this.cachedRemoteRelease?.version.forceUpdate || !this.downloadedInstaller) {
+      throw new DesktopVersionGatewayError('NO_UPDATE');
     }
-    return normalized;
+    await this.verifyDownloadedInstaller();
+    const error = await this.runtime.openPath(this.downloadedInstaller.filePath);
+    if (error) throw new DesktopVersionGatewayError('INSTALL_FAILED');
+    this.runtime.quit();
+    return { launched: true };
+  }
+
+  private async verifyDownloadedInstaller(): Promise<void> {
+    if (!this.downloadedInstaller || !this.isPackaged || this.runtime.platform !== 'win32') return;
+    const signatureStatus = await this.signatureVerifier(this.downloadedInstaller.filePath);
+    if (signatureStatus === 'INVALID') throw new DesktopVersionGatewayError('SIGNATURE_INVALID');
   }
 
   private resolveRuntime(): { platform: DesktopVersionPlatform; architecture: DesktopVersionArchitecture } {

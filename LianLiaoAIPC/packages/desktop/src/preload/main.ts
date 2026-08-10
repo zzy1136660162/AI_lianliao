@@ -70,6 +70,7 @@ import type {
 import type {
   DesktopVersionCheckResult,
   DesktopVersionDownloadResult,
+  DesktopVersionInstallResult,
   DesktopVersionIpcErrorCode,
   DesktopVersionIpcResult,
   DesktopVersionOpenDownloadedResult,
@@ -102,6 +103,7 @@ import {
 import {
   desktopVersionCheckResultSchema,
   desktopVersionDownloadResultSchema,
+  desktopVersionInstallResultSchema,
   desktopVersionIpcResultSchema,
   desktopVersionOpenDownloadedResultSchema,
 } from '../common/enterprise/desktop-version/schemas';
@@ -599,6 +601,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       invokeDesktopVersion<DesktopVersionOpenDownloadedResult>(
         DESKTOP_VERSION_IPC_CHANNELS.OPEN_DOWNLOADED,
         desktopVersionOpenDownloadedResultSchema
+      ),
+    installRequired: () =>
+      invokeDesktopVersion<DesktopVersionInstallResult>(
+        DESKTOP_VERSION_IPC_CHANNELS.INSTALL_REQUIRED,
+        desktopVersionInstallResultSchema
       ),
   },
 });

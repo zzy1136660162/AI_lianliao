@@ -47,6 +47,7 @@ const client: DesktopVersionClient = {
     filePath: 'C:\\Downloads\\lianliao-ai-2.1.28.exe',
   })),
   openDownloaded: vi.fn(async () => ({ opened: true })),
+  installRequired: vi.fn(async () => ({ launched: true })),
 };
 
 describe('VersionUpdatePage', () => {

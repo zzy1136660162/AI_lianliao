@@ -82,7 +82,7 @@ export type DesktopVersionDownloaderInput = {
 
 export type DownloadedDesktopVersionInstaller = { fileName: string; filePath: string };
 
-/** Downloads the backend-selected package into Downloads and verifies exact size plus SHA-256 before exposure. */
+/** Downloads the backend-selected package into a caller-owned cache and verifies exact size plus SHA-256. */
 export const downloadDesktopVersionInstaller = async (
   input: DesktopVersionDownloaderInput
 ): Promise<DownloadedDesktopVersionInstaller> => {

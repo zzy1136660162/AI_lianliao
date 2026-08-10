@@ -39,6 +39,7 @@ import type {
 import type {
   DesktopVersionCheckResult,
   DesktopVersionDownloadResult,
+  DesktopVersionInstallResult,
   DesktopVersionIpcResult,
   DesktopVersionOpenDownloadedResult,
 } from '../../enterprise/desktop-version/contracts';
@@ -150,6 +151,7 @@ export interface ElectronBridgeAPI {
     check: () => Promise<DesktopVersionIpcResult<DesktopVersionCheckResult>>;
     download: () => Promise<DesktopVersionIpcResult<DesktopVersionDownloadResult>>;
     openDownloaded: () => Promise<DesktopVersionIpcResult<DesktopVersionOpenDownloadedResult>>;
+    installRequired: () => Promise<DesktopVersionIpcResult<DesktopVersionInstallResult>>;
   };
 }
 

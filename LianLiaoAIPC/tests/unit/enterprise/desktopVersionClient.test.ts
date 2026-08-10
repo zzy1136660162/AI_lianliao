@@ -20,6 +20,7 @@ describe('desktop version renderer client', () => {
         data: { fileName: 'installer.exe', filePath: 'C:\\Downloads\\installer.exe' },
       }),
       openDownloaded: async () => ({ ok: true, data: { opened: true } }),
+      installRequired: async () => ({ ok: true, data: { launched: true } }),
     }));
 
     await expect(client.check()).resolves.toEqual(result);
@@ -37,6 +38,7 @@ describe('desktop version renderer client', () => {
         data: { fileName: 'installer.exe', filePath: 'C:\\Downloads\\installer.exe' },
       }),
       openDownloaded: async () => ({ ok: true, data: { opened: true } }),
+      installRequired: async () => ({ ok: true, data: { launched: true } }),
     }));
 
     await expect(client.check()).rejects.toEqual(

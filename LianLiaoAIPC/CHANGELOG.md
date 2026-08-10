@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.1.33](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.32...desktop-v2.1.33) (2026-08-10)
+
+### Desktop
+
+#### Features
+
+- **update:** 增加服务端最低支持版本策略、全局强制更新门禁及离线策略缓存
+- **update:** 安装包下载强制校验文件大小与 SHA256，并兼容当前未配置代码签名证书的 Windows 发布链
+
+#### Bug Fixes
+
+- **enterprise:** 完善企业码、重点产品、在建项目、供需对接与产业检索助手的查询及展示体验
+- **desktop:** 优化窄屏布局、客服咨询输入区、窗口工具栏和本地打包流程
+
+---
+
 ## [2.1.32](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.31...desktop-v2.1.32) (2026-08-05)
 
 ### Desktop

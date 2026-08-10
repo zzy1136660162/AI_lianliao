@@ -4,6 +4,7 @@ import { DESKTOP_VERSION_IPC_CHANNELS } from '@/common/enterprise/desktop-versio
 import type {
   DesktopVersionCheckResult,
   DesktopVersionDownloadResult,
+  DesktopVersionInstallResult,
   DesktopVersionOpenDownloadedResult,
 } from '@/common/enterprise/desktop-version/contracts';
 import {
@@ -47,6 +48,7 @@ const makeGateway = (): DesktopVersionBridgeGateway => ({
     })
   ),
   openDownloadedInstaller: vi.fn(async (): Promise<DesktopVersionOpenDownloadedResult> => ({ opened: true })),
+  installRequiredUpdate: vi.fn(async (): Promise<DesktopVersionInstallResult> => ({ launched: true })),
 });
 
 describe('desktop-version IPC bridge', () => {

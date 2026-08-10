@@ -15,7 +15,7 @@ const defaultTransport: DesktopVersionApiTransport = async (url, init) => {
   return net.fetch(url, init);
 };
 
-const apiPackageSchema = z
+export const apiPackageSchema = z
   .object({
     id: z.string().regex(/^-?[1-9][0-9]{0,18}$/),
     platform: z.enum(['WINDOWS', 'MACOS', 'LINUX']),
@@ -26,7 +26,7 @@ const apiPackageSchema = z
   })
   .strict();
 
-const apiVersionSchema = z
+export const apiVersionSchema = z
   .object({
     id: z.string().regex(/^-?[1-9][0-9]{0,18}$/),
     versionCode: z.number().int().positive().safe(),
@@ -59,6 +59,10 @@ export type DesktopVersionRemoteRelease = {
   packageInfo: z.infer<typeof apiPackageSchema>;
 };
 
+export const desktopVersionRemoteReleaseSchema = z
+  .object({ version: apiVersionSchema, packageInfo: apiPackageSchema })
+  .strict();
+
 export type DesktopVersionApiClientOptions = {
   baseUrl: string;
   fetchImpl?: DesktopVersionApiTransport;
@@ -90,12 +94,12 @@ export class DesktopVersionApiClient {
     this.fetchImpl = options.fetchImpl ?? defaultTransport;
   }
 
-  async getLatest(
-    openId: string,
+  async getPolicy(
+    currentVersion: string,
     platform: DesktopVersionPlatform,
     architecture: DesktopVersionArchitecture
   ): Promise<DesktopVersionRemoteRelease | null> {
-    const payload = await this.post('getLatest', { openId, platform, architecture });
+    const payload = await this.post('getPolicy', { currentVersion, platform, architecture });
     if (!payload.available) return null;
     if (!payload.version || !payload.package) throw new DesktopVersionApiError('INVALID_RESPONSE');
     return { version: payload.version, packageInfo: payload.package };

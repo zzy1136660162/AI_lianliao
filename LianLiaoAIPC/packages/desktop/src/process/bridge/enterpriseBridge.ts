@@ -72,6 +72,7 @@ import type {
 import type {
   DesktopVersionCheckResult,
   DesktopVersionDownloadResult,
+  DesktopVersionInstallResult,
   DesktopVersionIpcErrorCode,
   DesktopVersionIpcResult,
   DesktopVersionOpenDownloadedResult,
@@ -88,6 +89,7 @@ import {
 import {
   desktopVersionCheckResultSchema,
   desktopVersionDownloadResultSchema,
+  desktopVersionInstallResultSchema,
   desktopVersionOpenDownloadedResultSchema,
 } from '@/common/enterprise/desktop-version/schemas';
 import { desktopManagedAiSyncResultSchema } from '@/common/enterprise/managed-ai-model/schemas';
@@ -261,6 +263,7 @@ export type DesktopVersionBridgeGateway = {
   check: () => Promise<DesktopVersionCheckResult>;
   downloadLatest: () => Promise<DesktopVersionDownloadResult>;
   openDownloadedInstaller: () => Promise<DesktopVersionOpenDownloadedResult>;
+  installRequiredUpdate: () => Promise<DesktopVersionInstallResult>;
 };
 
 export type DesktopVersionBridgeDependencies = {
@@ -1330,13 +1333,13 @@ const normalizeDesktopVersionBridgeError = (error: unknown): DesktopVersionIpcEr
 
 const getDefaultDesktopVersionGateway = (): DesktopVersionBridgeGateway => {
   defaultDesktopVersionGateway ??= new DesktopVersionGateway({
-    sessionStore: getDefaultSessionStore(),
     runtime: {
       getVersion: () => app.getVersion(),
       getPath: (name) => app.getPath(name),
       platform: process.platform,
       arch: process.arch,
       openPath: (filePath) => shell.openPath(filePath),
+      quit: () => app.quit(),
     },
     isPackaged: app.isPackaged,
   });
@@ -1376,6 +1379,10 @@ export function initDesktopVersionBridge(dependencies: DesktopVersionBridgeDepen
     [
       DESKTOP_VERSION_IPC_CHANNELS.OPEN_DOWNLOADED,
       createHandler(desktopVersionOpenDownloadedResultSchema, () => gateway.openDownloadedInstaller()),
+    ],
+    [
+      DESKTOP_VERSION_IPC_CHANNELS.INSTALL_REQUIRED,
+      createHandler(desktopVersionInstallResultSchema, () => gateway.installRequiredUpdate()),
     ],
   ];
 

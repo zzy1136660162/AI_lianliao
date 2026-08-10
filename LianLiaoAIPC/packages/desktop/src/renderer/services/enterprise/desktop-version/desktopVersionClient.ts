@@ -4,6 +4,7 @@ import { DESKTOP_VERSION_IPC_ERROR_MESSAGES } from '@/common/enterprise/desktop-
 import type {
   DesktopVersionCheckResult,
   DesktopVersionDownloadResult,
+  DesktopVersionInstallResult,
   DesktopVersionIpcErrorCode,
   DesktopVersionIpcResult,
   DesktopVersionOpenDownloadedResult,
@@ -11,6 +12,7 @@ import type {
 import {
   desktopVersionCheckResultSchema,
   desktopVersionDownloadResultSchema,
+  desktopVersionInstallResultSchema,
   desktopVersionIpcResultSchema,
   desktopVersionOpenDownloadedResultSchema,
 } from '@/common/enterprise/desktop-version/schemas';
@@ -23,6 +25,7 @@ export type DesktopVersionClient = {
   check: () => Promise<DesktopVersionCheckResult>;
   download: () => Promise<DesktopVersionDownloadResult>;
   openDownloaded: () => Promise<DesktopVersionOpenDownloadedResult>;
+  installRequired: () => Promise<DesktopVersionInstallResult>;
 };
 
 export class DesktopVersionRendererError extends Error {
@@ -70,6 +73,7 @@ export const createDesktopVersionClient = (getBridge: DesktopVersionRawBridgePro
   download: () => invoke(getBridge, desktopVersionDownloadResultSchema, (bridge) => bridge.download()),
   openDownloaded: () =>
     invoke(getBridge, desktopVersionOpenDownloadedResultSchema, (bridge) => bridge.openDownloaded()),
+  installRequired: () => invoke(getBridge, desktopVersionInstallResultSchema, (bridge) => bridge.installRequired()),
 });
 
 const getWindowDesktopVersionBridge = (): DesktopVersionRawBridge | undefined =>

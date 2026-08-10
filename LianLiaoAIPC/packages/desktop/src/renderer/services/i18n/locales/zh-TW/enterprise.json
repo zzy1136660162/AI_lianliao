@@ -965,7 +965,7 @@
     "packageInfo": "{{platform}} · {{architecture}} · {{size}}",
     "packageSize": "{{size}} MB",
     "force": "This is a required update",
-    "forceDescription": "To continue using the Liaoning Industrial Cloud City workbench, confirm downloading the latest installer first.",
+    "forceDescription": "目前版本低於後台設定的最低支援版本。系統會自動下載並驗證最新版安裝包，完成更新前無法繼續使用。",
     "releaseNotes": "Release notes",
     "checking": "Checking for updates",
     "upToDate": "You are already on the latest version",
@@ -973,6 +973,8 @@
     "checkFailed": "The update could not be checked. Please try again later.",
     "downloadFailed": "The installer download or integrity check failed. Please try again later.",
     "downloading": "Downloading and verifying installer",
+    "installing": "安裝包已通過驗證，正在啟動更新程式並結束舊版本",
+    "mandatoryFailed": "必要更新尚未完成。請檢查網路後重試；更新完成前無法繼續使用目前版本。",
     "downloadComplete": "Installer downloaded to {{path}}",
     "openPromptTitle": "Installer downloaded",
     "openPromptDescription": "Open the installer now to continue updating?",
@@ -981,7 +983,8 @@
       "check": "Check for updates",
       "download": "Confirm download",
       "open": "Open installer",
-      "later": "Install later"
+      "later": "Install later",
+      "retry": "重試更新"
     }
   },
   "notifications": {

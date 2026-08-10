@@ -38,27 +38,28 @@ describe('DesktopVersionApiClient', () => {
     electronNetFetch.mockReset();
   });
 
-  it('checks the fixed local API origin with the main-process OpenID and runtime selection', async () => {
+  it('checks the fixed local policy API with the main-process version and runtime selection', async () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify(response), { status: 200 }));
     const client = new DesktopVersionApiClient({ baseUrl: 'http://127.0.0.1:12580/', fetchImpl });
 
-    const release = await client.getLatest('desktop-open-id', 'WINDOWS', 'X64');
+    const release = await client.getPolicy('2.1.27', 'WINDOWS', 'X64');
 
     expect(release?.version.versionName).toBe('2.1.28');
     expect(release?.packageInfo.downloadUrl).toContain('downloads.example.com');
     const [url, options] = fetchImpl.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://127.0.0.1:12580/cloud-api/DesktopVersionController/getLatest');
-    expect(options.body).toBe(JSON.stringify({ openId: 'desktop-open-id', platform: 'WINDOWS', architecture: 'X64' }));
+    expect(url).toBe('http://127.0.0.1:12580/cloud-api/DesktopVersionController/getPolicy');
+    expect(options.body).toBe(JSON.stringify({ currentVersion: '2.1.27', platform: 'WINDOWS', architecture: 'X64' }));
+    expect(options.body).not.toContain('openId');
   });
 
   it('uses Electron net.fetch by default so version checks inherit the application proxy', async () => {
     electronNetFetch.mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
     const client = new DesktopVersionApiClient({ baseUrl: 'https://cloud.lslnii.com/' });
 
-    await expect(client.getLatest('desktop-open-id', 'WINDOWS', 'X64')).resolves.toBeTruthy();
+    await expect(client.getPolicy('2.1.27', 'WINDOWS', 'X64')).resolves.toBeTruthy();
 
     expect(electronNetFetch).toHaveBeenCalledWith(
-      'https://cloud.lslnii.com/cloud-api/DesktopVersionController/getLatest',
+      'https://cloud.lslnii.com/cloud-api/DesktopVersionController/getPolicy',
       expect.objectContaining({ method: 'POST' })
     );
   });
@@ -69,7 +70,7 @@ describe('DesktopVersionApiClient', () => {
     );
     const client = new DesktopVersionApiClient({ baseUrl: 'http://127.0.0.1:12580/', fetchImpl });
 
-    await expect(client.getLatest('desktop-open-id', 'WINDOWS', 'X64')).rejects.toEqual(
+    await expect(client.getPolicy('2.1.27', 'WINDOWS', 'X64')).rejects.toEqual(
       expect.objectContaining<Partial<DesktopVersionApiError>>({ code: 'INVALID_RESPONSE' })
     );
   });

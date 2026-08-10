@@ -31,6 +31,7 @@ vi.mock('@/renderer/hooks/context/EnterpriseAuthContext', () => ({
       companyId: '-18',
       companyName: '沈阳航燃科技有限公司',
       roleId: authMocks.roleId,
+      customerServiceStaff: true,
     },
     logout: vi.fn(async () => true),
   }),

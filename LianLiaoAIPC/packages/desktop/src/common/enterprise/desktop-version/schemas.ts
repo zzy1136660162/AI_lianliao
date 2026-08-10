@@ -32,6 +32,8 @@ export const desktopVersionDownloadResultSchema = z
 
 export const desktopVersionOpenDownloadedResultSchema = z.object({ opened: z.boolean() }).strict();
 
+export const desktopVersionInstallResultSchema = z.object({ launched: z.boolean() }).strict();
+
 export const desktopVersionIpcErrorSchema = z
   .object({
     code: z.enum([
@@ -46,7 +48,9 @@ export const desktopVersionIpcErrorSchema = z
       'NO_UPDATE',
       'DOWNLOAD_FAILED',
       'INTEGRITY_FAILED',
+      'SIGNATURE_INVALID',
       'OPEN_FAILED',
+      'INSTALL_FAILED',
       'UNTRUSTED_SENDER',
       'IPC_UNAVAILABLE',
       'INVALID_IPC_RESPONSE',

@@ -1,5 +1,5 @@
 import { Robot } from '@icon-park/react';
-import { App, Button, Modal } from 'antd';
+import { App } from 'antd';
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -8,12 +8,7 @@ import { CUSTOMER_SERVICE_NAVIGATE_CHANNEL } from '@/common/enterprise/customer-
 import { customerServiceNavigationDetailSchema } from '@/common/enterprise/customer-service/schemas';
 import { desktopNotificationClient } from '@/renderer/services/enterprise/desktop-notification/desktopNotificationClient';
 import type { DesktopNotificationInboxItem } from '@/common/enterprise/desktop-notification/contracts';
-import { desktopVersionClient } from '@/renderer/services/enterprise/desktop-version/desktopVersionClient';
 import { recordEnterprisePageView } from '@/renderer/services/enterprise/enterpriseBehaviorLog';
-import type {
-  DesktopVersionDownloadResult,
-  DesktopVersionRelease,
-} from '@/common/enterprise/desktop-version/contracts';
 
 import EnterpriseAntdProvider from './EnterpriseAntdProvider';
 import EnterpriseHeader from './EnterpriseHeader';
@@ -50,11 +45,6 @@ const EnterpriseShellContent: React.FC = () => {
   // Users can expand the assistant for the current mounted session; the choice is intentionally not persisted.
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [notificationUnreadCount, setNotificationUnreadCount] = useState(0);
-  const [forcedRelease, setForcedRelease] = useState<DesktopVersionRelease | null>(null);
-  const [forceDownloading, setForceDownloading] = useState(false);
-  const [forceDownloadFailed, setForceDownloadFailed] = useState(false);
-  const [forceDownloaded, setForceDownloaded] = useState<DesktopVersionDownloadResult | null>(null);
-  const [forceOpening, setForceOpening] = useState(false);
   const isCustomerServiceRoute = location.pathname.startsWith('/enterprise/customer-service');
   const isCustomerConsultationRoute = location.pathname.startsWith('/enterprise/consultation');
   const isDemandPublishRoute = location.pathname === '/enterprise/supply-demand/publish';
@@ -124,47 +114,6 @@ const EnterpriseShellContent: React.FC = () => {
     };
   }, [navigate, notificationApi]);
 
-  /** A forced release blocks only after the trusted main process confirms a newer compatible package. */
-  useEffect(() => {
-    let active = true;
-    void desktopVersionClient
-      .check()
-      .then((result) => {
-        if (active && result.updateAvailable && result.release?.forceUpdate) setForcedRelease(result.release);
-      })
-      .catch((): undefined => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const downloadForcedRelease = async (): Promise<void> => {
-    setForceDownloading(true);
-    setForceDownloadFailed(false);
-    try {
-      setForceDownloaded(await desktopVersionClient.download());
-      // The requirement is satisfied after user-confirmed download completes; installation remains a user action.
-      setForcedRelease(null);
-    } catch {
-      setForceDownloadFailed(true);
-    } finally {
-      setForceDownloading(false);
-    }
-  };
-
-  const openForcedInstaller = async (): Promise<void> => {
-    setForceOpening(true);
-    try {
-      const result = await desktopVersionClient.openDownloaded();
-      if (!result.opened) throw new Error('installer was not opened');
-      setForceDownloaded(null);
-    } catch {
-      setForceDownloadFailed(true);
-    } finally {
-      setForceOpening(false);
-    }
-  };
-
   return (
     <>
       <div
@@ -203,36 +152,6 @@ const EnterpriseShellContent: React.FC = () => {
           </div>
         </div>
       </div>
-      <Modal
-        closable={false}
-        footer={null}
-        keyboard={false}
-        maskClosable={false}
-        open={forcedRelease !== null}
-        title={t('enterprise.versionUpdate.force')}
-      >
-        <p>{t('enterprise.versionUpdate.forceDescription')}</p>
-        {forcedRelease ? (
-          <p>{t('enterprise.versionUpdate.latestVersion', { version: forcedRelease.versionName })}</p>
-        ) : null}
-        {forceDownloadFailed ? <p role='alert'>{t('enterprise.versionUpdate.downloadFailed')}</p> : null}
-        <Button type='primary' loading={forceDownloading} onClick={() => void downloadForcedRelease()}>
-          {t('enterprise.versionUpdate.actions.download')}
-        </Button>
-      </Modal>
-      <Modal
-        open={forceDownloaded !== null}
-        title={t('enterprise.versionUpdate.openPromptTitle')}
-        okText={t('enterprise.versionUpdate.actions.open')}
-        cancelText={t('enterprise.versionUpdate.actions.later')}
-        confirmLoading={forceOpening}
-        onCancel={() => setForceDownloaded(null)}
-        onOk={() => void openForcedInstaller()}
-      >
-        <p>{t('enterprise.versionUpdate.downloadComplete', { path: forceDownloaded?.filePath ?? '' })}</p>
-        <p>{t('enterprise.versionUpdate.openPromptDescription')}</p>
-        {forceDownloadFailed ? <p role='alert'>{t('enterprise.versionUpdate.openFailed')}</p> : null}
-      </Modal>
     </>
   );
 };

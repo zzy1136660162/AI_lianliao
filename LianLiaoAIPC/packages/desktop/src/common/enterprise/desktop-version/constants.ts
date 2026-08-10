@@ -13,6 +13,7 @@ export const DESKTOP_VERSION_IPC_CHANNELS = Object.freeze({
   CHECK: 'enterprise:desktop-version:check',
   DOWNLOAD: 'enterprise:desktop-version:download',
   OPEN_DOWNLOADED: 'enterprise:desktop-version:open-downloaded',
+  INSTALL_REQUIRED: 'enterprise:desktop-version:install-required',
 } as const);
 
 /** Stable failure descriptions reconstructed by preload instead of trusting IPC error text. */
@@ -28,7 +29,9 @@ export const DESKTOP_VERSION_IPC_ERROR_MESSAGES: Readonly<Record<DesktopVersionI
   NO_UPDATE: 'No compatible desktop update is available.',
   DOWNLOAD_FAILED: 'Desktop installer download failed.',
   INTEGRITY_FAILED: 'Downloaded desktop installer failed integrity verification.',
+  SIGNATURE_INVALID: 'Downloaded desktop installer has an invalid code signature.',
   OPEN_FAILED: 'The downloaded installer could not be opened.',
+  INSTALL_FAILED: 'The required desktop installer could not be launched.',
   UNTRUSTED_SENDER: 'Desktop version IPC sender is not trusted.',
   IPC_UNAVAILABLE: 'Desktop version IPC is unavailable.',
   INVALID_IPC_RESPONSE: 'Desktop version IPC returned an invalid response.',

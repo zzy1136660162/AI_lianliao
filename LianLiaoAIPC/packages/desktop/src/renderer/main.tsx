@@ -88,6 +88,7 @@ import { bootstrapRendererConfig } from '@renderer/services/bootstrapRenderer';
 
 // Components and utilities
 import Layout from './components/layout/Layout';
+import MandatoryUpdateGate from './components/layout/MandatoryUpdateGate';
 import Router from './components/layout/Router';
 import Sider from './components/layout/Sider';
 import { useAuth } from './hooks/context/AuthContext';
@@ -301,7 +302,13 @@ const Main = () => {
   );
 };
 
-const App = HOC.Wrapper(Config)(Main);
+const UpdateProtectedMain: React.FC = () => (
+  <MandatoryUpdateGate>
+    <Main />
+  </MandatoryUpdateGate>
+);
+
+const App = HOC.Wrapper(Config)(UpdateProtectedMain);
 
 const BackendStartupFailureDialog: React.FC<{ failure: BackendStartupFailureInfo }> = ({ failure }) => {
   const { t } = useTranslation();

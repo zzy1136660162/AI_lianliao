@@ -30,6 +30,10 @@ export type DesktopVersionOpenDownloadedResult = {
   opened: boolean;
 };
 
+export type DesktopVersionInstallResult = {
+  launched: boolean;
+};
+
 export type DesktopVersionIpcErrorCode =
   | 'INVALID_REQUEST'
   | 'MISSING_ENTERPRISE_SESSION'
@@ -42,7 +46,9 @@ export type DesktopVersionIpcErrorCode =
   | 'NO_UPDATE'
   | 'DOWNLOAD_FAILED'
   | 'INTEGRITY_FAILED'
+  | 'SIGNATURE_INVALID'
   | 'OPEN_FAILED'
+  | 'INSTALL_FAILED'
   | 'UNTRUSTED_SENDER'
   | 'IPC_UNAVAILABLE'
   | 'INVALID_IPC_RESPONSE'
