@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.34](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.33...desktop-v2.1.34) (2026-08-10)
+
+### Desktop
+
+#### Release
+
+- **update:** 发布 Windows x64 升级验证版本，继续强制校验文件大小与 SHA256，并允许当前未签名安装包由 2.1.33 客户端直接打开
+
+---
+
 ## [2.1.33](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.32...desktop-v2.1.33) (2026-08-10)
 
 ### Desktop
