@@ -45,10 +45,12 @@
 - Windows 发布前必须验证旧版本覆盖升级后不会产生第二个卸载项。
 - Windows 通知必须显示完整桌面产品名称，不能显示 `electron.app.Electron`。
 - 发布桌面安装包前核对本地和远端 SHA256；默认上传位置是 `10.2.202.23:/mnt/web/beiruan_ai/desktop_lianliao`。
-- 正式桌面 Release 必须同时包含 Windows x64/ARM64、macOS x64/ARM64、Ubuntu x64 的七个安装包和 `SHA256SUMS.txt`。
+- 用户未明确要求多平台时，桌面版本默认只构建和发布 Windows x64，使用 `tools/build/windows/build_lianliao_aipc_windows.ps1`，不得触发 GitHub Actions、GitHub Release 或额外生成 Windows ARM64、macOS、Linux 安装包。
+- Windows-only 版本只向桌面版本服务登记 `WINDOWS/X64` 安装包；macOS、Linux 和 Windows ARM64 客户端不得收到该版本。只有用户明确要求相应平台时才增加对应安装包记录。
+- 只有用户明确要求多平台发布时，正式桌面 Release 才同时包含 Windows x64/ARM64、macOS x64/ARM64、Ubuntu x64 的七个安装包和 `SHA256SUMS.txt`，并允许使用 GitHub Actions。
 - Windows ARM64 使用 `windows-11-arm` 原生 Runner 和锁定的 `win32-arm64` Core；不得用 x64 Core 冒充或回退。
 - macOS Intel 使用 `macos-15-intel`，macOS ARM64 使用 `macos-15`；未配置 Apple 凭据时仅允许按 Release 说明发布 ad-hoc 签名测试包。
-- 多平台安装包通过草稿 GitHub Release 中转；任一必需平台失败时不得公开 Release。
+- 明确要求的多平台安装包通过草稿 GitHub Release 中转；任一必需平台失败时不得公开 Release。
 - Actions Artifact 只保留一个轻量发布报告，不重复保存正式安装包。
 - 未经用户明确要求，不提交、不推送、不创建 GitHub Release，也不修改外部数据库。
 

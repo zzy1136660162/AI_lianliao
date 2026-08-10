@@ -101,6 +101,8 @@ See the `testing` skill (`.claude/skills/testing/SKILL.md`) for complete workflo
 
 ### 链辽 AI 桌面安装包发布
 
+- 用户未明确要求多平台或 GitHub Actions 时，默认只使用 `tools/build/windows/build_lianliao_aipc_windows.ps1` 构建 Windows x64，不触发 GitHub Actions 或 GitHub Release。
+- Windows-only 发布记录只包含 `WINDOWS/X64` 包，因此只向 Windows x64 客户端下发更新；不得为未生成的系统或架构伪造、复用下载地址。
 - 默认发布服务器：`10.2.202.23`
 - 默认上传目录：`/mnt/web/beiruan_ai/desktop_lianliao`
 - 当用户要求上传链辽 AI 的桌面安装包时，默认使用该 SSH 目标上传，不再重复询问服务器地址与目录。
