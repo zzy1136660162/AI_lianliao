@@ -60,7 +60,7 @@ fn relative_path_for_api(path: &Path, root: &Path) -> String {
     let relative = path.strip_prefix(root).unwrap_or(path).to_string_lossy().into_owned();
     #[cfg(windows)]
     {
-        return relative.replace('\\', "/");
+        relative.replace('\\', "/")
     }
     #[cfg(not(windows))]
     relative
