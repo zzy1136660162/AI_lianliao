@@ -12,6 +12,10 @@ use tracing::{info, warn};
 
 use crate::error::DbError;
 
+mod migration_compat;
+
+use migration_compat::align_known_migration_line_ending_checksum;
+
 /// Maximum number of connections in the pool.
 const MAX_CONNECTIONS: u32 = 5;
 
@@ -400,42 +404,51 @@ async fn run_migrations_staged(pool: &SqlitePool) -> Result<(), DatabaseInitErro
 /// pass sees the row that the winner committed, checksum matches (same
 /// shipped binary), and the migration is treated as already applied.
 async fn run_migrations_with_retry(conn: &mut sqlx::SqliteConnection) -> Result<(), DbError> {
-    match DB_MIGRATOR.run(&mut *conn).await {
-        Ok(()) => Ok(()),
-        Err(e) if is_migrations_table_unique_conflict(&e) => {
-            warn!("Concurrent migrator detected (UNIQUE conflict on _sqlx_migrations); retrying");
-            DB_MIGRATOR.run(&mut *conn).await.map_err(DbError::Migration)
-        }
-        Err(sqlx::migrate::MigrateError::VersionMismatch(version)) if version == INITIAL_SCHEMA_MIGRATION_VERSION => {
-            if align_known_initial_schema_line_ending_checksum(&mut *conn).await? {
+    let mut retried_unique_conflict = false;
+
+    loop {
+        match DB_MIGRATOR.run(&mut *conn).await {
+            Ok(()) => return Ok(()),
+            Err(e) if is_migrations_table_unique_conflict(&e) && !retried_unique_conflict => {
+                retried_unique_conflict = true;
+                warn!("Concurrent migrator detected (UNIQUE conflict on _sqlx_migrations); retrying");
+            }
+            Err(sqlx::migrate::MigrateError::VersionMismatch(version))
+                if version == INITIAL_SCHEMA_MIGRATION_VERSION =>
+            {
+                if !align_known_initial_schema_line_ending_checksum(&mut *conn).await? {
+                    return Err(DbError::Migration(sqlx::migrate::MigrateError::VersionMismatch(
+                        version,
+                    )));
+                }
                 warn!(
                     code = "BOOTSTRAP_MIGRATION_1_LINE_ENDING_RECONCILED",
                     migration_version = INITIAL_SCHEMA_MIGRATION_VERSION,
                     "Aligned the known CRLF migration checksum to the canonical LF checksum; retrying"
                 );
-                DB_MIGRATOR.run(&mut *conn).await.map_err(DbError::Migration)
-            } else {
-                Err(DbError::Migration(sqlx::migrate::MigrateError::VersionMismatch(
-                    version,
-                )))
             }
-        }
-        Err(sqlx::migrate::MigrateError::VersionMismatch(version))
-            if version == MCP_SCHEMA_RECONCILIATION_MIGRATION_VERSION =>
-        {
-            if align_reconciled_mcp_migration_checksum(&mut *conn).await? {
-                warn!(
-                    "Aligned checksum for reconciled MCP migration {}; retrying",
-                    MCP_SCHEMA_RECONCILIATION_MIGRATION_VERSION
-                );
-                DB_MIGRATOR.run(&mut *conn).await.map_err(DbError::Migration)
-            } else {
-                Err(DbError::Migration(sqlx::migrate::MigrateError::VersionMismatch(
-                    version,
-                )))
+            Err(sqlx::migrate::MigrateError::VersionMismatch(version)) => {
+                if align_known_migration_line_ending_checksum(&mut *conn, version).await? {
+                    warn!(
+                        code = "BOOTSTRAP_MIGRATION_LINE_ENDING_RECONCILED",
+                        migration_version = version,
+                        "Aligned a known migration line-ending checksum to this build; retrying"
+                    );
+                } else if version == MCP_SCHEMA_RECONCILIATION_MIGRATION_VERSION
+                    && align_reconciled_mcp_migration_checksum(&mut *conn).await?
+                {
+                    warn!(
+                        "Aligned checksum for reconciled MCP migration {}; retrying",
+                        MCP_SCHEMA_RECONCILIATION_MIGRATION_VERSION
+                    );
+                } else {
+                    return Err(DbError::Migration(sqlx::migrate::MigrateError::VersionMismatch(
+                        version,
+                    )));
+                }
             }
+            Err(e) => return Err(DbError::Migration(e)),
         }
-        Err(e) => Err(DbError::Migration(e)),
     }
 }
 
