@@ -30,6 +30,7 @@
 - Codex ACP、Codex CLI 和平台 npm 包的精确版本与 SHA-512 固定在 `LianLiaoAICore/managed-acp-lock.json`；不得恢复为 `^0.144.0` 等浮动根依赖，版本或完整性不匹配必须使 Core 准备失败。
 - 本地 Core 更新可以复用已有托管资源，但必须先通过结构契约、Codex 依赖锁和完整资源树 SHA-256 校验，并在 staging 中再次校验后原子切换；正式 Release 不得复用本地托管资源。
 - 根目录 `.github/workflows/lianliao-aicore-release.yml` 是当前仓库有效的 Core 发布工作流。
+- 用户未明确要求多平台时，Core Release 默认只构建和发布 Windows x64；只有用户明确要求多平台时才构建 Windows ARM64、macOS 和 Linux 资产。
 - GitHub Actions 必须统一放在仓库根目录 `.github/workflows`；不得在 `LianLiaoAICore` 或 `LianLiaoAIPC` 子目录维护看似可执行但实际无效的 workflow。
 
 ## 文件修改

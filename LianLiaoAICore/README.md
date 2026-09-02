@@ -23,7 +23,7 @@ cargo run -p aionui-app -- --help
 
 帮助信息应显示“链辽 AI Core 本地服务”，binary 名称仍为 `aioncore`。
 
-## 多平台 Release
+## Release
 
 当前仓库有效发布工作流位于：
 
@@ -33,13 +33,12 @@ cargo run -p aionui-app -- --help
 
 GitHub 只执行仓库根目录中的工作流。Core 与桌面端的 CI/Release 均应统一维护在根目录 `.github/workflows`；`LianLiaoAICore` 和 `LianLiaoAIPC` 子目录不单独创建 `.github/workflows`。
 
-正式发布资产：
+未明确要求多平台时，发布范围默认是 Windows x64，只生成 Windows x64 Core 和 `SHA256SUMS`。只有明确要求多平台时才在工作流中选择 `all`。
+
+Windows x64 正式发布资产：
 
 ```text
 lianliao-aicore-v{version}-x86_64-pc-windows-msvc.zip
-lianliao-aicore-v{version}-x86_64-apple-darwin.tar.gz
-lianliao-aicore-v{version}-aarch64-apple-darwin.tar.gz
-lianliao-aicore-v{version}-x86_64-unknown-linux-gnu.tar.gz
 SHA256SUMS
 ```
 

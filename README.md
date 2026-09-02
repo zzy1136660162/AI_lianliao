@@ -8,7 +8,7 @@
 AI_lianliao/
 ├─ LianLiaoAIPC/       Electron + React 桌面端
 ├─ LianLiaoAICore/     Rust 本地 AI Core
-├─ .github/workflows/  链辽 Core 多平台发布工作流
+├─ .github/workflows/  链辽 Core 与桌面端发布工作流
 ├─ docs/               跨项目设计与实施文档
 └─ tools/              只读数据库查询及项目辅助工具
 ```
@@ -86,8 +86,8 @@ AionUi-Dev-2 -> LianLiaoAIPC-Dev-2
 发布流程：
 
 1. 在 GitHub Actions 运行 `Release LianLiaoAICore`，输入不带 `v` 的版本号，例如 `0.1.48`；或推送 `aicore-v0.1.48` 标签。
-2. 工作流生成 Windows x64/ARM64、macOS x64/ARM64、Linux x64 资产和 `SHA256SUMS`。
-3. 将每个平台的真实 SHA256 写入 `LianLiaoAIPC/aioncore-release-lock.json`。
+2. 未明确要求多平台时，`release_scope` 默认使用 `windows-x64`，只生成 Windows x64 资产和 `SHA256SUMS`；明确需要全平台时才选择 `all`。
+3. 将本次发布平台的真实 SHA256 写入 `LianLiaoAIPC/aioncore-release-lock.json`。
 4. 运行 `node scripts/verifyAioncoreReleaseLock.js`。
 5. 再构建桌面安装包。
 
@@ -112,12 +112,12 @@ GitHub 只执行仓库根目录 `.github/workflows` 中的工作流。本仓库�
 1. 确认 `LianLiaoAIPC/package.json` 中的版本已经提交到 `master`。
 2. 打开 GitHub 仓库的 `Actions` 页面。
 3. 选择 `Release LianLiaoAIPC`。
-4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.32`；`release_scope` 默认使用 `all`。
-5. `all` 会并行构建 Windows x64/ARM64、macOS Intel/Apple Silicon 和 Ubuntu x64；明确只发布 Windows x64 时选择 `windows-x64`，其他平台不会启动构建。
+4. 点击 `Run workflow`，分支选择 `master`，输入不带 `v` 的版本号，例如 `2.1.32`；`release_scope` 默认使用 `windows-x64`。
+5. 未明确要求多平台时保持 `windows-x64`；只有明确要求时才选择 `all` 并行构建 Windows x64/ARM64、macOS Intel/Apple Silicon 和 Ubuntu x64。
 6. 在 Releases 页面下载长期保留的 `desktop-v2.1.30` 正式安装包和 `SHA256SUMS.txt`。
 7. Actions 页面只保留一个轻量发布报告 Artifact，其中包含版本、Commit、文件大小和 SHA256，不重复保存安装包。
 
-安装包先上传到草稿 GitHub Release，所选发布范围的资产集合和 SHA256 全部验证通过后才转为公开发布。常规正式版本仍应使用 `all`；`windows-x64` 仅用于用户明确要求的 Windows 专项发布。macOS 首版使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示。Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
+安装包先上传到草稿 GitHub Release，所选发布范围的资产集合和 SHA256 全部验证通过后才转为公开发布。常规正式版本默认使用 `windows-x64`；只有用户明确要求多平台时才使用 `all`。macOS 首版使用 ad-hoc 签名且未经过 Apple 公证，首次启动可能出现 Gatekeeper 提示。Release Tag 已存在时工作流会停止，禁止覆盖正式版本。
 
 ## 桌面安装包发布位置
 

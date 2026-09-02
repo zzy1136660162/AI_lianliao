@@ -10,7 +10,7 @@ on:
       release_scope:
         description: Platforms included in this release
         required: true
-        default: all
+        default: windows-x64
         type: choice
         options:
           - all
