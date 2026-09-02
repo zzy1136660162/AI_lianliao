@@ -51,6 +51,7 @@ mod tests {
         assert_eq!(root, PathBuf::from("/opt/node-v24"));
     }
 
+    #[cfg(unix)]
     #[test]
     fn mixed_roots_are_rejected() {
         let root = tempfile::tempdir().unwrap();

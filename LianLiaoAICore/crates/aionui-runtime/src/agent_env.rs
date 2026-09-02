@@ -37,6 +37,10 @@ fn build_agent_process_env(
         .iter()
         .filter_map(|(name, _)| proxy_env_key(name.as_os_str()))
         .collect();
+    let current_protected_keys: std::collections::HashSet<&'static str> = current_env
+        .iter()
+        .filter_map(|(name, _)| lianliao_protected_env_key(name.as_os_str()))
+        .collect();
 
     let mut merged: BTreeMap<OsString, OsString> = current_env.into_iter().collect();
     for (name, value) in shell_env {
@@ -45,6 +49,11 @@ fn build_agent_process_env(
         // inherited value authoritative for both upper- and lowercase forms.
         // Proxy values remain shell-derived when Core inherited no value.
         if proxy_env_key(name.as_os_str()).is_some_and(|key| current_proxy_keys.contains(key)) {
+            continue;
+        }
+        // These values form a process-local capability chain from Electron to
+        // the built-in MCP. A login shell must never replace either value.
+        if lianliao_protected_env_key(name.as_os_str()).is_some_and(|key| current_protected_keys.contains(key)) {
             continue;
         }
         merged.insert(name, value);
@@ -63,6 +72,15 @@ fn proxy_env_key(name: &std::ffi::OsStr) -> Option<&'static str> {
     const PROXY_ENV_KEYS: [&str; 4] = ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY"];
     let name = name.to_string_lossy();
     PROXY_ENV_KEYS.into_iter().find(|key| name.eq_ignore_ascii_case(key))
+}
+
+fn lianliao_protected_env_key(name: &std::ffi::OsStr) -> Option<&'static str> {
+    const KEYS: [&str; 2] = [
+        "LIANLIAO_INDUSTRY_GATEWAY_URL",
+        "LIANLIAO_INDUSTRY_GATEWAY_BOOTSTRAP_TOKEN",
+    ];
+    let name = name.to_string_lossy();
+    KEYS.into_iter().find(|key| name.eq_ignore_ascii_case(key))
 }
 
 fn clean_agent_env(env: &mut BTreeMap<OsString, OsString>) {
@@ -220,8 +238,10 @@ fn is_valid_env_key(key: &str) -> bool {
 mod tests {
     use super::*;
     use std::ffi::OsStr;
+    #[cfg(unix)]
     use std::path::Path;
 
+    #[cfg(unix)]
     const CHILD_MARKER: &str = "AIONUI_RUNTIME_AGENT_ENV_TEST_CHILD";
 
     #[test]
@@ -296,6 +316,43 @@ mod tests {
                 .as_deref(),
             Some("from-shell")
         );
+    }
+
+    #[test]
+    fn agent_process_env_preserves_lianliao_gateway_env() {
+        let current_env = vec![
+            (
+                OsString::from("LIANLIAO_INDUSTRY_GATEWAY_URL"),
+                OsString::from("http://127.0.0.1:43210"),
+            ),
+            (
+                OsString::from("LIANLIAO_INDUSTRY_GATEWAY_BOOTSTRAP_TOKEN"),
+                OsString::from("current-secret"),
+            ),
+        ];
+        let shell_env = vec![
+            (
+                OsString::from("LIANLIAO_INDUSTRY_GATEWAY_URL"),
+                OsString::from("http://127.0.0.1:1"),
+            ),
+            (
+                OsString::from("LIANLIAO_INDUSTRY_GATEWAY_BOOTSTRAP_TOKEN"),
+                OsString::from("shell-secret"),
+            ),
+            (OsString::from("LIANLIAO_SHELL_ONLY"), OsString::from("merged")),
+        ];
+
+        let env = build_agent_process_env(current_env, shell_env);
+
+        assert_eq!(
+            exact_env_value(&env, "LIANLIAO_INDUSTRY_GATEWAY_URL").as_deref(),
+            Some("http://127.0.0.1:43210")
+        );
+        assert_eq!(
+            exact_env_value(&env, "LIANLIAO_INDUSTRY_GATEWAY_BOOTSTRAP_TOKEN").as_deref(),
+            Some("current-secret")
+        );
+        assert_eq!(exact_env_value(&env, "LIANLIAO_SHELL_ONLY").as_deref(), Some("merged"));
     }
 
     fn exact_env_value(env: &[(OsString, OsString)], key: &str) -> Option<String> {

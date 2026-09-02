@@ -994,9 +994,25 @@ fn normalize_import_source_path(source_path: &Path) -> Result<PathBuf, Extension
 async fn replace_existing_path(path: &Path) -> Result<(), ExtensionError> {
     let metadata = match tokio::fs::symlink_metadata(path).await {
         Ok(metadata) => metadata,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            // A dangling NTFS junction reports NotFound through ordinary
+            // metadata APIs even though its reparse point still occupies the
+            // destination path. Remove that junction before the atomic rename.
+            #[cfg(windows)]
+            match junction::delete(path) {
+                Ok(()) => {}
+                Err(delete_error) if delete_error.kind() == io::ErrorKind::NotFound => {}
+                Err(delete_error) => return Err(delete_error.into()),
+            }
+            return Ok(());
+        }
         Err(e) => return Err(e.into()),
     };
+
+    #[cfg(windows)]
+    if metadata.file_type().is_symlink() && junction::delete(path).is_ok() {
+        return Ok(());
+    }
 
     if metadata.file_type().is_symlink() || metadata.is_file() {
         tokio::fs::remove_file(path).await?;
@@ -2767,8 +2783,8 @@ mod tests {
 
         let outcome = import_skills(&paths, &fresh_source).await.unwrap();
 
+        assert!(outcome.failed.is_empty(), "import failures: {:?}", outcome.failed);
         assert_eq!(outcome.imported, vec!["dangling"]);
-        assert!(outcome.failed.is_empty());
         assert!(!target.is_symlink());
         assert!(target.join(SKILL_MANIFEST_FILE).exists());
         assert!(

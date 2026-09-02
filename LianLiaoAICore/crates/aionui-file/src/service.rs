@@ -56,6 +56,16 @@ const PLACEHOLDER_SVG: &str = concat!(
     "</svg>",
 );
 
+fn relative_path_for_api(path: &Path, root: &Path) -> String {
+    let relative = path.strip_prefix(root).unwrap_or(path).to_string_lossy().into_owned();
+    #[cfg(windows)]
+    {
+        return relative.replace('\\', "/");
+    }
+    #[cfg(not(windows))]
+    relative
+}
+
 /// A concrete implementation of [`crate::traits::IFileService`].
 pub struct FileService {
     broadcaster: Arc<dyn EventBroadcaster>,
@@ -144,7 +154,7 @@ fn build_dir_tree_sync(dir: &Path, root: &Path) -> Result<Vec<DirOrFile>, FileEr
         let name = entry.file_name().to_string_lossy().into_owned();
 
         let full_path = path.to_string_lossy().into_owned();
-        let relative_path = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().into_owned();
+        let relative_path = relative_path_for_api(&path, root);
 
         let is_dir = metadata.is_dir();
 
@@ -191,7 +201,7 @@ fn read_children_sync(dir: &Path, root: &Path) -> Result<Vec<DirOrFile>, FileErr
         let name = entry.file_name().to_string_lossy().into_owned();
 
         let full_path = path.to_string_lossy().into_owned();
-        let relative_path = path.strip_prefix(root).unwrap_or(&path).to_string_lossy().into_owned();
+        let relative_path = relative_path_for_api(&path, root);
 
         children.push(DirOrFile {
             name,
@@ -248,7 +258,7 @@ fn list_workspace_files_sync(root: &Path) -> Result<Vec<WorkspaceFlatFile>, File
             .unwrap_or_default();
 
         let full_path = path.to_string_lossy().into_owned();
-        let relative_path = path.strip_prefix(root).unwrap_or(path).to_string_lossy().into_owned();
+        let relative_path = relative_path_for_api(path, root);
 
         files.push(WorkspaceFlatFile {
             name,
@@ -709,11 +719,9 @@ impl crate::traits::IFileService for FileService {
 
         // Compute relative path from workspace
         let workspace_path = Path::new(workspace);
-        let relative_path = canonical
-            .strip_prefix(std::fs::canonicalize(workspace_path).unwrap_or_else(|_| workspace_path.to_path_buf()))
-            .unwrap_or(&canonical)
-            .to_string_lossy()
-            .into_owned();
+        let canonical_workspace =
+            std::fs::canonicalize(workspace_path).unwrap_or_else(|_| workspace_path.to_path_buf());
+        let relative_path = relative_path_for_api(&canonical, &canonical_workspace);
 
         // Build and broadcast contentUpdate event
         let content = String::from_utf8(data.to_vec()).ok();
@@ -817,11 +825,9 @@ impl crate::traits::IFileService for FileService {
 
         // Compute relative path from workspace
         let workspace_path = Path::new(workspace);
-        let relative_path = canonical
-            .strip_prefix(std::fs::canonicalize(workspace_path).unwrap_or_else(|_| workspace_path.to_path_buf()))
-            .unwrap_or(&canonical)
-            .to_string_lossy()
-            .into_owned();
+        let canonical_workspace =
+            std::fs::canonicalize(workspace_path).unwrap_or_else(|_| workspace_path.to_path_buf());
+        let relative_path = relative_path_for_api(&canonical, &canonical_workspace);
 
         // Broadcast contentUpdate delete event
         let event = ContentUpdateEvent {

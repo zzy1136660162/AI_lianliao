@@ -7,6 +7,7 @@ fn write_file(path: &Path) {
     std::fs::write(path, b"").expect("write file");
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn managed_runtime_validation_uses_real_commands() {
     let tmp = tempfile::tempdir().unwrap();
@@ -159,6 +160,7 @@ fn managed_runtime_checksum_verification_detects_mismatch() {
     assert!(error.to_string().contains("checksum mismatch"));
 }
 
+#[cfg(unix)]
 #[test]
 fn managed_runtime_injects_npm_state_under_runtime_root() {
     let tmp = tempfile::tempdir().unwrap();

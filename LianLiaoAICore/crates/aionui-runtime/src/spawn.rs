@@ -365,7 +365,9 @@ fn resolve_program(program: &OsStr) -> OsString {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use crate::ResolvedCommand;
+    #[cfg(unix)]
     use std::time::{Duration, Instant};
 
     #[tokio::test]
@@ -444,6 +446,7 @@ mod tests {
         assert!(status.success());
     }
 
+    #[cfg(unix)]
     #[test]
     fn resolved_command_builder_applies_prefix_and_env() {
         let resolved = ResolvedCommand {
@@ -461,6 +464,7 @@ mod tests {
         assert!(preview.contains("NO_COLOR=\"1\"") || preview.contains("NO_COLOR=1"));
     }
 
+    #[cfg(unix)]
     #[test]
     fn display_renders_shell_style_command() {
         let mut b = Builder::new("/usr/local/bin/node");

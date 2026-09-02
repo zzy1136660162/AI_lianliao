@@ -1446,6 +1446,7 @@ fn create_team_temp_workspace_uses_date_partition() {
     assert!(workspace.is_dir());
 }
 
+#[cfg(unix)]
 #[tokio::test]
 async fn create_rejects_unavailable_workspace_with_trailing_whitespace_in_request() {
     let (svc, _broadcaster, _repo, _task_mgr) = make_service();

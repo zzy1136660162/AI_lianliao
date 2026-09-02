@@ -21,6 +21,9 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       release_tag: ${{ steps.version.outputs.release_tag }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Resolve release version
         id: version
         env:
@@ -39,6 +42,39 @@ jobs:
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "release_tag=aicore-v${VERSION}" >> "${GITHUB_OUTPUT}"
 
+      - name: Validate source release version
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          root = pathlib.Path("LianLiaoAICore")
+          manifest = (root / "Cargo.toml").read_text(encoding="utf-8")
+          workspace_package = manifest.split("[workspace.package]", 1)[1]
+          match = re.search(r'^version\s*=\s*"([^"]+)"', workspace_package, re.MULTILINE)
+          if match is None:
+              raise SystemExit("Missing workspace package version in Cargo.toml")
+          source_version = match.group(1)
+          release_version = os.environ["RELEASE_VERSION"]
+          if source_version != release_version:
+              raise SystemExit(
+                  f"Release version {release_version} does not match Cargo.toml {source_version}"
+              )
+
+          migration_versions = sorted(
+              int(path.name.split("_", 1)[0])
+              for path in (root / "crates" / "aionui-db" / "migrations").glob("[0-9]*_*.sql")
+          )
+          expected_versions = list(range(1, migration_versions[-1] + 1))
+          if migration_versions != expected_versions:
+              raise SystemExit(f"Non-contiguous database migrations: {migration_versions}")
+          if migration_versions[-1] < 25:
+              raise SystemExit("Core 0.1.49 must include database migration 25")
+          PY
+
       - name: Ensure draft GitHub Release exists
         env:
           GH_TOKEN: ${{ github.token }}
@@ -46,7 +82,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "Release ${RELEASE_TAG} already exists; platform assets will be replaced."
+            IS_DRAFT="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)"
+            if [[ "${IS_DRAFT}" != "true" ]]; then
+              echo "Published Release ${RELEASE_TAG} already exists and is immutable." >&2
+              exit 1
+            fi
+            echo "Draft Release ${RELEASE_TAG} already exists; resuming the interrupted build."
           else
             gh release create "${RELEASE_TAG}" \
               --repo "${GITHUB_REPOSITORY}" \
