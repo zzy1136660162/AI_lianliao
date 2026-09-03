@@ -14,6 +14,7 @@ Project-specific rules and conventions for AI assistants and contributors.
 - Keep `aionui-*` crate names, REST paths, WebSocket event names, MCP IDs, SQLite files, migrations, and `AIONUI_*` environment variables unless a separately approved compatibility migration exists.
 - User-visible CLI help and diagnostics should use the LianLiao brand.
 - Production assets are released by the repository-root `.github/workflows/lianliao-aicore-release.yml` workflow to `zzy1136660162/AI_lianliao`.
+- Core releases default to Windows x64 only unless the user explicitly requests multiple platforms; use the workflow's `all` scope only for an explicit multi-platform release.
 - Never make the desktop client consume upstream `iOfficeAI/AionCore` releases or `latest`.
 - Any Core release consumed by the desktop app must be pinned with a SHA256 in `LianLiaoAIPC/aioncore-release-lock.json`.
 

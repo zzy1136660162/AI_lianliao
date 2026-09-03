@@ -280,6 +280,7 @@ mod tests {
         assert_eq!(result, "");
     }
 
+    #[cfg(unix)]
     #[test]
     fn platform_extra_bins_at_filters_nonexistent() {
         let tmp = tempfile::TempDir::new().unwrap();

@@ -307,14 +307,18 @@ pub fn doctor_snapshot_for_test(rows: Vec<(&str, &str, &str)>) -> Vec<DoctorRow>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::fs;
     use std::path::PathBuf;
-    use std::sync::{Arc, Mutex, OnceLock};
+    #[cfg(unix)]
+    use std::sync::OnceLock;
+    use std::sync::{Arc, Mutex};
 
     use std::io::Write;
     use tracing::Level;
     use tracing_subscriber::fmt;
 
+    #[cfg(unix)]
     static TEST_MANAGED_RUNTIME_CACHE_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
     #[derive(Clone)]
@@ -348,6 +352,7 @@ mod tests {
         String::from_utf8(buffer.lock().expect("lock").clone()).expect("utf8")
     }
 
+    #[cfg(unix)]
     fn write_executable(path: &std::path::Path, body: &str) {
         fs::write(path, body).expect("write executable");
         #[cfg(unix)]
@@ -359,6 +364,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     fn fake_managed_runtime(root: &std::path::Path) -> ResolvedNodeRuntime {
         let bin = root.join("bin");
         fs::create_dir_all(&bin).expect("create runtime bin");
@@ -379,6 +385,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     fn test_managed_runtime_cache_lock() -> &'static tokio::sync::Mutex<()> {
         TEST_MANAGED_RUNTIME_CACHE_LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
     }
@@ -506,6 +513,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn stale_managed_runtime_cache_is_evicted_when_root_is_deleted() {
         let _guard = test_managed_runtime_cache_lock().lock().await;
@@ -531,6 +539,7 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn cached_managed_runtime_emits_ready_after_validation() {
         let _guard = test_managed_runtime_cache_lock().lock().await;

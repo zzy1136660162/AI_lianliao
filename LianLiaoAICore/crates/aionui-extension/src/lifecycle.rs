@@ -169,6 +169,7 @@ pub fn needs_install_hook(current_version: &str, persisted_version: Option<&str>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use tokio::process::Command;
 
     // -----------------------------------------------------------------------
@@ -264,6 +265,7 @@ mod tests {
         assert!(matches!(err, ExtensionError::HookNotFound(_)));
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_execute_hook_success() {
         let dir = tempfile::tempdir().unwrap();
@@ -281,6 +283,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_execute_hook_nonzero_exit() {
         let dir = tempfile::tempdir().unwrap();
@@ -310,6 +313,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_execute_hook_timeout() {
         let dir = tempfile::tempdir().unwrap();
@@ -337,6 +341,7 @@ mod tests {
         assert!(result.is_err(), "should have timed out");
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn test_execute_hook_working_directory() {
         let dir = tempfile::tempdir().unwrap();

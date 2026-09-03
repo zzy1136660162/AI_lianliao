@@ -7,6 +7,14 @@ on:
         description: LianLiaoAICore version without the v prefix
         required: true
         type: string
+      release_scope:
+        description: Platforms to publish
+        required: true
+        default: windows-x64
+        type: choice
+        options:
+          - windows-x64
+          - all
   push:
     tags:
       - "aicore-v*"
@@ -20,38 +28,99 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_tag: ${{ steps.version.outputs.release_tag }}
+      release_scope: ${{ steps.version.outputs.release_scope }}
+      build_matrix: ${{ steps.version.outputs.build_matrix }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
       - name: Resolve release version
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          INPUT_RELEASE_SCOPE: ${{ inputs.release_scope }}
           REF_NAME: ${{ github.ref_name }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
             VERSION="${INPUT_VERSION#v}"
+            RELEASE_SCOPE="${INPUT_RELEASE_SCOPE:-windows-x64}"
           else
             VERSION="${REF_NAME#aicore-v}"
+            RELEASE_SCOPE="windows-x64"
           fi
           if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid semantic version: ${VERSION}" >&2
             exit 1
           fi
+          case "${RELEASE_SCOPE}" in
+            windows-x64)
+              BUILD_MATRIX='{"include":[{"os":"windows-latest","target":"x86_64-pc-windows-msvc","binary":"aioncore.exe","archive":"zip"}]}'
+              ;;
+            all)
+              BUILD_MATRIX='{"include":[{"os":"windows-latest","target":"x86_64-pc-windows-msvc","binary":"aioncore.exe","archive":"zip"},{"os":"windows-11-arm","target":"aarch64-pc-windows-msvc","binary":"aioncore.exe","archive":"zip"},{"os":"macos-15-intel","target":"x86_64-apple-darwin","binary":"aioncore","archive":"tar.gz"},{"os":"macos-15","target":"aarch64-apple-darwin","binary":"aioncore","archive":"tar.gz"},{"os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","binary":"aioncore","archive":"tar.gz"}]}'
+              ;;
+            *)
+              echo "Unsupported release scope: ${RELEASE_SCOPE}" >&2
+              exit 1
+              ;;
+          esac
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
           echo "release_tag=aicore-v${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "release_scope=${RELEASE_SCOPE}" >> "${GITHUB_OUTPUT}"
+          echo "build_matrix=${BUILD_MATRIX}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate source release version
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import re
+
+          root = pathlib.Path("LianLiaoAICore")
+          manifest = (root / "Cargo.toml").read_text(encoding="utf-8")
+          workspace_package = manifest.split("[workspace.package]", 1)[1]
+          match = re.search(r'^version\s*=\s*"([^"]+)"', workspace_package, re.MULTILINE)
+          if match is None:
+              raise SystemExit("Missing workspace package version in Cargo.toml")
+          source_version = match.group(1)
+          release_version = os.environ["RELEASE_VERSION"]
+          if source_version != release_version:
+              raise SystemExit(
+                  f"Release version {release_version} does not match Cargo.toml {source_version}"
+              )
+
+          migration_versions = sorted(
+              int(path.name.split("_", 1)[0])
+              for path in (root / "crates" / "aionui-db" / "migrations").glob("[0-9]*_*.sql")
+          )
+          expected_versions = list(range(1, migration_versions[-1] + 1))
+          if migration_versions != expected_versions:
+              raise SystemExit(f"Non-contiguous database migrations: {migration_versions}")
+          if migration_versions[-1] < 25:
+              raise SystemExit("Core 0.1.49 must include database migration 25")
+          PY
 
       - name: Ensure draft GitHub Release exists
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.version.outputs.release_tag }}
           VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_SCOPE: ${{ steps.version.outputs.release_scope }}
         run: |
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            echo "Release ${RELEASE_TAG} already exists; platform assets will be replaced."
+            IS_DRAFT="$(gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)"
+            if [[ "${IS_DRAFT}" != "true" ]]; then
+              echo "Published Release ${RELEASE_TAG} already exists and is immutable." >&2
+              exit 1
+            fi
+            echo "Draft Release ${RELEASE_TAG} already exists; resuming the interrupted build."
           else
             gh release create "${RELEASE_TAG}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "LianLiaoAICore v${VERSION}" \
-              --notes "链辽 AI Core 多平台发布。桌面端构建必须使用 aioncore-release-lock.json 固定资产和 SHA256。" \
+              --notes "链辽 AI Core 发布范围：${RELEASE_SCOPE}。桌面端构建必须使用 aioncore-release-lock.json 固定资产和 SHA256。" \
               --draft
           fi
 
@@ -59,28 +128,7 @@ jobs:
     needs: prepare
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            binary: aioncore.exe
-            archive: zip
-          - os: windows-11-arm
-            target: aarch64-pc-windows-msvc
-            binary: aioncore.exe
-            archive: zip
-          - os: macos-15-intel
-            target: x86_64-apple-darwin
-            binary: aioncore
-            archive: tar.gz
-          - os: macos-15
-            target: aarch64-apple-darwin
-            binary: aioncore
-            archive: tar.gz
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            binary: aioncore
-            archive: tar.gz
+      matrix: ${{ fromJSON(needs.prepare.outputs.build_matrix) }}
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -138,6 +186,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          RELEASE_SCOPE: ${{ needs.prepare.outputs.release_scope }}
         run: |
           shopt -s nullglob
           archives=(dist/lianliao-aicore-*)
@@ -159,6 +208,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          RELEASE_SCOPE: ${{ needs.prepare.outputs.release_scope }}
         run: |
           mkdir -p artifacts
           gh release download "${RELEASE_TAG}" \
@@ -168,11 +218,15 @@ jobs:
 
           expected_assets=(
             "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip"
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-pc-windows-msvc.zip"
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz"
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz"
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz"
           )
+          if [[ "${RELEASE_SCOPE}" == "all" ]]; then
+            expected_assets+=(
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-pc-windows-msvc.zip"
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz"
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz"
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz"
+            )
+          fi
           for asset in "${expected_assets[@]}"; do
             if [[ ! -f "artifacts/${asset}" ]]; then
               echo "Missing required Release asset: ${asset}" >&2
@@ -182,14 +236,21 @@ jobs:
 
       - name: Generate SHA256SUMS
         working-directory: artifacts
+        env:
+          RELEASE_SCOPE: ${{ needs.prepare.outputs.release_scope }}
         run: |
-          sha256sum \
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip" \
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-pc-windows-msvc.zip" \
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz" \
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz" \
-            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz" \
-            > SHA256SUMS
+          assets=(
+            "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-pc-windows-msvc.zip"
+          )
+          if [[ "${RELEASE_SCOPE}" == "all" ]]; then
+            assets+=(
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-pc-windows-msvc.zip"
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-apple-darwin.tar.gz"
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-aarch64-apple-darwin.tar.gz"
+              "lianliao-aicore-v${{ needs.prepare.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz"
+            )
+          fi
+          sha256sum "${assets[@]}" > SHA256SUMS
 
       - name: Publish GitHub Release
         env:

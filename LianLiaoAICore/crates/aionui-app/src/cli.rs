@@ -589,7 +589,10 @@ mod tests {
 
     #[test]
     fn help_uses_lianliao_brand_while_preserving_binary_name() {
-        let err = Cli::try_parse_from(["aioncore", "--help"]).expect_err("--help should exit through clap DisplayHelp");
+        let err = match Cli::try_parse_from(["aioncore", "--help"]) {
+            Ok(_) => panic!("expected --help to exit through clap DisplayHelp"),
+            Err(err) => err,
+        };
 
         assert_eq!(err.kind(), ErrorKind::DisplayHelp);
         let rendered = err.to_string();

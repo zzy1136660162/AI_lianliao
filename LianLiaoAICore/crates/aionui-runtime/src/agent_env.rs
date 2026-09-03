@@ -238,8 +238,10 @@ fn is_valid_env_key(key: &str) -> bool {
 mod tests {
     use super::*;
     use std::ffi::OsStr;
+    #[cfg(unix)]
     use std::path::Path;
 
+    #[cfg(unix)]
     const CHILD_MARKER: &str = "AIONUI_RUNTIME_AGENT_ENV_TEST_CHILD";
 
     #[test]
