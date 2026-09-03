@@ -42,25 +42,19 @@ afterEach(() => {
 });
 
 describe('LianLiaoAICore release lock', () => {
-  it('pins the current repository, release tag, and five platform assets', () => {
+  it('pins the current repository, release tag, and Windows x64 asset', () => {
     const { lock } = releaseLockTools.loadReleaseLock(projectRoot);
 
     expect(lock.repository).toBe('zzy1136660162/AI_lianliao');
-    expect(lock.version).toBe('v0.1.48');
-    expect(lock.releaseTag).toBe('aicore-v0.1.48');
-    expect(Object.keys(lock.assets).toSorted()).toEqual([
-      'darwin-arm64',
-      'darwin-x64',
-      'linux-x64',
-      'win32-arm64',
-      'win32-x64',
-    ]);
-    expect(Object.values(lock.assets).every((asset) => asset.name.startsWith('lianliao-aicore-v0.1.48-'))).toBe(true);
+    expect(lock.version).toBe('v0.1.50');
+    expect(lock.releaseTag).toBe('aicore-v0.1.50');
+    expect(Object.keys(lock.assets)).toEqual(['win32-x64']);
+    expect(Object.values(lock.assets).every((asset) => asset.name.startsWith('lianliao-aicore-v0.1.50-'))).toBe(true);
     expect(Object.values(lock.assets).every((asset) => /^[a-f0-9]{64}$/.test(asset.sha256))).toBe(true);
   });
 
   it('resolves formal assets only with a published SHA256', () => {
-    const { asset } = releaseLockTools.getLockedAsset(projectRoot, 'win32-arm64');
+    const { asset } = releaseLockTools.getLockedAsset(projectRoot, 'win32-x64');
 
     expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/);
   });

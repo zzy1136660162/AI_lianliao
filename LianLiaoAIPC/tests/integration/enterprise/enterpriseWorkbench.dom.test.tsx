@@ -27,7 +27,7 @@ const chartMocks = vi.hoisted(() => ({
 const ROUTE_RENDER_TIMEOUT = 15_000;
 
 vi.mock('echarts/core', () => ({ init: chartMocks.init, use: chartMocks.use }));
-vi.mock('echarts/charts', () => ({ BarChart: {} }));
+vi.mock('echarts/charts', () => ({ BarChart: {}, LineChart: {}, ScatterChart: {}, TreemapChart: {} }));
 vi.mock('echarts/components', () => ({ GridComponent: {}, LegendComponent: {}, TooltipComponent: {} }));
 vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }));
 
@@ -586,20 +586,22 @@ describe('enterprise desktop core workbench', () => {
       { timeout: ROUTE_RENDER_TIMEOUT }
     );
     expect(screen.getByRole('heading', { name: 'enterprise.routes.projectDetail.title' })).toBeVisible();
-    await waitFor(() => expect(container.querySelectorAll('[data-protected="true"]')).toHaveLength(4), {
+    await waitFor(() => expect(container.querySelectorAll('[data-protected="true"]')).toHaveLength(3), {
       timeout: ROUTE_RENDER_TIMEOUT,
     });
     expect(screen.getByRole('heading', { name: /^enterprise\.projectDetail\.lockedProjectTitle/ })).toBeVisible();
 
     sensitiveAudit.assertNeverObserved(container);
     expect(container).not.toHaveTextContent(PRIVATE_PROJECT_NAME);
+    expect(container).not.toHaveTextContent(PRIVATE_PROJECT_OWNER);
     expect(container).not.toHaveTextContent(RAW_PRIVATE_PROJECT_PHONE);
     expect(container).not.toHaveTextContent(AUTHENTICATED_USER.openId);
     const protectedValues = [...container.querySelectorAll<HTMLElement>('[data-protected="true"]')].map(
       (element) => element.textContent
     );
-    expect(protectedValues).toContain(PRIVATE_PROJECT_OWNER);
-    expect(protectedValues).toContain(PRIVATE_PROJECT_PHONE);
+    expect(protectedValues).not.toContain(PRIVATE_PROJECT_OWNER);
+    expect(protectedValues).not.toContain(RAW_PRIVATE_PROJECT_PHONE);
+    expect(screen.getByText(PRIVATE_PROJECT_PHONE)).not.toHaveAttribute('data-protected');
 
     await user.click(screen.getByRole('button', { name: 'enterprise.shell.actions.logout' }));
     await waitFor(() =>

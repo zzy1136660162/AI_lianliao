@@ -7,20 +7,24 @@ const repositoryRoot = resolve(desktopRoot, '..');
 const workflow = readFileSync(resolve(repositoryRoot, '.github/workflows/lianliao-aicore-release.yml'), 'utf8');
 
 describe('LianLiaoAICore release workflow', () => {
-  it('builds all Core targets required by the desktop release', () => {
+  it('defaults to Windows x64 and keeps all-platform targets behind an explicit scope', () => {
+    expect(workflow).toContain('default: windows-x64');
+    expect(workflow).toContain('- windows-x64');
+    expect(workflow).toContain('- all');
     [
       'x86_64-pc-windows-msvc',
       'aarch64-pc-windows-msvc',
       'x86_64-apple-darwin',
       'aarch64-apple-darwin',
       'x86_64-unknown-linux-gnu',
-    ].forEach((target) => expect(workflow).toContain(`target: ${target}`));
-    expect(workflow).toContain('os: windows-11-arm');
-    expect(workflow).toContain('os: macos-15-intel');
-    expect(workflow).toContain('os: macos-15');
+    ].forEach((target) => expect(workflow).toContain(`"target":"${target}"`));
+    expect(workflow).toContain('"os":"windows-11-arm"');
+    expect(workflow).toContain('"os":"macos-15-intel"');
+    expect(workflow).toContain('"os":"macos-15"');
+    expect(workflow).toContain('Unsupported release scope');
   });
 
-  it('requires every archive before publishing the Core release', () => {
+  it('requires Windows x64 by default and every archive for all-platform releases', () => {
     [
       'x86_64-pc-windows-msvc.zip',
       'aarch64-pc-windows-msvc.zip',
