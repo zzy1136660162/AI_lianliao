@@ -99,13 +99,17 @@
 
 .gridPanel {
   min-width: 0;
-  padding: 16px;
+  padding: 12px;
 }
 
 .productGrid {
   display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.catalogWithPreview .productGrid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
 }
 
 .productCard {
@@ -140,7 +144,8 @@
 .cardImage {
   position: relative;
   display: grid;
-  aspect-ratio: var(--enterprise-catalog-image-ratio);
+  width: 100%;
+  aspect-ratio: 4 / 3;
   place-items: center;
   overflow: hidden;
   color: var(--text-secondary);
@@ -160,13 +165,16 @@
 }
 
 .cardImage img {
+  position: absolute;
+  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 .cardBody {
-  padding: 14px;
+  padding: 10px 11px 11px;
 }
 
 .cardCompanyLine {
@@ -193,8 +201,8 @@
 }
 
 .cardHeading h2 {
-  min-height: 48px;
-  font-size: 18px;
+  min-height: 40px;
+  font-size: 15px;
   line-height: 1.35;
 }
 
@@ -202,18 +210,18 @@
 .detailTags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  gap: 4px;
+  margin-top: 8px;
 }
 
 .cardBody > p {
   display: -webkit-box;
-  min-height: 38px;
-  margin: 12px 0 8px;
+  min-height: 34px;
+  margin: 8px 0 6px;
   overflow: hidden;
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.55;
   overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -225,7 +233,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 4px;
-  margin: 0 -8px;
+  margin: 0 -6px;
 }
 
 .paginationBar {
@@ -515,6 +523,16 @@
   }
 }
 
+@media (max-width: 1600px) {
+  .productGrid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .catalogWithPreview .productGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 1220px) {
   .filterForm {
     grid-template-columns: repeat(3, minmax(140px, 1fr));
@@ -529,7 +547,11 @@
   }
 
   .productGrid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .catalogWithPreview .productGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -549,7 +571,8 @@
     border-left: 0;
   }
 
-  .productGrid {
+  .productGrid,
+  .catalogWithPreview .productGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -568,7 +591,8 @@
   }
 
   .filterForm,
-  .productGrid {
+  .productGrid,
+  .catalogWithPreview .productGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 

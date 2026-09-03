@@ -29,10 +29,22 @@ describe('product catalog compact CSS contract', () => {
     expect(quickViewRule).not.toMatch(/display:\s*none/);
   });
 
-  it('uses four visual cards on wide screens and the shared image ratio', () => {
+  it('uses six compact cards with a fixed 4:3 clipped image frame', () => {
     const gridRule = productCss.match(/\.productGrid\s*\{([^}]*)\}/s)?.[1] ?? '';
     const imageRule = productCss.match(/\.cardImage\s*\{([^}]*)\}/s)?.[1] ?? '';
-    expect(gridRule).toMatch(/grid-template-columns:\s*repeat\(4,/);
-    expect(imageRule).toMatch(/aspect-ratio:\s*var\(--enterprise-catalog-image-ratio\)/);
+    const imageElementRule = productCss.match(/\.cardImage img\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(gridRule).toMatch(/grid-template-columns:\s*repeat\(6,/);
+    expect(imageRule).toMatch(/aspect-ratio:\s*4\s*\/\s*3/);
+    expect(imageRule).toMatch(/overflow:\s*hidden/);
+    expect(imageElementRule).toMatch(/position:\s*absolute/);
+    expect(imageElementRule).toMatch(/inset:\s*0/);
+    expect(imageElementRule).toMatch(/object-fit:\s*cover/);
+  });
+
+  it('reduces the product grid when the preview sidebar or a narrower viewport needs more room', () => {
+    expect(productCss).toMatch(/\.catalogWithPreview\s+\.productGrid\s*\{[^}]*repeat\(4,/s);
+    expect(productCss).toMatch(/@media\s*\(max-width:\s*1600px\)[\s\S]*?\.productGrid\s*\{[^}]*repeat\(5,/);
+    expect(productCss).toMatch(/@media\s*\(max-width:\s*820px\)[\s\S]*?\.productGrid,[\s\S]*?repeat\(2,/);
   });
 });
