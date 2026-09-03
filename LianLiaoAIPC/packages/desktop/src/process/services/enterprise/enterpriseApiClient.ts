@@ -467,7 +467,7 @@ const serializeUnifiedRequest = (
 const BEHAVIOR_TYPE_LABELS = Object.freeze({
   // 桌面工具访问与 H5 页面访问使用不同类型，便于后台按终端来源统计。
   PAGE_VIEW: 'PC端工具',
-  CONTACT_ACQUIRE: '获取联系方式',
+  CONTACT_ACQUIRE: '解锁联系方式',
   PHONE_DIAL: '拨打电话',
   DEMAND_PUBLISH: '发布需求',
 });

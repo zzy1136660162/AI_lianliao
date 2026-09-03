@@ -110,7 +110,6 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
   const { t } = useTranslation();
   const [activeKeys, setActiveKeys] = useState<string[]>([]);
   const expanded = activeKeys.includes('overview');
-  const { dashboard } = data;
 
   return (
     <section className={styles.dashboard} aria-labelledby='project-dashboard-title'>
@@ -125,13 +124,9 @@ const ProjectDashboard: React.FC<ProjectDashboardProps> = ({ data }) => {
             label: (
               <div className={styles.dashboardHeading}>
                 <div>
-                  <span>{t('enterprise.projects.dashboard.eyebrow')}</span>
                   <h2 id='project-dashboard-title'>{t('enterprise.projects.dashboard.title')}</h2>
                 </div>
                 <div className={styles.dashboardHeadingMeta}>
-                  {dashboard.updatedAt ? (
-                    <p>{t('enterprise.projects.dashboard.updatedAt', { date: dashboard.updatedAt })}</p>
-                  ) : null}
                   <span>
                     {t(expanded ? 'enterprise.projects.dashboard.collapse' : 'enterprise.projects.dashboard.expand')}
                   </span>

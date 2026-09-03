@@ -1,28 +1,12 @@
 {
   "schemaVersion": 1,
   "repository": "zzy1136660162/AI_lianliao",
-  "version": "v0.1.48",
-  "releaseTag": "aicore-v0.1.48",
+  "version": "v0.1.50",
+  "releaseTag": "aicore-v0.1.50",
   "assets": {
     "win32-x64": {
-      "name": "lianliao-aicore-v0.1.48-x86_64-pc-windows-msvc.zip",
-      "sha256": "99426d0c5b551da7adc1ffcacfbbd6a280c46b723a33b5f52f906eb72a94eb91"
-    },
-    "win32-arm64": {
-      "name": "lianliao-aicore-v0.1.48-aarch64-pc-windows-msvc.zip",
-      "sha256": "c65e134391eb71c60a03b280a6dfe051728e12ef3be343da002174f3f0702887"
-    },
-    "darwin-x64": {
-      "name": "lianliao-aicore-v0.1.48-x86_64-apple-darwin.tar.gz",
-      "sha256": "42bfdfcac4cdd8514dedb67124364d26cf6669865583e02961e54b4f3854e5cf"
-    },
-    "darwin-arm64": {
-      "name": "lianliao-aicore-v0.1.48-aarch64-apple-darwin.tar.gz",
-      "sha256": "66615c0705dcf5a71ade2a6a0fa8dce34f447244226255a552e73d53786bf631"
-    },
-    "linux-x64": {
-      "name": "lianliao-aicore-v0.1.48-x86_64-unknown-linux-gnu.tar.gz",
-      "sha256": "cfd9b2e65eb550492bf201320593e1e89ea40c0cd36aadaede3f5c253b77f473"
+      "name": "lianliao-aicore-v0.1.50-x86_64-pc-windows-msvc.zip",
+      "sha256": "e2e701b5286e70ecefa2439d98e5da3267f6cbb443c8a1417a340dc3f7da6edf"
     }
   }
 }

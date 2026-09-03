@@ -13,7 +13,7 @@ import { ipcMain, app, BrowserWindow } from 'electron';
 import * as path from 'path';
 import packageJson from '../../../../../package.json';
 import type { DesktopDiagnosticSubmitRequest } from '@/common/types/desktopDiagnostic';
-import { collectFeedbackLogAttachment } from '../feedback/logs';
+import { collectFeedbackLogAttachment, resolveFeedbackLogDirectories } from '../feedback/logs';
 import { EnterpriseApiClient } from '@process/services/enterprise/enterpriseApiClient';
 import { resolveEnterpriseApiClientOptions } from '@process/services/enterprise/enterpriseRuntimeConfig';
 import { EnterpriseSessionStore } from '@process/services/enterprise/enterpriseSessionStore';
@@ -64,7 +64,13 @@ ipcMain.handle('feedback:collect-logs', async () => {
       logsDir = path.join(app.getPath('userData'), 'logs');
     }
 
-    const logDirs = [logsDir, path.join(logsDir, 'logs')];
+    const logDirs = resolveFeedbackLogDirectories({
+      appDataDir: app.getPath('appData'),
+      currentLogsDir: logsDir,
+      isMultiInstance: process.env.AIONUI_MULTI_INSTANCE === '1',
+      isPackaged: app.isPackaged,
+      productName: app.getName(),
+    });
     const attachment = collectFeedbackLogAttachment(logDirs);
     if (!attachment) return null;
 

@@ -578,6 +578,28 @@ export interface IConversationMcpStatus {
 export const BUILTIN_IMAGE_GEN_ID = 'builtin-image-gen';
 export const BUILTIN_IMAGE_GEN_NAME = 'aionui-image-generation';
 export const BUILTIN_IMAGE_GEN_LEGACY_NAMES = ['AionUi Image Generation', BUILTIN_IMAGE_GEN_ID] as const;
+export const BUILTIN_INDUSTRY_SEARCH_ID = 'builtin-industry-search';
+export const BUILTIN_INDUSTRY_SEARCH_NAME = 'lianliao-industry-search';
+
+export const isRequiredBuiltinMcpServer = (server: Pick<IMcpServer, 'id' | 'name' | 'builtin'>): boolean =>
+  server.builtin === true && (server.id === BUILTIN_INDUSTRY_SEARCH_ID || server.name === BUILTIN_INDUSTRY_SEARCH_NAME);
+
+export const isUserVisibleMcpServer = (server: IMcpServer): boolean =>
+  !(
+    isRequiredBuiltinMcpServer(server) ||
+    (server.builtin === true && (server.id === BUILTIN_IMAGE_GEN_ID || server.name === BUILTIN_IMAGE_GEN_NAME))
+  );
+
+/** Appends required built-ins after user/default selection and deduplicates by stable ID and name. */
+export const appendRequiredBuiltinMcpServers = (selected: IMcpServer[], available: IMcpServer[]): IMcpServer[] => {
+  const output = [...selected];
+  for (const server of available) {
+    if (!isRequiredBuiltinMcpServer(server)) continue;
+    if (output.some((candidate) => candidate.id === server.id || candidate.name === server.name)) continue;
+    output.push(server);
+  }
+  return output;
+};
 
 export interface IMcpTool {
   name: string;

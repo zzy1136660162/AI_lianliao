@@ -7,7 +7,12 @@
 import type { ImageGenerationModelSetting } from '@/common/config/clientSettings';
 import { removeImageGenerationEnvKeys, resolveImageGenerationMcpEnv } from '@/common/config/imageGenerationMcpEnv';
 import { mcpService } from '@/common/adapter/ipcBridge';
-import { type IMcpServer, BUILTIN_IMAGE_GEN_ID, BUILTIN_IMAGE_GEN_NAME } from '@/common/config/storage';
+import {
+  type IMcpServer,
+  BUILTIN_IMAGE_GEN_ID,
+  BUILTIN_IMAGE_GEN_NAME,
+  isUserVisibleMcpServer,
+} from '@/common/config/storage';
 import { isImageGenSupported } from '@/common/utils/imageModelAllowlist';
 import { Divider, Form, Tooltip, Message, Modal, Switch } from '@arco-design/web-react';
 import { Help } from '@icon-park/react';
@@ -54,10 +59,7 @@ const ModalMcpManagementSection: React.FC<{
 }> = ({ message, mcpServers, extensionMcpServers, setMcpServers, saveMcpServers, isPageMode }) => {
   const { t } = useTranslation();
   const { oauthStatus, loggingIn, checkOAuthStatus, markLoginRequired, clearLoginRequired, login } = useMcpOAuth();
-  const visibleMcpServers = useMemo(
-    () => mcpServers.filter((server) => !isBuiltinImageGenServer(server)),
-    [mcpServers]
-  );
+  const visibleMcpServers = useMemo(() => mcpServers.filter(isUserVisibleMcpServer), [mcpServers]);
 
   const handleAuthRequired = useCallback(
     (server: IMcpServer) => {

@@ -103,7 +103,15 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
   };
 
   const viewProduct = (product: EnterpriseProductSummary) => {
-    navigate(productDetailPath(product.productId));
+    navigate(productDetailPath(product.productId), {
+      state: createCatalogReturnState({
+        kind: 'companies',
+        path: '/enterprise/companies',
+        query: catalog.query,
+        selectedId: product.companyId,
+        scrollTop: getEnterpriseCatalogScrollTop(),
+      }),
+    });
   };
 
   const resetFilters = () => {
@@ -150,9 +158,15 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
       );
     }
 
+    const resultLabel = t('enterprise.companies.resultCount', { count: catalog.data.total });
+
     return (
       <div className={styles.catalogGrid}>
-        <div ref={targetRef} className={styles.catalogListPanel}>
+        <div ref={targetRef} className={styles.catalogListPanel} role='region' aria-label={resultLabel}>
+          <div className={styles.catalogListHeader}>
+            <h2>{t('enterprise.navigation.companies')}</h2>
+            {/*<span>{resultLabel}</span>*/}
+          </div>
           <div
             className={[
               styles.catalogList,
@@ -177,7 +191,7 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
             current={catalog.query.pageNum}
             pageSize={catalog.query.pageSize}
             total={catalog.data.total}
-            resultLabel={t('enterprise.companies.resultCount', { count: catalog.data.total })}
+            resultLabel={resultLabel}
             onChange={changePage}
           />
         </div>
@@ -232,7 +246,6 @@ const CompanyListPage: React.FC<CompanyListPageProps> = ({ client = enterpriseCl
   return (
     <EnterpriseCatalogShell
       titleId='company-catalog-title'
-      eyebrow={t('enterprise.companies.eyebrow')}
       title={t('enterprise.routes.companies.title')}
       description={t('enterprise.companies.description')}
       filters={filters}

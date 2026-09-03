@@ -15,6 +15,7 @@ type QuitCleanupDeps = {
   markExplicitQuit: () => void;
   destroyTray: () => void;
   disposeCronResumeListener: () => void;
+  stopIndustrySearchGateway: () => Promise<void>;
   stopBackend: () => Promise<void>;
   logInfo: (message: string) => void;
   logWarn: (message: string) => void;
@@ -54,6 +55,9 @@ async function runQuitCleanup(deps: QuitCleanupDeps): Promise<void> {
   const cleanup = async () => {
     deps.disposeCronResumeListener();
 
+    await deps
+      .stopIndustrySearchGateway()
+      .catch((err) => deps.logError('[App] Failed to stop industry search gateway:', err));
     await deps.stopBackend().catch((err) => deps.logError('[App] Failed to stop backend:', err));
   };
 

@@ -521,5 +521,14 @@
       }
     }
   },
+  "industrySearch": {
+    "title": "Ergebnisse der Branchensuche",
+    "resultCount": "{{count}} Ergebnisse",
+    "broadened": "Der Suchbereich wurde einmal erweitert",
+    "noResults": "Keine passenden Ergebnisse gefunden",
+    "viewDetail": "Details anzeigen",
+    "loadMore": "Mehr laden",
+    "productEvidence": "Zugehörige Produkte"
+  },
   "notFound": "Unterhaltung nicht gefunden oder wurde gelöscht"
 }

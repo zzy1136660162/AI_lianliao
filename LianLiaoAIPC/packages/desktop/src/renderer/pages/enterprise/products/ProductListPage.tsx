@@ -281,7 +281,6 @@ const ProductListPage: React.FC<ProductListPageProps> = ({ client = enterpriseCl
     <EnterpriseCatalogShell
       className='enterprise-product-list'
       titleId='product-catalog-title'
-      eyebrow={t('enterprise.products.eyebrow')}
       title={t('enterprise.routes.products.title')}
       description={t('enterprise.products.description')}
       filters={filters}

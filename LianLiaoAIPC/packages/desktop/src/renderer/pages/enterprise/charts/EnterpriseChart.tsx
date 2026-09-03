@@ -1,10 +1,19 @@
-import { BarChart } from 'echarts/charts';
+import { BarChart, LineChart, ScatterChart, TreemapChart } from 'echarts/charts';
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components';
 import { init, use, type EChartsCoreOption, type EChartsType } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 
-use([BarChart, GridComponent, LegendComponent, TooltipComponent, CanvasRenderer]);
+use([
+  BarChart,
+  LineChart,
+  ScatterChart,
+  TreemapChart,
+  GridComponent,
+  LegendComponent,
+  TooltipComponent,
+  CanvasRenderer,
+]);
 
 export type EnterpriseChartRow = {
   label: string;

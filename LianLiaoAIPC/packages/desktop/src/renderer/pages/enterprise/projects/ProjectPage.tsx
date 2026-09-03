@@ -166,7 +166,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
         >
           <div className={styles.sectionHeading}>
             <div>
-              <span>{t('enterprise.projects.catalog.eyebrow')}</span>
               <h2 id='project-catalog-title'>{t('enterprise.projects.catalog.title')}</h2>
             </div>
             {/*<p>{t('enterprise.projects.catalog.description')}</p>*/}
@@ -253,7 +252,6 @@ const ProjectPage: React.FC<ProjectPageProps> = ({ client = enterpriseClient }) 
     <section className={styles.page} aria-labelledby='project-page-title'>
       <header className={styles.pageHeader}>
         <div>
-          <span className={styles.eyebrow}>{t('enterprise.projects.eyebrow')}</span>
           <h1 id='project-page-title'>{t('enterprise.routes.projects.title')}</h1>
           <p>{t('enterprise.projects.description')}</p>
         </div>

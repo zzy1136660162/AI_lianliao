@@ -26,6 +26,7 @@ export type EnterpriseContactAccessPanelProps = {
   contactName?: string;
   contactNameLabel?: string;
   maskedPhone?: string;
+  onAccessGranted?: () => void;
 };
 
 /**
@@ -45,6 +46,7 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
   contactName,
   contactNameLabel = '联系人',
   maskedPhone,
+  onAccessGranted,
 }) => {
   const [phone, setPhone] = useState<string>();
   const [loading, setLoading] = useState(false);
@@ -89,6 +91,7 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
         setPhone(access.phone);
         setNoticeType('success');
         setNotice('联系方式已获取。');
+        onAccessGranted?.();
         return;
       }
 
@@ -154,7 +157,7 @@ const EnterpriseContactAccessPanel: React.FC<EnterpriseContactAccessPanelProps> 
       <Space wrap>
         {!phone ? (
           <Button type='primary' loading={loading} onClick={() => void acquire()}>
-            获取联系方式
+            解锁联系方式
           </Button>
         ) : (
           <>

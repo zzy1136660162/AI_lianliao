@@ -16,7 +16,7 @@ const chartMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('echarts/core', () => ({ init: chartMocks.init, use: chartMocks.use }));
-vi.mock('echarts/charts', () => ({ BarChart: {} }));
+vi.mock('echarts/charts', () => ({ BarChart: {}, LineChart: {}, ScatterChart: {}, TreemapChart: {} }));
 vi.mock('echarts/components', () => ({ GridComponent: {}, LegendComponent: {}, TooltipComponent: {} }));
 vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }));
 
@@ -523,7 +523,13 @@ describe('project detail permission display', () => {
       if (input.operation === 'contact.acquire') {
         return {
           operation: 'contact.acquire',
-          data: { allowed: true, errType: 0, message: '', action: 'NONE' },
+          data: {
+            allowed: true,
+            errType: 0,
+            message: '',
+            action: 'NONE',
+            ...(input.payload.consumeQuota === false ? {} : { phone: '13800000000' }),
+          },
         };
       }
       if (input.operation === 'project.contactUnlock') {
@@ -556,16 +562,27 @@ describe('project detail permission display', () => {
     expect(container.querySelector('[class*="arco-"]')).not.toBeInTheDocument();
     expect(screen.getByText(/enterprise\.projectDetail\.lockedProjectTitle/)).toBeVisible();
     expect(screen.getByText('Plant and warehouse')).toBeVisible();
-    expect(screen.getByText('Secret owner')).toHaveAttribute('data-protected', 'true');
     expect(container).not.toHaveTextContent('Factory expansion');
-    expect(screen.getByText('Secret contact')).toHaveAttribute('data-protected', 'true');
+    expect(container).not.toHaveTextContent('Secret owner');
+    expect(container).not.toHaveTextContent('Secret contact');
+    expect(container).not.toHaveTextContent('Secret address');
     expect(container).not.toHaveTextContent('1380000');
-    expect(screen.getByText('Secret address')).toHaveAttribute('data-protected', 'true');
-    expect(screen.getByText('138********')).toHaveAttribute('data-protected', 'true');
+    expect(container.querySelectorAll('[data-protected="true"]')).toHaveLength(3);
+    expect(screen.getByText('138********')).not.toHaveAttribute('data-protected');
+
     await userEvent.click(screen.getByRole('button', { name: 'enterprise.projectDetail.unlock.action' }));
-    expect(await screen.findByText('Secret owner')).toBeVisible();
+    const acquireButton = await screen.findByRole('button', { name: '解锁联系方式' });
+    expect(container).not.toHaveTextContent('Factory expansion');
+    expect(container).not.toHaveTextContent('Secret owner');
+    expect(container.querySelectorAll('[data-protected="true"]')).toHaveLength(3);
+
+    await userEvent.click(acquireButton);
+    expect(await screen.findByRole('heading', { name: 'Factory expansion' })).toBeVisible();
     expect(screen.getByText('Secret owner')).not.toHaveAttribute('data-protected');
-    expect(screen.getByRole('button', { name: '获取联系方式' })).toBeVisible();
+    expect(screen.getByText('Secret contact')).not.toHaveAttribute('data-protected');
+    expect(screen.getByText('Secret address')).not.toHaveAttribute('data-protected');
+    expect(screen.getAllByText('13800000000')).not.toHaveLength(0);
+    expect(container.querySelector('[data-protected="true"]')).toBeNull();
     expect(request).toHaveBeenCalledWith({
       operation: 'contact.acquire',
       payload: { resourceType: 'PROJECT', resourceId: '901', consumeQuota: false },
@@ -573,6 +590,10 @@ describe('project detail permission display', () => {
     expect(request).toHaveBeenCalledWith({
       operation: 'project.contactUnlock',
       payload: { hpInfoId: '901' },
+    });
+    expect(request).toHaveBeenCalledWith({
+      operation: 'contact.acquire',
+      payload: { resourceType: 'PROJECT', resourceId: '901' },
     });
   });
 
@@ -637,33 +658,59 @@ describe('project detail permission display', () => {
   });
 
   it('shows authorized fields and renders rich-looking content as text for a purchased project', async () => {
-    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
-      operation: 'project.detail',
-      data: {
-        hpInfoId: '901',
-        projectName: 'Factory expansion',
-        constructionUnit: 'Acme Manufacturing',
-        contactName: 'Jane',
-        phone: '13800000000',
-        address: 'No. 8 Industry Road',
-        constructionNature: 'New build',
-        totalInvestment: 5000,
-        constructionPeriod: '2026-2027',
-        projectComposition: '<script>window.stolen=true</script>Plant',
-        equipment: 'Production line',
-        materials: 'Steel and cement',
-        purchased: true,
-      },
+    const request = vi.fn<EnterpriseClient['request']>(async (input) => {
+      if (input.operation === 'contact.acquire') {
+        return {
+          operation: 'contact.acquire',
+          data: {
+            allowed: true,
+            errType: 0,
+            message: '',
+            action: 'NONE',
+            phone: '13800000000',
+          },
+        };
+      }
+      return {
+        operation: 'project.detail',
+        data: {
+          hpInfoId: '901',
+          projectName: 'Factory expansion',
+          constructionUnit: 'Acme Manufacturing',
+          contactName: 'Jane',
+          phone: '13800000000',
+          address: 'No. 8 Industry Road',
+          constructionNature: 'New build',
+          totalInvestment: 5000,
+          constructionPeriod: '2026-2027',
+          projectComposition: '<script>window.stolen=true</script>Plant',
+          equipment: 'Production line',
+          materials: 'Steel and cement',
+          purchased: true,
+        },
+      };
     });
     const { container } = renderDetail(createClient(request));
 
-    expect(await screen.findByText('Acme Manufacturing')).toBeVisible();
-    expect(screen.getByText('Jane')).toBeVisible();
-    expect(screen.getByText('138********')).toBeVisible();
-    expect(screen.getByRole('button', { name: '获取联系方式' })).toBeVisible();
+    const acquireButton = await screen.findByRole('button', { name: '解锁联系方式' });
+    expect(container).not.toHaveTextContent('Factory expansion');
+    expect(container).not.toHaveTextContent('Acme Manufacturing');
+    expect(container).not.toHaveTextContent('Jane');
+    expect(container).not.toHaveTextContent('No. 8 Industry Road');
+    expect(container).not.toHaveTextContent('13800000000');
+    expect(screen.getAllByText('138********')).not.toHaveLength(0);
+    expect(container.querySelectorAll('[data-protected="true"]')).toHaveLength(3);
     expect(screen.getByText('<script>window.stolen=true</script>Plant')).toBeVisible();
     expect(container.querySelector('script')).toBeNull();
     expect(container.querySelector("a[href^='tel:']")).toBeNull();
+
+    await userEvent.click(acquireButton);
+    expect(await screen.findByRole('heading', { name: 'Factory expansion' })).toBeVisible();
+    expect(screen.getByText('Acme Manufacturing')).toBeVisible();
+    expect(screen.getByText('Jane')).toBeVisible();
+    expect(screen.getByText('No. 8 Industry Road')).toBeVisible();
+    expect(screen.getAllByText('13800000000')).not.toHaveLength(0);
+    expect(container.querySelector('[data-protected="true"]')).toBeNull();
   });
 
   it('rejects a nonnumeric detail route before any IPC request', async () => {

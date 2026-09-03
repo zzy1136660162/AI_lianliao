@@ -559,5 +559,14 @@
       }
     }
   },
+  "industrySearch": {
+    "title": "Sektör arama sonuçları",
+    "resultCount": "{{count}} sonuç",
+    "broadened": "Arama alanı bir kez genişletildi",
+    "noResults": "Eşleşen sonuç bulunamadı",
+    "viewDetail": "Ayrıntıları görüntüle",
+    "loadMore": "Daha fazla yükle",
+    "productEvidence": "İlgili ürünler"
+  },
   "notFound": "Konuşma bulunamadı veya silinmiş"
 }

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
+  configureAppLogsPath,
   configureUserDataPath,
   getDevAppName,
   resolveLegacyUserDataPath,
@@ -10,6 +11,7 @@ import {
 } from '@/common/platform/userDataPath';
 
 const readSource = (relativePath: string): string => readFileSync(path.resolve(relativePath), 'utf8');
+const noOpEnsureDirectory = () => undefined;
 
 const createAppProbe = (isPackaged: boolean, defaultUserDataPath: string) => {
   const events: string[] = [];
@@ -45,6 +47,40 @@ const createAppProbe = (isPackaged: boolean, defaultUserDataPath: string) => {
 };
 
 describe('Electron user data path compatibility', () => {
+  it('keeps packaged logs under the stable LianLiaoAIPC directory even when legacy data remains selected', () => {
+    const selectedLegacyPath = path.join('appData', 'AionUi');
+    const expectedLogsPath = path.join('appData', 'LianLiaoAIPC', 'logs');
+    const events: string[] = [];
+    const app = {
+      isPackaged: true,
+      setAppLogsPath: (targetPath: string) => events.push(`setAppLogsPath:${targetPath}`),
+    };
+    const ensureDirectory = (targetPath: string, options: { recursive: true }) => {
+      events.push(`mkdir:${String(options.recursive)}:${targetPath}`);
+    };
+
+    expect(configureAppLogsPath(app, selectedLegacyPath, ensureDirectory, false)).toBe(expectedLogsPath);
+    expect(events).toEqual([`mkdir:true:${expectedLogsPath}`, `setAppLogsPath:${expectedLogsPath}`]);
+  });
+
+  it('keeps development log directories isolated by instance', () => {
+    const events: string[] = [];
+    const app = {
+      isPackaged: false,
+      setAppLogsPath: (targetPath: string) => events.push(targetPath),
+    };
+    expect(configureAppLogsPath(app, path.join('appData', 'AionUi-Dev'), noOpEnsureDirectory, false)).toBe(
+      path.join('appData', 'LianLiaoAIPC-Dev', 'logs')
+    );
+    expect(configureAppLogsPath(app, path.join('appData', 'AionUi-Dev-2'), noOpEnsureDirectory, true)).toBe(
+      path.join('appData', 'LianLiaoAIPC-Dev-2', 'logs')
+    );
+    expect(events).toEqual([
+      path.join('appData', 'LianLiaoAIPC-Dev', 'logs'),
+      path.join('appData', 'LianLiaoAIPC-Dev-2', 'logs'),
+    ]);
+  });
+
   it('uses the LianLiaoAIPC packaged directory and resolves the paired legacy source', () => {
     const defaultPath = path.join('appData', '链上辽宁·产业云城 AI桌面平台');
 

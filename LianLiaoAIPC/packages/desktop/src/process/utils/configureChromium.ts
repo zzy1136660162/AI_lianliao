@@ -9,6 +9,7 @@ import http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import os from 'os';
+import { configureAppLogsPath } from '@/common/platform/userDataPath';
 import { configureUserDataPath } from '@/common/platform/userDataPath';
 import { configureDesktopIdentity } from './configureDesktopIdentity';
 import { applyGpuRecoveryFlags } from './gpuRecovery';
@@ -19,6 +20,7 @@ import { applyGpuRecoveryFlags } from './gpuRecovery';
 configureDesktopIdentity(app);
 const isMultiInstance = process.env.AIONUI_MULTI_INSTANCE === '1';
 configureUserDataPath(app, fs.mkdirSync, isMultiInstance);
+configureAppLogsPath(app, app.getPath('userData'), fs.mkdirSync, isMultiInstance);
 
 // app.disableHardwareAcceleration() must run before app is ready.
 applyGpuRecoveryFlags();

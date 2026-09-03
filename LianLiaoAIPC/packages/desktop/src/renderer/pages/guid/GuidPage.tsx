@@ -5,7 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
+import { isUserVisibleMcpServer, type IMcpServer, type TProviderWithModel } from '@/common/config/storage';
 import { resolveLocaleKey } from '@/common/utils';
 import type { AssistantDetail } from '@/common/types/agent/assistantTypes';
 
@@ -475,7 +475,7 @@ const GuidPage: React.FC = () => {
       disabledBuiltinSkills={guidDisabledBuiltinSkills ?? []}
       enabledSkills={guidEnabledSkills ?? []}
       onToggleSkill={handleToggleSkill}
-      mcpServers={availableMcpServers}
+      mcpServers={availableMcpServers.filter(isUserVisibleMcpServer)}
       selectedMcpServerIds={guidSelectedMcpServerIds ?? []}
       onToggleMcpServer={handleToggleMcpServer}
       speechInputNode={

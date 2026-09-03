@@ -190,6 +190,19 @@ describe('company list data lifecycle', () => {
     expect(screen.getByText('5000万元人民币')).toBeVisible();
     expect(screen.getByText('Precision pump')).toBeVisible();
     expect(screen.getByText('+2')).toBeVisible();
+    const resultsRegion = screen.getByRole('region', {
+      name: 'enterprise.companies.resultCount:45',
+    });
+    expect(
+      within(resultsRegion).getByRole('heading', {
+        name: 'enterprise.navigation.companies',
+      })
+    ).toBeVisible();
+    expect(
+      within(resultsRegion).queryByRole('button', {
+        name: /export|导出|enterprise\.companies\.actions\.export/i,
+      })
+    ).not.toBeInTheDocument();
     const featuredHeader = screen.getByText('enterprise.navigation.products').parentElement;
     expect(featuredHeader).not.toBeNull();
     expect(
@@ -355,6 +368,70 @@ describe('company list interactions', () => {
     expect(screen.getByRole('status', { name: 'location' })).toHaveTextContent('/enterprise/companies/42');
   });
 
+  it('keeps contextual returns across company list, product detail and owning company detail', async () => {
+    const request = vi.fn<EnterpriseClient['request']>(async (input) => {
+      if (input.operation === 'company.list') return companyPage('Alpha Hydraulics');
+      if (input.operation === 'product.detail') {
+        return {
+          operation: 'product.detail',
+          data: {
+            productId: '901',
+            companyId: '42',
+            name: 'Precision pump',
+            companyName: 'Alpha Hydraulics',
+            industry: 'Equipment',
+            phone: '1380000****',
+          },
+        };
+      }
+      if (input.operation === 'company.detail') {
+        return {
+          operation: 'company.detail',
+          data: { companyId: '42', name: 'Alpha Hydraulics', industry: 'Equipment', phone: '1380000****' },
+        };
+      }
+      if (input.operation === 'product.list') {
+        return {
+          operation: 'product.list',
+          data: {
+            list: [{ productId: '901', companyId: '42', name: 'Precision pump' }],
+            pageNum: 1,
+            pageSize: 12,
+            pages: 1,
+            total: 1,
+          },
+        };
+      }
+      throw new Error(`Unexpected operation: ${input.operation}`);
+    });
+    const client = createClient(request);
+    const user = userEvent.setup();
+
+    render(
+      <EnterpriseAntdProvider>
+        <MemoryRouter initialEntries={['/enterprise/companies']}>
+          <Routes>
+            <Route path='/enterprise/companies' element={<CompanyListPage client={client} />} />
+            <Route path='/enterprise/companies/:companyId' element={<CompanyDetailPage client={client} />} />
+            <Route path='/enterprise/products/:productId' element={<ProductDetailPage client={client} />} />
+          </Routes>
+        </MemoryRouter>
+      </EnterpriseAntdProvider>
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'Precision pump' }));
+    expect(await screen.findByRole('heading', { name: 'Precision pump' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'enterprise.productDetail.backToCompanyList' })).toBeVisible();
+
+    await user.click(screen.getByRole('link', { name: 'Alpha Hydraulics' }));
+    expect(await screen.findByRole('heading', { name: 'Alpha Hydraulics' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'enterprise.companyDetail.backToProductDetail' }));
+
+    expect(await screen.findByRole('heading', { name: 'Precision pump' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'enterprise.productDetail.backToCompanyList' }));
+    expect(await screen.findByText('Alpha Hydraulics')).toBeVisible();
+  });
+
   it('opens company details directly from the row action', async () => {
     const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue(companyPage('Alpha Hydraulics'));
     renderList(createClient(request));
@@ -486,7 +563,7 @@ describe('company detail', () => {
     await user.click((await screen.findByText('Industrial pump')).closest('a') as HTMLElement);
     expect(await screen.findByRole('heading', { name: 'Industrial pump' })).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'enterprise.productDetail.backToList' }));
+    await user.click(screen.getByRole('button', { name: 'enterprise.productDetail.backToCompanyDetail' }));
     expect(await screen.findByRole('heading', { name: 'Alpha Hydraulics' })).toBeVisible();
   });
 
@@ -546,8 +623,8 @@ describe('company detail', () => {
     expect(container).not.toHaveTextContent(rawPhone);
     const contactSection = screen.getByText('enterprise.companyDetail.sections.contact').closest('.ll-ant-card');
     expect(contactSection).not.toBeNull();
-    expect(within(contactSection as HTMLElement).getByRole('button', { name: '获取联系方式' })).toBeVisible();
-    await userEvent.click(within(contactSection as HTMLElement).getByRole('button', { name: '获取联系方式' }));
+    expect(within(contactSection as HTMLElement).getByRole('button', { name: '解锁联系方式' })).toBeVisible();
+    await userEvent.click(within(contactSection as HTMLElement).getByRole('button', { name: '解锁联系方式' }));
     expect(await within(contactSection as HTMLElement).findByText(rawPhone)).toBeVisible();
     expect(request).toHaveBeenCalledWith({
       operation: 'contact.acquire',

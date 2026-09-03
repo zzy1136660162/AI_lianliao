@@ -406,7 +406,7 @@ describe('product detail', () => {
     expect(screen.queryByText('enterprise.productDetail.contactPermissionNote')).toBeNull();
     expect(screen.getByRole('link', { name: 'Alpha Hydraulics' })).toHaveAttribute('href', '/enterprise/companies/42');
     expect(container.querySelector("a[href^='tel:']")).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: '获取联系方式' }));
+    await userEvent.click(screen.getByRole('button', { name: '解锁联系方式' }));
     expect(await screen.findByText('13800000000')).toBeVisible();
     expect(screen.getByText('江庆博')).toBeVisible();
     expect(screen.queryByRole('button', { name: '拨打电话' })).toBeNull();

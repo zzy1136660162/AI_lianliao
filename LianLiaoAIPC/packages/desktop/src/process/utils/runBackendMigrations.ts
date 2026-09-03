@@ -14,7 +14,12 @@ import {
   resolveImageGenerationMcpEnv,
   type ImageGenerationMcpEnvResolveResult,
 } from '@/common/config/imageGenerationMcpEnv';
-import { BUILTIN_IMAGE_GEN_NAME, type IMcpServer, type IProvider } from '@/common/config/storage';
+import {
+  BUILTIN_IMAGE_GEN_NAME,
+  BUILTIN_INDUSTRY_SEARCH_NAME,
+  type IMcpServer,
+  type IProvider,
+} from '@/common/config/storage';
 import { getBuiltinMcpScriptPath, type ProcessConfig as ProcessConfigType } from './initStorage';
 import { migrateAssistantsToBackend } from './migrateAssistants';
 
@@ -133,6 +138,19 @@ function buildBuiltinImageGenerationServer(
       env,
     },
     original_json: JSON.stringify({ mcpServers: { [BUILTIN_IMAGE_GEN_NAME]: serverConfig } }, null, 2),
+  };
+}
+
+function buildBuiltinIndustrySearchServer(): McpImportServer {
+  const scriptPath = getBuiltinMcpScriptPath('builtin-mcp-industry-search');
+  const serverConfig = { command: 'node', args: [scriptPath] };
+  return {
+    name: BUILTIN_INDUSTRY_SEARCH_NAME,
+    description: '链辽AI内置产业检索，可查询企业码、重点产品、在建项目和供需信息。',
+    enabled: true,
+    builtin: true,
+    transport: { type: 'stdio', command: 'node', args: [scriptPath] },
+    original_json: JSON.stringify({ mcpServers: { [BUILTIN_INDUSTRY_SEARCH_NAME]: serverConfig } }, null, 2),
   };
 }
 
@@ -267,8 +285,9 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
   const imageEnvResolution = resolveImageGenerationMcpEnv(imageConfig, providers, existingImageEnv);
   logImageGenerationEnvResolution(imageEnvResolution, 'bootstrap');
   const imageServer = buildBuiltinImageGenerationServer(imageEnvResolution, imageConfig);
+  const industryServer = buildBuiltinIndustrySearchServer();
   const defaultServers = buildDefaultMcpServers();
-  const missing = [...defaultServers, imageServer].filter((server) => !existingByName.has(server.name));
+  const missing = [...defaultServers, imageServer, industryServer].filter((server) => !existingByName.has(server.name));
   let imageServerUpdated = false;
 
   if (missing.length > 0) {
@@ -295,6 +314,31 @@ async function ensureBootstrapMcpServersInDb(configFile: ConfigFile): Promise<vo
   const refreshedServers = await mcpService.listServers.invoke();
   const chromeDevtoolsServer = refreshedServers.find((server) => server.name === BUILTIN_CHROME_DEVTOOLS_NAME);
   await ensureBuiltinChromeDevtoolsAvailability(chromeDevtoolsServer);
+
+  const existingIndustryServer = existingByName.get(BUILTIN_INDUSTRY_SEARCH_NAME);
+  if (existingIndustryServer && industryServer.transport.type === 'stdio') {
+    const industryChanged =
+      existingIndustryServer.description !== industryServer.description ||
+      existingIndustryServer.enabled !== true ||
+      existingIndustryServer.builtin !== true ||
+      !isSameStdioTransport(existingIndustryServer.transport, industryServer.transport) ||
+      existingIndustryServer.original_json !== industryServer.original_json;
+    if (industryChanged) {
+      await mcpService.updateServer.invoke({
+        id: existingIndustryServer.id,
+        data: {
+          name: industryServer.name,
+          description: industryServer.description,
+          builtin: true,
+          transport: industryServer.transport,
+          original_json: industryServer.original_json,
+        },
+      });
+    }
+    if (existingIndustryServer.enabled !== true) {
+      await mcpService.toggleServer.invoke({ id: existingIndustryServer.id });
+    }
+  }
 
   if (
     imageEnvResolution.ok === true &&

@@ -34,7 +34,7 @@ const MembershipUpgradeModal: React.FC<MembershipUpgradeModalProps> = ({ open, m
     try {
       if (enterpriseAuth) await enterpriseAuth.refreshUserContext();
       await onRefreshed?.();
-      setRefreshMessage('会员权限已刷新，请重新获取联系方式。');
+      setRefreshMessage('会员权限已刷新，请重新解锁联系方式。');
     } catch {
       setRefreshMessage('暂时无法刷新会员权限，请稍后重试。');
     } finally {

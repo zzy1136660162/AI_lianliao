@@ -557,5 +557,14 @@
       }
     }
   },
+  "industrySearch": {
+    "title": "產業檢索結果",
+    "resultCount": "{{count}} 筆",
+    "broadened": "已適當擴大檢索範圍",
+    "noResults": "暫未找到符合條件的結果",
+    "viewDetail": "查看詳情",
+    "loadMore": "載入更多",
+    "productEvidence": "相關產品"
+  },
   "notFound": "會話不存在或已被刪除"
 }

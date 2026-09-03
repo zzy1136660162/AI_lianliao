@@ -2,7 +2,7 @@ import { Box, BuildingFour, EngineeringBrand, Search } from '@icon-park/react';
 import { Alert, AutoComplete, Button, Empty, Input, Spin, type AutoCompleteProps } from 'antd';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import type { UnifiedSearchItem } from '@/common/enterprise/unified-search/contracts';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
@@ -45,6 +45,12 @@ const groupIcon = {
   products: Box,
   projects: EngineeringBrand,
 } as const;
+
+const searchScopes = [
+  { kind: 'companies', path: '/enterprise/companies', Icon: BuildingFour },
+  { kind: 'products', path: '/enterprise/products', Icon: Box },
+  { kind: 'projects', path: '/enterprise/projects', Icon: EngineeringBrand },
+] as const;
 
 /** Ant Design autocomplete over the three verified enterprise catalogs. */
 const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 }) => {
@@ -242,12 +248,8 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
 
   return (
     <section className={styles.searchSection} aria-labelledby='enterprise-global-search-title'>
-      <div className={styles.sectionIndex} aria-hidden='true'>
-        {t('enterprise.dashboard.search.index')}
-      </div>
       <div className={styles.searchHeading}>
         <div>
-          <span>{t('enterprise.dashboard.search.eyebrow')}</span>
           <h2 id='enterprise-global-search-title'>{t('enterprise.dashboard.search.title')}</h2>
         </div>
       </div>
@@ -282,6 +284,12 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
           <Input.Search
             maxLength={100}
             prefix={<Search aria-hidden='true' />}
+            enterButton={
+              <span className={styles.searchButtonContent}>
+                <Search aria-hidden='true' fill='var(--enterprise-on-primary)' strokeWidth={5} />
+                <span>{t('enterprise.dashboard.search.button')}</span>
+              </span>
+            }
             allowClear
             placeholder={t('enterprise.dashboard.search.placeholder')}
             aria-label={t('enterprise.dashboard.search.ariaLabel')}
@@ -302,6 +310,14 @@ const GlobalSearch: React.FC<GlobalSearchProps> = ({ client, debounceMs = 300 })
           />
         </AutoComplete>
         {!ready && query.length > 0 ? <p>{t('enterprise.dashboard.search.minimumHint')}</p> : null}
+        <nav className={styles.searchScopes} aria-label={t('enterprise.dashboard.search.scopeAriaLabel')}>
+          {searchScopes.map(({ kind, path, Icon }) => (
+            <Link key={kind} to={path}>
+              <Icon aria-hidden='true' />
+              <span>{t(`enterprise.dashboard.search.groups.${kind}`)}</span>
+            </Link>
+          ))}
+        </nav>
       </div>
     </section>
   );

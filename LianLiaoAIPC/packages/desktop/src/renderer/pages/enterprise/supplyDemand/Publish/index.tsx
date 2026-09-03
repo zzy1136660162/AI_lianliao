@@ -391,7 +391,6 @@ const PublishDemandPage: React.FC<PublishDemandPageProps> = ({ client = enterpri
     <section className={styles.page} aria-labelledby='enterprise-demand-publish-title'>
       <header className={styles.header}>
         <div className={styles.headerCopy}>
-          <span className={styles.eyebrow}>{t('enterprise.supplyDemand.publish.eyebrow')}</span>
           <h1 id='enterprise-demand-publish-title'>{t('enterprise.supplyDemand.publish.title')}</h1>
           <p>{t('enterprise.supplyDemand.publish.description')}</p>
         </div>

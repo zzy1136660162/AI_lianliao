@@ -1,5 +1,100 @@
 # Changelog
 
+## [2.1.39](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.38...desktop-v2.1.39) (2026-09-03)
+
+### Desktop
+
+#### Bug Fixes
+
+- **catalog:** 修复企业码关联产品、产品所属企业详情之间的返回路径，保留原列表筛选和滚动位置
+- **enterprise:** 完善在建项目联系信息脱敏和供需详情相关图片展示
+- **workbench:** 修复主操作按钮图标对比度，并统一工作台快捷入口图标颜色
+
+#### Improvements
+
+- **workbench:** 重点采购品类图表直接显示项目数与材料数，产业动态标签和标题调整为单行省略布局
+
+#### Release
+
+- 本次仅发布 Windows x64 安装包，并通过后台设置为强制更新版本
+
+---
+
+## [2.1.38](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.37...desktop-v2.1.38) (2026-09-02)
+
+### Core ([aicore-v0.1.50](https://github.com/zzy1136660162/AI_lianliao/releases/tag/aicore-v0.1.50))
+
+#### Bug Fixes
+
+- **database:** 兼容历史 Windows Core 以 CRLF 记录的迁移校验和，修复升级正式版后误报“本地数据迁移失败”
+
+#### Release
+
+- 本次仅发布 Windows x64 安装包，并通过后台设置为强制更新版本
+
+---
+
+## [2.1.37](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.36...desktop-v2.1.37) (2026-09-02)
+
+### Desktop
+
+#### Bug Fixes
+
+- **diagnostics:** 将新版桌面日志统一写入 `%APPDATA%\LianLiaoAIPC\logs`，同时保留旧品牌目录日志的兼容采集
+- **desktop:** 保持中文应用名称与稳定日志目录相互独立，避免升级后产生多个新的日志位置
+- **workbench:** 修正重点采购品类的同图例纵向连线，并让重点采购材料树图填满可用图表区域
+
+### Core ([aicore-v0.1.49](https://github.com/zzy1136660162/AI_lianliao/releases/tag/aicore-v0.1.49))
+
+#### Bug Fixes
+
+- **database:** 随正式桌面包提供包含迁移 025 的 Core，修复旧 Core 无法识别新版本地数据库的问题
+
+#### Release
+
+- 本次仅发布 Windows x64 安装包，并通过后台设置为强制更新版本
+
+---
+
+## [2.1.36](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.35...desktop-v2.1.36) (2026-09-02)
+
+### Desktop
+
+#### Features
+
+- **workbench:** 优化企业工作台信息架构，增加产业动态、统一检索和高密度产业机会图表
+- **catalog:** 重点产品与供需对接筛选项和查询操作采用紧凑单行布局
+
+#### Improvements
+
+- **charts:** 地区机会热度改为柱状图，扩充重点采购材料并增加采购品类对比连线
+- **ui:** 精简工作台标题区域，移除无实际业务含义的实时状态标识
+
+#### Release
+
+- 本次仅发布 Windows x64 安装包，并通过后台设置为强制更新版本
+
+---
+
+## [2.1.35](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.34...desktop-v2.1.35) (2026-09-01)
+
+### Desktop
+
+#### Features
+
+- **assistant:** 产业检索助手接入独立的产业检索 MCP 工具，统一支持企业、产品、在建项目与供需信息检索
+- **enterprise:** 完善产业数据详情跳转、返回状态与多语言工具展示
+
+#### Bug Fixes
+
+- **desktop:** 优化启动清理、后端迁移和内置 MCP 资源打包流程
+
+#### Release
+
+- 本次仅发布 Windows x64 安装包，并通过后台设置为强制更新版本
+
+---
+
 ## [2.1.34](https://github.com/zzy1136660162/AI_lianliao/compare/desktop-v2.1.33...desktop-v2.1.34) (2026-08-10)
 
 ### Desktop

@@ -17,6 +17,7 @@ import { createTwoFilesPatch } from 'diff';
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import MarkdownView from '@renderer/components/Markdown';
+import { IndustrySearchResult, parseIndustryToolResult } from '../components/MessageToolCall';
 
 const StatusTag: React.FC<{ status: string }> = ({ status }) => {
   const getTagProps = () => {
@@ -106,7 +107,7 @@ const MessageAcpToolCall: React.FC<{ message: IMessageAcpToolCall }> = ({ messag
     return null;
   }
   const { update } = content;
-  const { tool_call_id, kind, title, status, rawInput, content: diffContent } = update;
+  const { tool_call_id, kind, title, status, rawInput, rawOutput, raw_output, content: diffContent } = update;
   const imagePath = getAcpImagePath(update);
   const imageAlt = imagePath?.split(/[/\\]/).pop() || t('acp.image.generated_alt');
   const [messageApi, messageContext] = Message.useMessage();
@@ -122,6 +123,10 @@ const MessageAcpToolCall: React.FC<{ message: IMessageAcpToolCall }> = ({ messag
     },
     [messageApi, t]
   );
+  const industryResult = parseIndustryToolResult(rawOutput ?? raw_output ?? diffContent);
+  if (industryResult) {
+    return <IndustrySearchResult result={industryResult} sourceMessageId={message.id} />;
+  }
 
   return (
     <Card className='w-full mb-2' size='small' bordered>

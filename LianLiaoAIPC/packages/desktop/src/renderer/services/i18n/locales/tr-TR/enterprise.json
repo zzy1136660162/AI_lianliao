@@ -299,6 +299,9 @@
     },
     "detail": {
       "summaryTitle": "Talep özeti",
+      "relatedImages": "İlgili görseller",
+      "relatedImageAlt": "{{name}} ilgili görseli {{index}}",
+      "relatedImageUnavailable": "İlgili görseller kullanılamıyor",
       "fieldsTitle": "İş alanları",
       "noFields": "Bu tür için görüntülenebilir ek alan yok."
     },
@@ -389,9 +392,11 @@
       "index": "01 / SEARCH",
       "eyebrow": "Cross-domain intelligence",
       "title": "Search companies, products and projects",
+      "button": "Search",
       "description": "One query runs across three verified catalogs. Each group remains available when another service is unavailable.",
       "placeholder": "Enter at least two characters",
       "ariaLabel": "Search enterprise companies, products and projects",
+      "scopeAriaLabel": "Arama kategorisi kısayolları",
       "resultsLabel": "Grouped enterprise search results",
       "minimumHint": "Enter at least two characters to search.",
       "loading": "Searching verified enterprise catalogs",
@@ -413,17 +418,29 @@
     },
     "quick": {
       "index": "03 / ACCESS",
-      "title": "Verified catalog entrances",
-      "description": "Continue directly to enterprise code, featured products or the project radar.",
+      "title": "Industrial services",
+      "description": "Find companies, products, projects and business opportunities.",
       "ariaLabel": "Enterprise catalog shortcuts"
     },
     "radar": {
       "eyebrow": "04 / PROCUREMENT RADAR",
-      "title": "Live project procurement signals",
-      "loading": "Loading live project procurement signals",
-      "errorTitle": "Project procurement signals could not be loaded",
+      "title": "Industry opportunity insights",
+      "loading": "Loading industry opportunity insights",
+      "errorTitle": "Industry opportunity insights could not be loaded",
       "errorDescription": "The dashboard service is temporarily unavailable. Your identity and catalog shortcuts remain available.",
       "viewAll": "Open project radar"
+    },
+    "activity": {
+      "title": "Industry activity",
+      "subtitle": "Live updates",
+      "demands": "Supply-demand orders",
+      "projects": "Projects",
+      "loading": "Loading",
+      "error": "Temporarily unavailable",
+      "empty": "No recent activity",
+      "projectTag": "Project",
+      "viewAllDemands": "View all supply-demand orders",
+      "viewAllProjects": "View all projects"
     }
   },
   "companies": {
@@ -497,6 +514,7 @@
     "eyebrow": "Verified company record",
     "profileEyebrow": "Company profile",
     "backToList": "Back to enterprise code",
+    "backToProductDetail": "Ürün ayrıntılarına dön",
     "loading": "Loading the company profile",
     "logoAlt": "{{name}} logo",
     "logoUnavailable": "Company logo unavailable",
@@ -591,6 +609,8 @@
     "eyebrow": "Verified product record",
     "profileEyebrow": "Product profile",
     "backToList": "Back to featured products",
+    "backToCompanyList": "Kurumsal kod listesine dön",
+    "backToCompanyDetail": "Şirket ayrıntılarına dön",
     "loading": "Loading the product profile",
     "contactPermissionNote": "The phone is masked at the trusted desktop boundary using the H5 policy. Dialing and access unlocking are not available.",
     "sections": {

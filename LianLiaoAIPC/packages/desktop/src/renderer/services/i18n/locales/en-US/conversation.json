@@ -557,5 +557,14 @@
       }
     }
   },
+  "industrySearch": {
+    "title": "Industry search results",
+    "resultCount": "{{count}} results",
+    "broadened": "The search area was broadened once",
+    "noResults": "No matching results found",
+    "viewDetail": "View details",
+    "loadMore": "Load more",
+    "productEvidence": "Related products"
+  },
   "notFound": "Conversation not found or has been deleted"
 }

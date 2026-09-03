@@ -15,7 +15,7 @@ const chartMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('echarts/core', () => ({ init: chartMocks.init, use: chartMocks.use }));
-vi.mock('echarts/charts', () => ({ BarChart: {} }));
+vi.mock('echarts/charts', () => ({ BarChart: {}, LineChart: {}, ScatterChart: {}, TreemapChart: {} }));
 vi.mock('echarts/components', () => ({ GridComponent: {}, LegendComponent: {}, TooltipComponent: {} }));
 vi.mock('echarts/renderers', () => ({ CanvasRenderer: {} }));
 
@@ -96,6 +96,40 @@ const drillResponse = (): EnterpriseResponse => ({
   ],
 });
 
+const demandActivityResponse = (): EnterpriseResponse => ({
+  operation: 'demand.list',
+  data: {
+    list: Array.from({ length: 3 }, (_, index) => ({
+      demandId: String(101 + index),
+      typeId: 0,
+      typeName: 'Machining',
+      title: `Demand ${index + 1}`,
+      publishedAt: `2026-08-0${index + 1}`,
+      primaryTags: [],
+    })),
+    pageNum: 1,
+    pageSize: 6,
+    pages: 1,
+    total: 3,
+  },
+});
+
+const projectActivityResponse = (): EnterpriseResponse => ({
+  operation: 'project.list',
+  data: {
+    list: Array.from({ length: 3 }, (_, index) => ({
+      hpInfoId: String(201 + index),
+      projectName: `RAW project ${index + 1}`,
+      province: 'Liaoning',
+      publishedAt: `2026-08-0${index + 1}`,
+    })),
+    pageNum: 1,
+    pageSize: 6,
+    pages: 1,
+    total: 3,
+  },
+});
+
 type UnifiedResponseOptions = {
   companyName?: string;
   productName?: string;
@@ -160,6 +194,8 @@ const unifiedResponse = ({
 const defaultRequest = vi.fn<EnterpriseClient['request']>((request: EnterpriseRequest) => {
   if (request.operation === 'project.dashboard') return Promise.resolve(dashboardResponse());
   if (request.operation === 'project.drill') return Promise.resolve(drillResponse());
+  if (request.operation === 'demand.list') return Promise.resolve(demandActivityResponse());
+  if (request.operation === 'project.list') return Promise.resolve(projectActivityResponse());
   if (request.operation === 'unified.search') return Promise.resolve(unifiedResponse());
   return Promise.reject(new Error('unexpected operation'));
 });
@@ -223,11 +259,24 @@ describe('enterprise dashboard', () => {
     expect(screen.getByRole('img', { name: 'enterprise.projects.dashboard.categoryTitle' })).toBeVisible();
     expect(screen.getByText('Shenyang')).toBeVisible();
     expect(screen.getByText('Industrial pumps')).toBeVisible();
+    const searchScopes = screen.getByRole('navigation', {
+      name: 'enterprise.dashboard.search.scopeAriaLabel',
+    });
+    expect(
+      within(searchScopes).getByRole('link', { name: 'enterprise.dashboard.search.groups.companies' })
+    ).toHaveAttribute('href', '/enterprise/companies');
+    expect(
+      within(searchScopes).getByRole('link', { name: 'enterprise.dashboard.search.groups.products' })
+    ).toHaveAttribute('href', '/enterprise/products');
+    expect(
+      within(searchScopes).getByRole('link', { name: 'enterprise.dashboard.search.groups.projects' })
+    ).toHaveAttribute('href', '/enterprise/projects');
     expect(screen.getByRole('link', { name: /enterprise\.navigation\.supplyDemand/ })).toHaveAttribute(
       'href',
       '/enterprise/supply-demand'
     );
     expect(container).not.toHaveTextContent('openid-must-never-appear');
+    expect(container).not.toHaveTextContent('enterprise.dashboard.heroIndex');
     expect(container).not.toHaveTextContent('enterprise.dashboard.metrics.favorites');
     expect(container).not.toHaveTextContent('enterprise.dashboard.metrics.leads');
   });
@@ -241,6 +290,34 @@ describe('enterprise dashboard', () => {
     expect(await screen.findByText('enterprise.shell.unknownCompany')).toBeVisible();
     expect(screen.getByText('enterprise.shell.unknownUser')).toBeVisible();
     expect(screen.queryByText(/enterprise\.companies\.memberLevel\.value/)).toBeNull();
+  });
+
+  it('renders the workbench search glyph with the primary-action foreground token', async () => {
+    renderDashboard();
+
+    const button = await screen.findByRole('button', { name: 'enterprise.dashboard.search.button' });
+    const strokes = Array.from(button.querySelectorAll('.i-icon-search [stroke]'));
+
+    expect(strokes.length).toBeGreaterThan(0);
+    expect(strokes.every((path) => path.getAttribute('stroke') === 'var(--enterprise-on-primary)')).toBe(true);
+  });
+
+  it('shows three latest supply-demand orders and three protected projects in industry activity', async () => {
+    const { container } = renderDashboard();
+    const activity = screen.getByRole('complementary', { name: 'enterprise.dashboard.activity.title' });
+
+    const latestDemand = await within(activity).findByRole('link', { name: /Demand 3/ });
+    expect(latestDemand).toHaveAttribute('href', '/enterprise/supply-demand/0/103');
+    expect(within(latestDemand).getByText('Machining').parentElement).toContainElement(
+      within(latestDemand).getByText('Demand 3')
+    );
+    expect(within(latestDemand).getByText('Demand 3')).toHaveAttribute('title', 'Demand 3');
+    expect(activity.querySelectorAll('a[href^="/enterprise/supply-demand/0/"]')).toHaveLength(3);
+    expect(
+      await within(activity).findByRole('link', { name: /enterprise\.projectDetail\.lockedProjectTitle.*2026-08-03/ })
+    ).toHaveAttribute('href', '/enterprise/projects/203');
+    expect(activity.querySelectorAll('a[href^="/enterprise/projects/"]')).toHaveLength(3);
+    expect(container).not.toHaveTextContent('RAW project');
   });
 
   it('waits 300ms and requires two trimmed characters before searching', async () => {
@@ -339,10 +416,11 @@ describe('enterprise dashboard', () => {
     const input = screen.getByRole('combobox', { name: 'enterprise.dashboard.search.ariaLabel' });
     setSearchValue(input, 'pump');
     await screen.findByRole('option', { name: /Search company/ }, SEARCH_WAIT_OPTIONS);
+    const listbox = screen.getByRole('listbox');
 
-    expect(screen.getByText('enterprise.dashboard.search.groups.companies')).toBeInTheDocument();
-    expect(screen.getByText('enterprise.dashboard.search.groups.products')).toBeInTheDocument();
-    expect(screen.getByText('enterprise.dashboard.search.groups.projects')).toBeInTheDocument();
+    expect(within(listbox).getByText('enterprise.dashboard.search.groups.companies')).toBeInTheDocument();
+    expect(within(listbox).getByText('enterprise.dashboard.search.groups.products')).toBeInTheDocument();
+    expect(within(listbox).getByText('enterprise.dashboard.search.groups.projects')).toBeInTheDocument();
     expect(screen.queryByText('138****0000')).toBeNull();
   });
 
@@ -494,6 +572,8 @@ describe('enterprise dashboard', () => {
           : Promise.resolve(dashboardResponse());
       }
       if (operation.operation === 'project.drill') return Promise.resolve(drillResponse());
+      if (operation.operation === 'demand.list') return Promise.resolve(demandActivityResponse());
+      if (operation.operation === 'project.list') return Promise.resolve(projectActivityResponse());
       return Promise.reject(new Error('unexpected operation'));
     });
     const { container } = renderDashboard(createClient(request));

@@ -7,7 +7,6 @@ import styles from './catalog-layout.module.css';
 export type EnterpriseCatalogShellProps = {
   className?: string;
   titleId: string;
-  eyebrow: ReactNode;
   title: ReactNode;
   description: ReactNode;
   filters: ReactNode;
@@ -21,7 +20,6 @@ export type EnterpriseCatalogShellProps = {
 export const EnterpriseCatalogShell: React.FC<EnterpriseCatalogShellProps> = ({
   className,
   titleId,
-  eyebrow,
   title,
   description,
   filters,
@@ -30,7 +28,6 @@ export const EnterpriseCatalogShell: React.FC<EnterpriseCatalogShellProps> = ({
   <section className={[styles.page, className].filter(Boolean).join(' ')} aria-labelledby={titleId}>
     <header className={styles.pageHeader}>
       <div>
-        <span className={styles.eyebrow}>{eyebrow}</span>
         <h1 id={titleId}>{title}</h1>
         <p>{description}</p>
       </div>

@@ -20,6 +20,25 @@ const compactEnd = css.indexOf('@media (prefers-reduced-motion: reduce)');
 const compactCss = css.slice(compactStart, compactEnd);
 
 describe('enterprise desktop shell CSS contract', () => {
+  it('aligns the menu, workspace, header, and page content to one 15px inset', () => {
+    const shellRule = css.match(/\.enterprise-shell\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const siderRule =
+      [...css.matchAll(/\.enterprise-sider\s*\{([^}]*)\}/gs)]
+        .map((match) => match[1])
+        .find((rule) => rule.includes('margin:')) ?? '';
+    const workspaceRule =
+      [...css.matchAll(/\.enterprise-shell__workspace\s*\{([^}]*)\}/gs)]
+        .map((match) => match[1])
+        .find((rule) => rule.includes('margin:')) ?? '';
+    const headerRule = css.match(/\.enterprise-header\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const mainRule = css.match(/\.enterprise-shell__main\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(shellRule).toMatch(/--enterprise-layout-inset:\s*15px/);
+    [siderRule, workspaceRule, headerRule, mainRule].forEach((rule) => {
+      expect(rule).toContain('var(--enterprise-layout-inset)');
+    });
+  });
+
   it('uses stable semantic cursors instead of Chromium auto cursor inference', () => {
     const shellRule = css.match(/\.enterprise-shell\s*\{([^}]*)\}/s)?.[1] ?? '';
     const windowChromeRule = windowChromeCss.match(/\.enterprise-window-chrome\s*\{([^}]*)\}/s)?.[1] ?? '';
@@ -74,12 +93,12 @@ describe('enterprise desktop shell CSS contract', () => {
     expect(catalogAssistantContentRule).toMatch(/overflow-y:\s*auto/);
   });
 
-  it('presents navigation groups as separated card surfaces', () => {
+  it('presents navigation groups as one compact divided menu surface', () => {
     const groupRule = css.match(/\.enterprise-sider__nav-group\s*\{([^}]*)\}/s)?.[1] ?? '';
 
-    expect(groupRule).toMatch(/background:\s*var\(--enterprise-surface\)/);
-    expect(groupRule).toMatch(/border-radius:\s*var\(--enterprise-radius-card\)/);
-    expect(groupRule).toMatch(/box-shadow:\s*var\(--enterprise-shadow-card\)/);
+    expect(groupRule).toMatch(/border-bottom:\s*1px solid var\(--border-light\)/);
+    expect(groupRule).toMatch(/box-shadow:\s*none/);
+    expect(groupRule).not.toMatch(/border-radius:\s*var\(--enterprise-radius-card\)/);
   });
 
   it('uses the bright page background and independent white shell cards', () => {

@@ -163,7 +163,7 @@ const DemandContactCard: React.FC<DemandContactCardProps> = ({ client, typeId, d
             <div className={styles.contactActions}>
               {access?.state === 'MEMBER_AVAILABLE' ? (
                 <Button type='primary' loading={acquiring} onClick={() => void acquire()}>
-                  使用会员权益获取联系方式
+                  使用会员权益解锁联系方式
                 </Button>
               ) : null}
               {access?.state === 'PAYMENT_REQUIRED' || access?.state === 'QUOTA_EXHAUSTED' ? (
@@ -176,7 +176,7 @@ const DemandContactCard: React.FC<DemandContactCardProps> = ({ client, typeId, d
                   扫码完成企业注册
                 </Button>
               ) : null}
-              {access?.state === 'DEMAND_CLOSED' ? <span>该需求已结束，暂不支持获取联系方式。</span> : null}
+              {access?.state === 'DEMAND_CLOSED' ? <span>该需求已结束，暂不支持解锁联系方式。</span> : null}
               {access?.state === 'UNAVAILABLE' ? <span>该需求不存在或暂不可查看。</span> : null}
               {/*  {typeof access?.remainingQuota === 'number' ? (
                 <span className={styles.quotaHint}>当前剩余获取次数：{access.remainingQuota}</span>

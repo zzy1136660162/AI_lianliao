@@ -11,14 +11,6 @@
   justify-content: space-between;
 }
 
-.eyebrow {
-  color: var(--primary);
-  font-family: var(--enterprise-font-ui);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-}
-
 .header h1 {
   margin: 7px 0 8px;
   font-family: var(--enterprise-font-ui);
@@ -145,7 +137,7 @@
   gap: 12px;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--enterprise-layout-inset);
   color: var(--text-secondary);
   text-align: center;
 }

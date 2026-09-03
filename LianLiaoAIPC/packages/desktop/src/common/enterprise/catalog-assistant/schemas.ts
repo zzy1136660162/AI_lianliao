@@ -12,7 +12,7 @@ import {
 const optionalShortText = (maximum: number) => z.string().trim().min(1).max(maximum).optional();
 const nullishShortText = (maximum: number) => z.string().trim().min(1).max(maximum).nullish();
 const catalogIdSchema = z.string().trim().min(1).max(100);
-const signedCatalogIdSchema = z
+export const signedCatalogIdSchema = z
   .string()
   .trim()
   .regex(/^-?[1-9]\d*$/, 'Expected a non-zero signed integer ID');

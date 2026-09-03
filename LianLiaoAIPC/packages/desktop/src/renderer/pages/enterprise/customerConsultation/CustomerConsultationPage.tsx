@@ -31,7 +31,6 @@ const CustomerConsultationPage: React.FC<CustomerConsultationPageProps> = ({ cli
           <HeadsetOne size={22} />
         </div>
         <div>
-          <span className={styles.eyebrow}>{t('enterprise.consultation.eyebrow')}</span>
           <h1>{t('enterprise.consultation.title')}</h1>
           <p>{t('enterprise.consultation.description')}</p>
         </div>

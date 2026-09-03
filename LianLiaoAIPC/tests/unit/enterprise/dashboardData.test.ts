@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { EnterpriseResponse } from '@/common/enterprise/contracts';
 import {
+  loadDashboardDemandActivity,
+  loadDashboardProjectActivity,
   loadDashboardSearch,
   normalizeDashboardSearchQuery,
 } from '@/renderer/pages/enterprise/dashboard/dashboardData';
@@ -96,5 +98,57 @@ describe('dashboard unified search loader', () => {
     pending.resolve(unifiedResponse());
 
     await expect(loading).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});
+
+describe('dashboard activity loaders', () => {
+  it('loads and keeps only the three newest supply-demand orders', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'demand.list',
+      data: {
+        list: [
+          { demandId: '1', typeId: 0, typeName: '加工', title: '订单 1', publishedAt: '2026-01-01', primaryTags: [] },
+          { demandId: '4', typeId: 0, typeName: '加工', title: '订单 4', publishedAt: '2026-04-01', primaryTags: [] },
+          { demandId: '2', typeId: 0, typeName: '加工', title: '订单 2', publishedAt: '2026-02-01', primaryTags: [] },
+          { demandId: '5', typeId: 0, typeName: '加工', title: '订单 5', publishedAt: '2026-05-01', primaryTags: [] },
+          { demandId: '3', typeId: 0, typeName: '加工', title: '订单 3', publishedAt: '2026-03-01', primaryTags: [] },
+          { demandId: '6', typeId: 0, typeName: '加工', title: '订单 6', publishedAt: '2026-06-01', primaryTags: [] },
+        ],
+        pageNum: 1,
+        pageSize: 6,
+        pages: 1,
+        total: 6,
+      },
+    });
+
+    const result = await loadDashboardDemandActivity(createClient(request), new AbortController().signal);
+
+    expect(request).toHaveBeenCalledWith({ operation: 'demand.list', payload: { pageNum: 1, pageSize: 6 } });
+    expect(result.map((item) => item.demandId)).toEqual(['6', '5', '4']);
+  });
+
+  it('loads and keeps only the three newest protected project records', async () => {
+    const request = vi.fn<EnterpriseClient['request']>().mockResolvedValue({
+      operation: 'project.list',
+      data: {
+        list: [
+          { hpInfoId: '1', projectName: '项目 1', publishedAt: '2026-01-01' },
+          { hpInfoId: '4', projectName: '项目 4', publishedAt: '2026-04-01' },
+          { hpInfoId: '2', projectName: '项目 2', publishedAt: '2026-02-01' },
+          { hpInfoId: '5', projectName: '项目 5', publishedAt: '2026-05-01' },
+          { hpInfoId: '3', projectName: '项目 3', publishedAt: '2026-03-01' },
+          { hpInfoId: '6', projectName: '项目 6', publishedAt: '2026-06-01' },
+        ],
+        pageNum: 1,
+        pageSize: 6,
+        pages: 1,
+        total: 6,
+      },
+    });
+
+    const result = await loadDashboardProjectActivity(createClient(request), new AbortController().signal);
+
+    expect(request).toHaveBeenCalledWith({ operation: 'project.list', payload: { pageNum: 1, pageSize: 6 } });
+    expect(result.map((item) => item.hpInfoId)).toEqual(['6', '5', '4']);
   });
 });

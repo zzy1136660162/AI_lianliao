@@ -2,10 +2,17 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IPlatformServices } from './IPlatformServices';
 import { NodePlatformServices } from './NodePlatformServices';
-import { configureUserDataPath } from './userDataPath';
+import { configureAppLogsPath, configureUserDataPath } from './userDataPath';
 
-export { configureUserDataPath, getDevAppName, resolveLegacyUserDataPath, resolveUserDataPath } from './userDataPath';
+export {
+  configureAppLogsPath,
+  configureUserDataPath,
+  getDevAppName,
+  resolveLegacyUserDataPath,
+  resolveUserDataPath,
+} from './userDataPath';
 export type {
+  AppLogsPathApp,
   EnsureUserDataDirectory,
   MigrateUserDataDirectory,
   UserDataPathApp,
@@ -43,6 +50,7 @@ export function getPlatformServices(): IPlatformServices {
         // the stable storage path here as a safety net for both build modes.
         const isMultiInstance = process.env.AIONUI_MULTI_INSTANCE === '1';
         configureUserDataPath(app, mkdirSync, isMultiInstance);
+        configureAppLogsPath(app, app.getPath('userData'), mkdirSync, isMultiInstance);
         // Typed as IPlatformPaths so tsc enforces completeness: any new method
         // added to the interface will cause a compile error here if omitted below.
         const paths: import('./IPlatformServices').IPlatformPaths = {

@@ -55,7 +55,7 @@ describe('enterprise dashboard search styles', () => {
 
     expect(searchContainerRule).toMatch(/height:\s*46px/);
     expect(alignedControlsRule).toMatch(/height:\s*46px/);
-    expect(searchButtonRule).toMatch(/min-width:\s*46px/);
+    expect(searchButtonRule).toMatch(/min-width:\s*92px/);
     expect(searchButtonRule).toMatch(/border-start-end-radius:\s*10px/);
     expect(searchButtonRule).toMatch(/border-end-end-radius:\s*10px/);
   });

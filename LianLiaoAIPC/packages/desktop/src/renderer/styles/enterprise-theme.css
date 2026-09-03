@@ -7,6 +7,7 @@
   --enterprise-surface-soft: #f8fbff;
   --enterprise-border: #d8e6f5;
   --enterprise-primary: #2878ff;
+  --enterprise-on-primary: #ffffff;
   --enterprise-primary-soft: #eaf3ff;
   --enterprise-text-primary: #102a43;
   --enterprise-text-secondary: #6b7f93;
@@ -60,4 +61,27 @@
 .enterprise-shell :where(.ll-ant-btn, .ll-ant-input, .ll-ant-select, .ll-ant-table),
 .enterprise-login :where(.ll-ant-btn, .ll-ant-card, .ll-ant-alert) {
   font-family: var(--enterprise-font-ui);
+}
+
+/*
+ * IconPark writes #333 directly into SVG stroke/fill attributes, so its
+ * glyphs do not inherit Ant Design's white primary-button text. Keep this
+ * correction inside the enterprise boundary and cover every primary action
+ * instead of maintaining page-specific icon overrides.
+ */
+.enterprise-shell .ll-ant-btn-primary .i-icon,
+.enterprise-login .ll-ant-btn-primary .i-icon,
+.enterprise-shell .ll-ant-btn-primary .i-icon svg,
+.enterprise-login .ll-ant-btn-primary .i-icon svg {
+  color: var(--enterprise-on-primary);
+}
+
+.enterprise-shell .ll-ant-btn-primary .i-icon svg [stroke],
+.enterprise-login .ll-ant-btn-primary .i-icon svg [stroke] {
+  stroke: currentColor;
+}
+
+.enterprise-shell .ll-ant-btn-primary .i-icon svg [fill]:not([fill='none']):not([fill='transparent']),
+.enterprise-login .ll-ant-btn-primary .i-icon svg [fill]:not([fill='none']):not([fill='transparent']) {
+  fill: currentColor;
 }

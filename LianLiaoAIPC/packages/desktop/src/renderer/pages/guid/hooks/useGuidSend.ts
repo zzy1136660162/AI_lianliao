@@ -5,7 +5,7 @@
  */
 
 import { ipcBridge } from '@/common';
-import type { IMcpServer, TProviderWithModel } from '@/common/config/storage';
+import { appendRequiredBuiltinMcpServers, type IMcpServer, type TProviderWithModel } from '@/common/config/storage';
 import { toSessionMcpServer } from '@/renderer/hooks/mcp/catalog';
 import { emitter } from '@/renderer/utils/emitter';
 import { updateWorkspaceTime } from '@/renderer/utils/workspace/workspaceHistory';
@@ -116,26 +116,36 @@ export const useGuidSend = (deps: GuidSendDeps): GuidSendResult => {
     const selectedUserMcpServerIds = availableMcpServers
       .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin !== true)
       .map((server) => server.id);
-    const selectedAllSessionMcpServers = availableMcpServers
-      .filter((server) => selectedMcpServerIdSet.has(server.id))
-      .map((server) => toSessionMcpServer(server));
-    const selectedSessionMcpServers = availableMcpServers
-      .filter((server) => selectedMcpServerIdSet.has(server.id) && server.builtin === true)
-      .map((server) => toSessionMcpServer(server));
+    const selectedAllMcpServers = availableMcpServers.filter((server) => selectedMcpServerIdSet.has(server.id));
+    const selectedAllSessionMcpServers = appendRequiredBuiltinMcpServers(
+      selectedAllMcpServers,
+      availableMcpServers
+    ).map((server) => toSessionMcpServer(server));
+    const selectedSessionMcpServers = appendRequiredBuiltinMcpServers(
+      selectedAllMcpServers.filter((server) => server.builtin === true),
+      availableMcpServers
+    ).map((server) => toSessionMcpServer(server));
     const defaultSelectedMcpServerIds = assistantDefaultMcpIds;
     const defaultSelectedUserMcpServerIds = availableMcpServers
       .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id) && server.builtin !== true)
       .map((server) => server.id);
-    const assistantOverrideMcpIds =
-      selectedMcpServerIds !== undefined ? selectedAllMcpServerIds : defaultSelectedMcpServerIds;
+    const selectedForOverrides = availableMcpServers.filter((server) =>
+      (selectedMcpServerIds !== undefined ? selectedAllMcpServerIds : (defaultSelectedMcpServerIds ?? [])).includes(
+        server.id
+      )
+    );
+    const assistantOverrideMcpIds = appendRequiredBuiltinMcpServers(selectedForOverrides, availableMcpServers).map(
+      (server) => server.id
+    );
     const selectedUserMcpServerIdsToSend =
       selectedMcpServerIds !== undefined ? selectedUserMcpServerIds : defaultSelectedUserMcpServerIds;
     const selectedSessionMcpServersToSend =
       selectedMcpServerIds !== undefined
         ? selectedAllSessionMcpServers
-        : availableMcpServers
-            .filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id))
-            .map((server) => toSessionMcpServer(server));
+        : appendRequiredBuiltinMcpServers(
+            availableMcpServers.filter((server) => (defaultSelectedMcpServerIds ?? []).includes(server.id)),
+            availableMcpServers
+          ).map((server) => toSessionMcpServer(server));
 
     const assistantOverrideModel =
       selectedAcpModel || currentAcpCachedModelInfo?.current_model_id || current_model?.use_model || undefined;

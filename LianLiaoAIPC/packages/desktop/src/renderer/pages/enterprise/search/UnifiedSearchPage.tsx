@@ -169,7 +169,6 @@ const UnifiedSearchPage: React.FC<UnifiedSearchPageProps> = ({ client = enterpri
     <section className={styles.page} aria-labelledby='unified-search-title'>
       <header className={styles.pageHeader}>
         <div>
-          <span className={styles.eyebrow}>跨域产业情报</span>
           <h1 id='unified-search-title'>统一检索</h1>
           <p>一次检索企业、产品与在建项目，结果均来自服务端可信业务数据。</p>
         </div>

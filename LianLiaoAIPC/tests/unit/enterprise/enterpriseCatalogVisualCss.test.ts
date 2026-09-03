@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest';
 const readStyle = (path: string) => readFileSync(resolve(path), 'utf8');
 const companyCss = readStyle('packages/desktop/src/renderer/pages/enterprise/companies/company-catalog.module.css');
 const productCss = readStyle('packages/desktop/src/renderer/pages/enterprise/products/product-catalog.module.css');
+const supplyDemandCss = readStyle(
+  'packages/desktop/src/renderer/pages/enterprise/supplyDemand/supply-demand.module.css'
+);
 const projectCss = readStyle('packages/desktop/src/renderer/pages/enterprise/projects/project-workspace.module.css');
 const catalogLayoutCss = readStyle(
   'packages/desktop/src/renderer/pages/enterprise/layout/catalog/catalog-layout.module.css'
@@ -56,6 +59,35 @@ describe('enterprise catalog visual contract', () => {
   it('keeps the company catalog on its dense card layout without legacy Arco selectors', () => {
     expect(companyCss).toContain('.catalogRow');
     expect(companyCss).not.toMatch(/\.arco-/);
+  });
+
+  it('keeps company filters and their actions on one dense desktop row', () => {
+    const filterRule = companyCss.match(/\.filterForm\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const actionsRule = companyCss.match(/\.filterActions\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(filterRule).toMatch(/grid-template-columns:[^;]*auto/);
+    expect(actionsRule).not.toMatch(/grid-column:\s*1\s*\/\s*-1/);
+  });
+
+  it('keeps product and supply-demand filters with their actions on one desktop row', () => {
+    [productCss, supplyDemandCss].forEach((css) => {
+      const filterRule = css.match(/\.filterForm\s*\{([^}]*)\}/s)?.[1] ?? '';
+      const actionsRule = css.match(/\.filterActions\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+      expect(filterRule).toMatch(/grid-template-columns:[^;]*auto/);
+      expect(actionsRule).not.toMatch(/grid-column:\s*1\s*\/\s*-1/);
+      expect(actionsRule).toMatch(/white-space:\s*nowrap/);
+    });
+  });
+
+  it('presents company results as separated high-density cards', () => {
+    const listRule = companyCss.match(/\.catalogList\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const rowRule = companyCss.match(/\.catalogRow\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(listRule).toMatch(/gap:\s*8px/);
+    expect(listRule).toMatch(/padding:\s*0\s+12px\s+12px/);
+    expect(rowRule).toMatch(/border:\s*1px\s+solid\s+var\(--enterprise-border-soft\)/);
+    expect(rowRule).toMatch(/border-radius:\s*var\(--enterprise-radius-control\)/);
   });
 
   it('declares reusable density, image and sticky-sidebar catalog tokens', () => {

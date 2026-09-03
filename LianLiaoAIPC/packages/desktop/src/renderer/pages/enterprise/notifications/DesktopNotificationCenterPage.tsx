@@ -214,7 +214,6 @@ const DesktopNotificationCenterPage: React.FC<DesktopNotificationCenterPageProps
     <section className={styles.page} aria-labelledby='desktop-notification-center-title'>
       <header className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>{t('enterprise.notifications.eyebrow')}</span>
           <h1 id='desktop-notification-center-title'>{t('enterprise.notifications.title')}</h1>
           <p>{t('enterprise.notifications.description')}</p>
         </div>

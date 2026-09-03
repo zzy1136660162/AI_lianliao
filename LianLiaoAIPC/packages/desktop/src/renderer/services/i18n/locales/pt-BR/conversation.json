@@ -563,5 +563,14 @@
       }
     }
   },
+  "industrySearch": {
+    "title": "Resultados da pesquisa industrial",
+    "resultCount": "{{count}} resultados",
+    "broadened": "A área de busca foi ampliada uma vez",
+    "noResults": "Nenhum resultado correspondente",
+    "viewDetail": "Ver detalhes",
+    "loadMore": "Carregar mais",
+    "productEvidence": "Produtos relacionados"
+  },
   "notFound": "Conversa não encontrada ou foi deletada"
 }

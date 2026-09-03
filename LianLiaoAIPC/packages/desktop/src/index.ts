@@ -37,6 +37,7 @@ import { ensureStartOnBootDefaultEnabled, wasLaunchedAtLogin } from '@process/br
 import { initializeCloseToTrayDefault, onLanguageChanged } from './process/bridge/systemSettingsBridge';
 import { setInitialLanguage } from '@process/services/i18n';
 import { initializeManualHttpProxyForStartup } from '@process/services/network-proxy/manualHttpProxyRuntime';
+import { startDesktopIndustrySearchGateway, stopIndustrySearchGateway } from '@process/webserver/industry-search';
 import { setupApplicationMenu } from './process/utils/appMenu';
 import { attachDevToolsShortcutToWindow, isDevToolsEnabled } from './process/utils/devToolsPolicy';
 import { startWebHost } from '@aionui/web-host';
@@ -636,6 +637,20 @@ const handleAppReady = async (): Promise<void> => {
     console.warn(message)
   );
 
+  try {
+    const industryGateway = await startDesktopIndustrySearchGateway({
+      userDataPath: app.getPath('userData'),
+      isPackaged: app.isPackaged,
+    });
+    process.env.LIANLIAO_INDUSTRY_GATEWAY_URL = industryGateway.baseUrl;
+    process.env.LIANLIAO_INDUSTRY_GATEWAY_BOOTSTRAP_TOKEN = industryGateway.bootstrapToken;
+    mark('industrySearchGateway');
+  } catch (error) {
+    delete process.env.LIANLIAO_INDUSTRY_GATEWAY_URL;
+    delete process.env.LIANLIAO_INDUSTRY_GATEWAY_BOOTSTRAP_TOKEN;
+    console.warn('[LianLiaoAI] Industry search gateway unavailable; ordinary AI remains available.', error);
+  }
+
   const debugBackendStartupFailure = resolveDebugBackendStartupFailure();
   if (debugBackendStartupFailure) {
     applyDebugBackendStartupFailure(debugBackendStartupFailure);
@@ -976,6 +991,7 @@ installQuitCleanup({
     disposeCronResumeListener?.();
     disposeCronResumeListener = null;
   },
+  stopIndustrySearchGateway,
   // Stop aioncore subprocess — backend shutdown kills all agent children
   // transitively (no separate frontend workerTaskManager remains).
   stopBackend: () => backendManager.stop(),

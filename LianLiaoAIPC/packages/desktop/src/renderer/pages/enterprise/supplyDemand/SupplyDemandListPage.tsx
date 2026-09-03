@@ -192,6 +192,15 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
     setSelected(null);
   };
 
+  const changeDemandType = (typeId: DemandListFilters['typeId']) => {
+    const nextDraft = { ...draft, typeId };
+    pendingPageScrollRef.current = false;
+    setDraft(nextDraft);
+    setFilters(nextDraft);
+    setPagination((current) => ({ ...current, pageNum: 1 }));
+    setSelected(null);
+  };
+
   const reset = () => {
     pendingPageScrollRef.current = false;
     setDraft({});
@@ -257,7 +266,6 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
     <section className={styles.page} aria-labelledby='enterprise-supply-demand-title'>
       <header className={styles.pageHeader}>
         <div>
-          <span className={styles.eyebrow}>{t('enterprise.supplyDemand.eyebrow')}</span>
           <h1 id='enterprise-supply-demand-title'>{t('enterprise.routes.supplyDemand.title')}</h1>
           <p>{t('enterprise.routes.supplyDemand.description')}</p>
         </div>
@@ -286,7 +294,7 @@ const SupplyDemandListPage: React.FC<SupplyDemandListPageProps> = ({ client = en
             value={draft.typeId}
             placeholder={t('enterprise.supplyDemand.filters.allTypes')}
             options={demandTypes.map(({ typeId, typeName }) => ({ value: typeId, label: typeName }))}
-            onChange={(typeId) => setDraft((current) => ({ ...current, typeId }))}
+            onChange={changeDemandType}
           />
         </Form.Item>
         <Form.Item label={t('enterprise.supplyDemand.filters.city')} htmlFor='supply-demand-city'>

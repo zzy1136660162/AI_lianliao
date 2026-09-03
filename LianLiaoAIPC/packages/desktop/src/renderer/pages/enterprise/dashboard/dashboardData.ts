@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ENTERPRISE_IPC_ERROR_MESSAGES } from '@/common/enterprise/constants';
-import type { EnterpriseIpcErrorCode } from '@/common/enterprise/contracts';
+import type {
+  EnterpriseDemandSummary,
+  EnterpriseIpcErrorCode,
+  EnterpriseProjectSummary,
+} from '@/common/enterprise/contracts';
 import type { UnifiedResourceType, UnifiedSearchItem } from '@/common/enterprise/unified-search/contracts';
+import { loadProjectList } from '@/renderer/pages/enterprise/projects/projectData';
+import { loadDemandList } from '@/renderer/pages/enterprise/supplyDemand/supplyDemandData';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
 export type DashboardSearchGroup = {
@@ -26,6 +32,20 @@ export type DashboardSearchState = {
 };
 
 const DASHBOARD_SEARCH_RESULT_LIMIT = 5;
+const DASHBOARD_ACTIVITY_REQUEST_LIMIT = 6;
+const DASHBOARD_ACTIVITY_VISIBLE_LIMIT = 3;
+
+export type DashboardActivitySource<T> = {
+  items: T[];
+  isLoading: boolean;
+  errorCode: EnterpriseIpcErrorCode | null;
+  retry: () => void;
+};
+
+export type DashboardActivityState = {
+  demands: DashboardActivitySource<EnterpriseDemandSummary>;
+  projects: DashboardActivitySource<EnterpriseProjectSummary>;
+};
 
 /** Stable renderer search error that never carries remote response text. */
 export class DashboardDataError extends Error {
@@ -74,6 +94,35 @@ const throwIfAborted = (signal: AbortSignal): void => {
   const error = new Error('Aborted');
   error.name = 'AbortError';
   throw error;
+};
+
+const publishedAtTimestamp = (value: string | undefined): number => {
+  if (!value) return 0;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const latestPublished = <T extends { publishedAt?: string }>(items: T[]): T[] =>
+  items
+    .toSorted((left, right) => publishedAtTimestamp(right.publishedAt) - publishedAtTimestamp(left.publishedAt))
+    .slice(0, DASHBOARD_ACTIVITY_VISIBLE_LIMIT);
+
+/** Fetches a slightly wider first page, then presents the three newest verified orders. */
+export const loadDashboardDemandActivity = async (
+  client: Pick<EnterpriseClient, 'request'>,
+  signal: AbortSignal
+): Promise<EnterpriseDemandSummary[]> => {
+  const page = await loadDemandList(client, { pageNum: 1, pageSize: DASHBOARD_ACTIVITY_REQUEST_LIMIT }, signal);
+  return latestPublished(page.list);
+};
+
+/** Keeps protected project summaries at the list boundary; names are still masked by the renderer. */
+export const loadDashboardProjectActivity = async (
+  client: Pick<EnterpriseClient, 'request'>,
+  signal: AbortSignal
+): Promise<EnterpriseProjectSummary[]> => {
+  const page = await loadProjectList(client, { pageNum: 1, pageSize: DASHBOARD_ACTIVITY_REQUEST_LIMIT }, signal);
+  return latestPublished(page.list);
 };
 
 /** Normalizes user input before it can become a cross-domain search request. */
@@ -179,3 +228,43 @@ export const useDashboardSearch = (
   const retry = useCallback(() => setRetryGeneration((value) => value + 1), []);
   return { normalizedQuery, result, isLoading, retry };
 };
+
+const useDashboardActivitySource = <T>(
+  client: Pick<EnterpriseClient, 'request'>,
+  loader: (client: Pick<EnterpriseClient, 'request'>, signal: AbortSignal) => Promise<T[]>
+): DashboardActivitySource<T> => {
+  const [items, setItems] = useState<T[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorCode, setErrorCode] = useState<EnterpriseIpcErrorCode | null>(null);
+  const [retryGeneration, setRetryGeneration] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+    setErrorCode(null);
+
+    void loader(client, controller.signal)
+      .then((nextItems) => {
+        if (!controller.signal.aborted) setItems(nextItems);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted || isAbortError(error)) return;
+        setItems([]);
+        setErrorCode(safeErrorCode(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [client, loader, retryGeneration]);
+
+  const retry = useCallback(() => setRetryGeneration((value) => value + 1), []);
+  return { items, isLoading, errorCode, retry };
+};
+
+/** Loads demand and project activity independently so a single service outage remains isolated. */
+export const useDashboardActivity = (client: Pick<EnterpriseClient, 'request'>): DashboardActivityState => ({
+  demands: useDashboardActivitySource(client, loadDashboardDemandActivity),
+  projects: useDashboardActivitySource(client, loadDashboardProjectActivity),
+});

@@ -116,8 +116,12 @@ const EnterpriseSider: React.FC = () => {
                       `enterprise-sider__nav-item${isActive ? ' enterprise-sider__nav-item--active' : ''}`
                     }
                   >
-                    <Icon size={18} />
-                    <span>{t(labelKey)}</span>
+                    {({ isActive }) => (
+                      <>
+                        <Icon size={18} theme={isActive ? 'filled' : 'outline'} />
+                        <span>{t(labelKey)}</span>
+                      </>
+                    )}
                   </NavLink>
                 ))}
             </div>

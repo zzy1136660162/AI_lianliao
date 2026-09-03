@@ -299,6 +299,9 @@
     },
     "detail": {
       "summaryTitle": "需求概況",
+      "relatedImages": "相關圖片",
+      "relatedImageAlt": "{{name}}相關圖片 {{index}}",
+      "relatedImageUnavailable": "相關圖片暫時無法顯示",
       "fieldsTitle": "業務欄位",
       "noFields": "此類型暫無可顯示的擴充欄位。"
     },
@@ -389,9 +392,11 @@
       "index": "01 / SEARCH",
       "eyebrow": "Cross-domain intelligence",
       "title": "Search companies, products and projects",
+      "button": "搜尋",
       "description": "One query runs across three verified catalogs. Each group remains available when another service is unavailable.",
       "placeholder": "Enter at least two characters",
       "ariaLabel": "Search enterprise companies, products and projects",
+      "scopeAriaLabel": "檢索分類快速入口",
       "resultsLabel": "Grouped enterprise search results",
       "minimumHint": "Enter at least two characters to search.",
       "loading": "Searching verified enterprise catalogs",
@@ -413,17 +418,29 @@
     },
     "quick": {
       "index": "03 / ACCESS",
-      "title": "Verified catalog entrances",
-      "description": "Continue directly to enterprise code, featured products or the project radar.",
+      "title": "產業服務直達",
+      "description": "查企業、找產品、看項目、對接需求",
       "ariaLabel": "Enterprise catalog shortcuts"
     },
     "radar": {
       "eyebrow": "04 / PROCUREMENT RADAR",
-      "title": "Live project procurement signals",
-      "loading": "Loading live project procurement signals",
-      "errorTitle": "Project procurement signals could not be loaded",
+      "title": "產業機會洞察",
+      "loading": "正在載入產業機會洞察",
+      "errorTitle": "暫時無法載入產業機會洞察",
       "errorDescription": "The dashboard service is temporarily unavailable. Your identity and catalog shortcuts remain available.",
       "viewAll": "Open project radar"
+    },
+    "activity": {
+      "title": "產業動態",
+      "subtitle": "即時更新",
+      "demands": "供需訂單",
+      "projects": "在建項目",
+      "loading": "正在載入",
+      "error": "暫時無法載入",
+      "empty": "暫無最新動態",
+      "projectTag": "項目",
+      "viewAllDemands": "查看全部供需訂單",
+      "viewAllProjects": "查看全部在建項目"
     }
   },
   "companies": {
@@ -497,6 +514,7 @@
     "eyebrow": "Verified company record",
     "profileEyebrow": "Company profile",
     "backToList": "Back to enterprise code",
+    "backToProductDetail": "返回產品詳情",
     "loading": "Loading the company profile",
     "logoAlt": "{{name}} logo",
     "logoUnavailable": "Company logo unavailable",
@@ -591,6 +609,8 @@
     "eyebrow": "Verified product record",
     "profileEyebrow": "Product profile",
     "backToList": "Back to featured products",
+    "backToCompanyList": "返回企業碼",
+    "backToCompanyDetail": "返回企業詳情",
     "loading": "Loading the product profile",
     "contactPermissionNote": "The phone is masked at the trusted desktop boundary using the H5 policy. Dialing and access unlocking are not available.",
     "sections": {

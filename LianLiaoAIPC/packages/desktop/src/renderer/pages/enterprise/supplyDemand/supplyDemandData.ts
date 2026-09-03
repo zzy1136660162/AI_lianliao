@@ -8,6 +8,7 @@ import type {
 import { isEnterpriseEntityId } from '@/common/enterprise/entityId';
 import { enterpriseRequestSchema, parseEnterpriseResponse } from '@/common/enterprise/schemas';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import { parseSafeEnterpriseImageUrl } from '@/renderer/services/enterprise/enterpriseDataValidation';
 
 export type DemandListFilters = Partial<Omit<DemandListQuery, 'pageNum' | 'pageSize'>>;
 
@@ -51,6 +52,22 @@ export const buildDemandListQuery = (
 };
 
 const invalidResponse = (): SupplyDemandDataError => new SupplyDemandDataError('INVALID_RESPONSE');
+
+export const isDemandImageField = (field: EnterpriseDemandDetail['fields'][number]): boolean =>
+  field.valueType.trim().toUpperCase() === 'IMAGE';
+
+/** Extracts unique demand images while enforcing the shared enterprise image allowlist. */
+export const parseSafeDemandImageUrls = (fields: EnterpriseDemandDetail['fields']): string[] => {
+  const urls = new Set<string>();
+  for (const field of fields) {
+    if (!isDemandImageField(field)) continue;
+    for (const candidate of field.value.split(/[\r\n,，]+/)) {
+      const safeUrl = parseSafeEnterpriseImageUrl(candidate);
+      if (safeUrl) urls.add(safeUrl);
+    }
+  }
+  return [...urls];
+};
 
 /** Loads database-backed public type labels through the exact allowlisted operation. */
 export const loadDemandTypes = async (

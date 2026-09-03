@@ -4,6 +4,7 @@ param(
     [string] $Proxy = "http://127.0.0.1:7897",
     [switch] $NoProxy,
     [switch] $Fast,
+    [switch] $ReleaseBuild,
     [ValidateRange(1, 1024)]
     [double] $MinimumFreeSpaceGB = 8
 )
@@ -143,7 +144,13 @@ $repoRoot = Find-RepositoryRoot
 $aipcRoot = Join-Path $repoRoot "LianLiaoAIPC"
 $coreRoot = Join-Path $repoRoot "LianLiaoAICore"
 $corePathWasProvided = -not [string]::IsNullOrWhiteSpace($CorePath)
-if ([string]::IsNullOrWhiteSpace($CorePath)) {
+if ($ReleaseBuild -and $Fast) {
+    throw "正式发布模式不能使用 -Fast。"
+}
+if ($ReleaseBuild -and $corePathWasProvided) {
+    throw "正式发布模式不能使用 -CorePath；Core 必须来自 aioncore-release-lock.json 锁定的 GitHub Release。"
+}
+if (-not $ReleaseBuild -and [string]::IsNullOrWhiteSpace($CorePath)) {
     $CorePath = Join-Path $coreRoot "target\x86_64-pc-windows-msvc\release\aioncore.exe"
 }
 
@@ -153,17 +160,19 @@ if (-not (Test-Path -LiteralPath $aipcRoot -PathType Container)) {
 if (-not (Test-Path -LiteralPath (Join-Path $aipcRoot "package.json") -PathType Leaf)) {
     throw "LianLiaoAIPC 缺少 package.json：$aipcRoot"
 }
-if (($Fast -or $corePathWasProvided) -and -not (Test-Path -LiteralPath $CorePath -PathType Leaf)) {
+if (-not $ReleaseBuild -and ($Fast -or $corePathWasProvided) -and -not (Test-Path -LiteralPath $CorePath -PathType Leaf)) {
     throw "未找到本地 Core，请先构建 LianLiaoAICore：$CorePath"
 }
 
-$CorePath = [IO.Path]::GetFullPath($CorePath)
+if (-not $ReleaseBuild) {
+    $CorePath = [IO.Path]::GetFullPath($CorePath)
+}
 $bunCommand = Get-Command bun -CommandType Application -ErrorAction SilentlyContinue
 if (-not $bunCommand) {
     throw "未找到 bun。请先安装 Bun，并重新打开 PowerShell。"
 }
 $cargoExecutable = $null
-if (-not $Fast -and -not $corePathWasProvided) {
+if (-not $ReleaseBuild -and -not $Fast -and -not $corePathWasProvided) {
     $cargoCommand = Get-Command cargo -CommandType Application -ErrorAction SilentlyContinue
     if ($cargoCommand) {
         $cargoExecutable = $cargoCommand.Source
@@ -211,7 +220,7 @@ foreach ($name in $environmentNames) {
 }
 
 try {
-    if (-not $Fast -and -not $corePathWasProvided) {
+    if (-not $ReleaseBuild -and -not $Fast -and -not $corePathWasProvided) {
         if (-not $PSCmdlet.ShouldProcess($coreRoot, "增量编译 Windows x64 Release Core")) {
             return
         }
@@ -241,7 +250,13 @@ try {
     Set-ProcessEnvironment "AIONUI_BACKEND_RUN_ID" $null
     Set-ProcessEnvironment "LIANLIAO_RELEASE_BUILD" $null
 
-    if ($Fast) {
+    if ($ReleaseBuild) {
+        Set-ProcessEnvironment "LIANLIAO_RELEASE_BUILD" "1"
+        Set-ProcessEnvironment "LIANLIAO_AICORE_LOCAL_BINARY" $null
+        Set-ProcessEnvironment "LIANLIAO_AICORE_VERIFY" "1"
+        Set-ProcessEnvironment "LIANLIAO_AICORE_TRUST_PREPARED" $null
+        Write-Host "正式发布构建：将下载并校验锁定 Release Core，重新准备托管资源，然后生成 Windows x64 安装包。" -ForegroundColor Cyan
+    } elseif ($Fast) {
         if (-not (Test-Path -LiteralPath $bundledCore -PathType Leaf)) {
             throw "快速构建缺少已准备的 Core，请先运行完整构建脚本：$bundledCore"
         }
@@ -292,7 +307,13 @@ try {
         }
     }
 
-    $operation = if ($Fast) { "复用现有 Core 资源快速构建 Windows x64 UI" } else { "注入本地 Core 并构建 Windows x64 UI" }
+    $operation = if ($ReleaseBuild) {
+        "使用锁定 Release Core 构建 Windows x64 正式安装包"
+    } elseif ($Fast) {
+        "复用现有 Core 资源快速构建 Windows x64 UI"
+    } else {
+        "注入本地 Core 并构建 Windows x64 UI"
+    }
     if (-not $PSCmdlet.ShouldProcess($aipcRoot, $operation)) {
         return
     }
@@ -314,11 +335,32 @@ try {
         throw "构建后缺少 Windows 安装包：$installerPath"
     }
 
-    $sourceCoreSha256 = Get-FileSha256 $CorePath
     $bundledCoreSha256 = Get-FileSha256 $bundledCore
     $unpackedCoreSha256 = Get-FileSha256 $unpackedCore
-    if ($sourceCoreSha256 -ne $bundledCoreSha256 -or $sourceCoreSha256 -ne $unpackedCoreSha256) {
-        throw "Core SHA256 校验失败：源码、bundled-aioncore 与 win-unpacked 中的文件不一致。"
+    if ($bundledCoreSha256 -ne $unpackedCoreSha256) {
+        throw "Core SHA256 校验失败：bundled-aioncore 与 win-unpacked 中的文件不一致。"
+    }
+
+    if ($ReleaseBuild) {
+        $releaseLock = Get-Content -LiteralPath (Join-Path $aipcRoot "aioncore-release-lock.json") -Raw | ConvertFrom-Json
+        $preparedManifest = Get-Content -LiteralPath (Join-Path $bundledRoot "manifest.json") -Raw | ConvertFrom-Json
+        $lockedAsset = $releaseLock.assets.'win32-x64'
+        if ($preparedManifest.sourceType -ne "locked-release" -or
+            $preparedManifest.version -ne $releaseLock.version -or
+            $preparedManifest.source.repository -ne $releaseLock.repository -or
+            $preparedManifest.source.releaseTag -ne $releaseLock.releaseTag -or
+            $preparedManifest.source.assetName -ne $lockedAsset.name -or
+            $preparedManifest.source.expectedSha256 -ne $lockedAsset.sha256 -or
+            $preparedManifest.source.actualSha256 -ne $lockedAsset.sha256 -or
+            $preparedManifest.binarySha256 -ne $bundledCoreSha256) {
+            throw "正式发布 Core 清单与 aioncore-release-lock.json 或实际二进制不一致。"
+        }
+        $sourceCoreSha256 = $bundledCoreSha256
+    } else {
+        $sourceCoreSha256 = Get-FileSha256 $CorePath
+        if ($sourceCoreSha256 -ne $bundledCoreSha256) {
+            throw "Core SHA256 校验失败：源码、bundled-aioncore 与 win-unpacked 中的文件不一致。"
+        }
     }
 
     $installer = Get-Item -LiteralPath $installerPath

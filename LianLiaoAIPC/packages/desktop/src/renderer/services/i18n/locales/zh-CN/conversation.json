@@ -557,5 +557,14 @@
       }
     }
   },
+  "industrySearch": {
+    "title": "产业检索结果",
+    "resultCount": "{{count}} 条",
+    "broadened": "已适当扩大检索范围",
+    "noResults": "暂未找到符合条件的结果",
+    "viewDetail": "查看详情",
+    "loadMore": "加载更多",
+    "productEvidence": "相关产品"
+  },
   "notFound": "会话不存在或已被删除"
 }

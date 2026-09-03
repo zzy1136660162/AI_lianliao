@@ -59,7 +59,7 @@ describe('EnterpriseContactAccessPanel', () => {
 
     expect(screen.getByText('1380000****')).toBeVisible();
     expect(screen.queryByText('13800000000')).toBeNull();
-    await user.click(screen.getByRole('button', { name: '获取联系方式' }));
+    await user.click(screen.getByRole('button', { name: '解锁联系方式' }));
 
     expect(await screen.findByText('13800000000')).toBeVisible();
     expect(screen.getByRole('button', { name: '复制电话' })).toBeVisible();
@@ -89,7 +89,7 @@ describe('EnterpriseContactAccessPanel', () => {
       </EnterpriseAntdProvider>
     );
 
-    await user.click(screen.getByRole('button', { name: '获取联系方式' }));
+    await user.click(screen.getByRole('button', { name: '解锁联系方式' }));
 
     expect(await screen.findByRole('button', { name: '复制电话' })).toBeVisible();
     expect(screen.queryByRole('button', { name: '拨打电话' })).toBeNull();
@@ -118,7 +118,7 @@ describe('EnterpriseContactAccessPanel', () => {
       </EnterpriseAntdProvider>
     );
 
-    await user.click(screen.getByRole('button', { name: '获取联系方式' }));
+    await user.click(screen.getByRole('button', { name: '解锁联系方式' }));
     expect(await screen.findByRole('dialog', { name: '扫码升级企业会员' })).toBeInTheDocument();
     expect(screen.getAllByText('请升级会员后查看')).toHaveLength(2);
     expect(screen.getByText('支付完成后可在本页面刷新会员权限，无需重新登录。')).toBeInTheDocument();
@@ -140,7 +140,7 @@ describe('EnterpriseContactAccessPanel', () => {
       </EnterpriseAntdProvider>
     );
 
-    await user.click(screen.getByRole('button', { name: '获取联系方式' }));
+    await user.click(screen.getByRole('button', { name: '解锁联系方式' }));
     expect(await screen.findByText('联系方式服务暂不可用，请稍后重试。')).toBeVisible();
     expect(screen.queryByText('联系方式权限校验失败，请稍后重试。')).toBeNull();
   });

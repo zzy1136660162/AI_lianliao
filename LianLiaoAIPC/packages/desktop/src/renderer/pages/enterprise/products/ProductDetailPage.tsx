@@ -14,6 +14,9 @@ import {
 } from '@/renderer/pages/enterprise/layout/catalog/DetailLayout';
 import {
   createCatalogReturnState,
+  createCompanyDetailProductReturnState,
+  type ProductDetailOrigin,
+  readAiConversationReturnState,
   readCatalogReturnState,
   readProductDetailCompanyReturnState,
 } from '@/renderer/pages/enterprise/layout/catalog/catalogReturnState';
@@ -60,18 +63,38 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
   const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
-  const catalogReturn = useMemo(() => readCatalogReturnState(location.state, 'products'), [location.state]);
+  const productCatalogReturn = useMemo(() => readCatalogReturnState(location.state, 'products'), [location.state]);
+  const companyCatalogReturn = useMemo(() => readCatalogReturnState(location.state, 'companies'), [location.state]);
   const companyReturn = useMemo(() => readProductDetailCompanyReturnState(location.state), [location.state]);
+  const aiConversationReturn = useMemo(
+    () => readAiConversationReturnState(location.state) ?? companyReturn?.aiConversationReturn ?? null,
+    [companyReturn, location.state]
+  );
   const detail = useProductDetail(client, productId);
   const missing = t('enterprise.products.missing');
+  const productDetailOrigin = useMemo<ProductDetailOrigin | undefined>(() => {
+    if (companyReturn) return { kind: 'company-detail', companyReturn };
+    if (aiConversationReturn) return { kind: 'ai-conversation', aiConversationReturn };
+    const catalogReturn = companyCatalogReturn ?? productCatalogReturn;
+    return catalogReturn ? { kind: 'catalog', catalogReturn } : undefined;
+  }, [aiConversationReturn, companyCatalogReturn, companyReturn, productCatalogReturn]);
 
   const backToList = () => {
     if (companyReturn) {
       navigate(`/enterprise/companies/${encodeURIComponent(companyReturn.companyId)}`, {
-        state: companyReturn.catalogReturn ? createCatalogReturnState(companyReturn.catalogReturn) : undefined,
+        state: companyReturn.aiConversationReturn
+          ? companyReturn.aiConversationReturn
+          : companyReturn.catalogReturn
+            ? createCatalogReturnState(companyReturn.catalogReturn)
+            : undefined,
       });
       return;
     }
+    if (aiConversationReturn) {
+      navigate(aiConversationReturn.path, { state: { targetMessageId: aiConversationReturn.targetMessageId } });
+      return;
+    }
+    const catalogReturn = companyCatalogReturn ?? productCatalogReturn;
     navigate(catalogReturn?.path ?? '/enterprise/products', {
       state: catalogReturn ? createCatalogReturnState(catalogReturn) : undefined,
     });
@@ -129,6 +152,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
               <Link
                 className={styles.detailCompanyLink}
                 to={`/enterprise/companies/${encodeURIComponent(product.companyId)}`}
+                state={createCompanyDetailProductReturnState(product.productId, productDetailOrigin)}
               >
                 {product.companyName || missing}
               </Link>
@@ -145,7 +169,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
       <div className={styles.detailBody}>
         <DetailHeroCard media={<DetailImage product={product} />} aside={contactCard} ariaLabelledBy='product-name'>
           <div className={styles.detailIdentity}>
-            <span className={styles.eyebrow}>{t('enterprise.productDetail.profileEyebrow')}</span>
             <h2 id='product-name'>{product.name}</h2>
             <div className={styles.detailTags}>
               {displayIndustry ? <Tag>{displayIndustry}</Tag> : null}
@@ -193,10 +216,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ client = enterpri
     <section className={styles.page} aria-labelledby='product-detail-title'>
       <header className={styles.detailPageHeader}>
         <Button type='text' icon={<Left />} onClick={backToList}>
-          {t('enterprise.productDetail.backToList')}
+          {t(
+            companyReturn
+              ? 'enterprise.productDetail.backToCompanyDetail'
+              : companyCatalogReturn
+                ? 'enterprise.productDetail.backToCompanyList'
+                : 'enterprise.productDetail.backToList'
+          )}
         </Button>
         <div>
-          {/*<span className={styles.eyebrow}>{t('enterprise.productDetail.eyebrow')}</span>*/}
           <h1 id='product-detail-title'>{t('enterprise.routes.productDetail.title')}</h1>
         </div>
       </header>

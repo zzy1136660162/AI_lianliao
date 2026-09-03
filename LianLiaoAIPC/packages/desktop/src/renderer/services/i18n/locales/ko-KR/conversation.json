@@ -557,5 +557,14 @@
       }
     }
   },
+  "industrySearch": {
+    "title": "산업 검색 결과",
+    "resultCount": "{{count}}건",
+    "broadened": "검색 범위를 한 번 확대했습니다",
+    "noResults": "조건에 맞는 결과가 없습니다",
+    "viewDetail": "상세 보기",
+    "loadMore": "더 보기",
+    "productEvidence": "관련 제품"
+  },
   "notFound": "대화를 찾을 수 없거나 삭제되었습니다"
 }

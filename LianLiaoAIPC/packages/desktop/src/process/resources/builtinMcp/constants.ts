@@ -9,6 +9,24 @@
 export const BUILTIN_IMAGE_GEN_ID = 'builtin-image-gen';
 export const BUILTIN_IMAGE_GEN_NAME = 'aionui-image-generation';
 export const BUILTIN_IMAGE_GEN_LEGACY_NAMES = ['AionUi Image Generation', BUILTIN_IMAGE_GEN_ID] as const;
+export const BUILTIN_INDUSTRY_SEARCH_ID = 'builtin-industry-search';
+export const BUILTIN_INDUSTRY_SEARCH_NAME = 'lianliao-industry-search';
+
+export function isBuiltinIndustrySearchName(name?: string | null): boolean {
+  return name === BUILTIN_INDUSTRY_SEARCH_NAME || name === BUILTIN_INDUSTRY_SEARCH_ID;
+}
+
+export function isBuiltinIndustrySearchTransport(transport?: {
+  type?: string;
+  command?: string;
+  args?: string[] | null;
+}): boolean {
+  return Boolean(
+    transport?.type === 'stdio' &&
+    transport.command === 'node' &&
+    transport.args?.some((arg) => arg.includes('builtin-mcp-industry-search.js'))
+  );
+}
 
 export function isBuiltinImageGenName(name?: string | null): boolean {
   if (!name) return false;

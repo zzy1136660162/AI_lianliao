@@ -9,11 +9,9 @@ import type {
   EnterpriseResponse,
 } from '@/common/enterprise/contracts';
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
-import {
-  CatalogAssistantCancelledError,
-  runCatalogAssistant,
-} from '@/renderer/pages/enterprise/layout/catalog/assistant/catalogAssistantOrchestrator';
-import { buildDeterministicCatalogPlan } from '@/renderer/pages/enterprise/layout/catalog/assistant/deterministicCatalogPlanner';
+import { CatalogAssistantCancelledError, runCatalogAssistant } from '@/common/enterprise/catalog-assistant/runtime';
+import { buildDeterministicCatalogPlan } from '@/common/enterprise/catalog-assistant/runtime';
+import { buildSingleBroadeningPlan } from '@/common/enterprise/catalog-assistant/runtime/catalogAssistantOrchestrator';
 
 const company = (id: string): EnterpriseCompanySummary => ({
   companyId: id,
@@ -82,6 +80,17 @@ const run = (client: EnterpriseClient, signal = new AbortController().signal) =>
   });
 
 describe('catalog assistant orchestrator', () => {
+  it('does not drop an unknown district when no owning city can be resolved', () => {
+    const broadening = buildSingleBroadeningPlan({
+      entityType: 'COMPANY',
+      filters: { keyword: '机械加工', district: '测试园区' },
+      resultLimit: 6,
+      summary: '查询测试园区机械加工企业',
+    });
+
+    expect(broadening).toBeUndefined();
+  });
+
   it('links product results to trusted company cards and applies sort inside the same match tier', async () => {
     const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
       if (input.operation === 'catalogAssistant.workflowPlan') {
@@ -817,6 +826,51 @@ describe('catalog assistant orchestrator', () => {
     expect(request.mock.calls.filter(([input]) => input.operation === 'product.list')).toHaveLength(3);
   });
 
+  it('honors the caller result ceiling even when the model plans a larger result set', async () => {
+    const items = Array.from({ length: 10 }, (_, index) => product(`-${index + 1}`));
+    const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
+      if (input.operation === 'catalogAssistant.plan') {
+        return {
+          operation: input.operation,
+          data: {
+            entityType: 'PRODUCT',
+            filters: { keyword: '工业产品' },
+            resultLimit: 50,
+            summary: '查询重点产品',
+          },
+        };
+      }
+      if (input.operation === 'product.list') {
+        return {
+          operation: input.operation,
+          data: { list: items, pageNum: 1, pageSize: 20, pages: 1, total: items.length },
+        };
+      }
+      if (input.operation === 'catalogAssistant.rank') {
+        return {
+          operation: input.operation,
+          data: {
+            summary: '已筛选重点产品',
+            items: input.payload.candidates.map((candidate) => ({ id: candidate.id, reason: '符合检索条件' })),
+          },
+        };
+      }
+      throw new Error(`unexpected operation ${input.operation}`);
+    });
+
+    const result = await runCatalogAssistant(createClient(request), {
+      requestId: 'caller-limit',
+      message: '查询工业产品',
+      resultLimit: 6,
+      signal: new AbortController().signal,
+      isCurrent: () => true,
+      onProgress: vi.fn(),
+    });
+
+    expect(result.plan?.resultLimit).toBe(6);
+    expect(result.results).toHaveLength(6);
+  });
+
   it('normalizes model cities and retries without an over-specific industry intersection', async () => {
     const productQueries: Array<Extract<EnterpriseRequest, { operation: 'product.list' }>['payload']> = [];
     const request = vi.fn(async (input: EnterpriseRequest): Promise<EnterpriseResponse> => {
@@ -1193,7 +1247,7 @@ describe('catalog assistant orchestrator', () => {
     const result = await run(createClient(request));
 
     expect(result.fallback).toBe(true);
-    expect(result.results.map((entry) => entry.item.companyId)).toEqual(['-8', '-9', '-10']);
+    expect(result.results.map((entry) => entry.item.companyId)).toEqual(['-11', '-10', '-9']);
     expect(result.results[0]?.reason).toBe('enterprise.catalogAssistant.fallbackReason');
   });
 
@@ -1231,7 +1285,7 @@ describe('catalog assistant orchestrator', () => {
     const result = await run(createClient(request));
 
     expect(result.fallback).toBe(true);
-    expect(result.results.map((entry) => entry.item.companyId)).toEqual(['-8', '-9', '-10', '-11']);
+    expect(result.results.map((entry) => entry.item.companyId)).toEqual(['-11', '-10', '-9', '-8']);
   });
 
   it('does not start a catalog request when plan asks for clarification', async () => {

@@ -20,6 +20,11 @@ export type UserDataPathApp = {
   setPath(name: 'userData', targetPath: string): void;
 };
 
+export type AppLogsPathApp = {
+  readonly isPackaged: boolean;
+  setAppLogsPath(targetPath: string): void;
+};
+
 export type EnsureUserDataDirectory = (targetPath: string, options: { recursive: true }) => unknown;
 export type MigrateUserDataDirectory = (options: {
   sourcePath: string;
@@ -94,4 +99,25 @@ export function configureUserDataPath(
   ensureDirectory(selectedPath, { recursive: true });
   app.setPath('userData', selectedPath);
   return selectedPath;
+}
+
+/**
+ * Keep logs under the stable storage identity instead of the user-visible
+ * product name. This prevents future branding changes from splitting logs
+ * across additional Windows roaming-profile directories.
+ */
+export function configureAppLogsPath(
+  app: AppLogsPathApp,
+  configuredUserDataPath: string,
+  ensureDirectory: EnsureUserDataDirectory,
+  isMultiInstance = process.env.AIONUI_MULTI_INSTANCE === '1'
+): string {
+  const stableUserDataPath = resolveUserDataPath(configuredUserDataPath, {
+    isPackaged: app.isPackaged,
+    isMultiInstance,
+  });
+  const logsPath = join(stableUserDataPath, 'logs');
+  ensureDirectory(logsPath, { recursive: true });
+  app.setAppLogsPath(logsPath);
+  return logsPath;
 }

@@ -188,7 +188,7 @@
   "routes": {
     "dashboard": {
       "title": "企业工作台",
-      "description": "在同一企业身份工作台中检索可信企业、产品与实时项目采购信号。"
+      "description": ""
     },
     "companies": {
       "title": "企业码",
@@ -299,6 +299,9 @@
     },
     "detail": {
       "summaryTitle": "需求概况",
+      "relatedImages": "相关图片",
+      "relatedImageAlt": "{{name}}相关图片 {{index}}",
+      "relatedImageUnavailable": "相关图片暂时无法显示",
       "fieldsTitle": "业务字段",
       "noFields": "该类型暂无可展示的扩展字段。"
     },
@@ -383,15 +386,17 @@
     }
   },
   "dashboard": {
-    "eyebrow": "辽宁产业身份工作台",
+    "eyebrow": "",
     "heroIndex": "辽 / 实时",
     "search": {
       "index": "01 / 统一检索",
       "eyebrow": "跨域产业情报",
       "title": "统一检索企业、产品与项目",
+      "button": "搜索",
       "description": "一次输入并行查询三个可信数据域；单个服务不可用时，其他分组仍可继续使用。",
       "placeholder": "请输入至少两个字符",
       "ariaLabel": "检索企业、产品与在建项目",
+      "scopeAriaLabel": "检索分类快捷入口",
       "resultsLabel": "企业统一检索分组结果",
       "minimumHint": "输入至少两个字符后开始检索。",
       "loading": "正在检索可信产业数据",
@@ -413,17 +418,29 @@
     },
     "quick": {
       "index": "03 / 快捷入口",
-      "title": "可信数据入口",
-      "description": "直接进入企业码、重点产品或在建项目雷达。",
+      "title": "产业服务直达",
+      "description": "查企业、找产品、看项目、对接需求",
       "ariaLabel": "企业工作台快捷入口"
     },
     "radar": {
       "eyebrow": "04 / 项目采购雷达",
-      "title": "实时项目采购信号",
-      "loading": "正在加载实时项目采购信号",
-      "errorTitle": "暂时无法加载项目采购信号",
+      "title": "产业机会洞察",
+      "loading": "正在加载产业机会洞察",
+      "errorTitle": "暂时无法加载产业机会洞察",
       "errorDescription": "看板服务暂时不可用，当前身份与数据入口仍可继续使用。",
       "viewAll": "打开项目雷达"
+    },
+    "activity": {
+      "title": "产业动态",
+      "subtitle": "实时更新",
+      "demands": "供需订单",
+      "projects": "在建项目",
+      "loading": "正在加载",
+      "error": "暂时无法加载",
+      "empty": "暂无最新动态",
+      "projectTag": "项目",
+      "viewAllDemands": "查看全部供需订单",
+      "viewAllProjects": "查看全部在建项目"
     }
   },
   "companies": {
@@ -497,10 +514,11 @@
     "eyebrow": "已校验企业档案",
     "profileEyebrow": "企业档案",
     "backToList": "返回企业码",
+    "backToProductDetail": "返回产品详情",
     "loading": "正在加载企业详情",
     "logoAlt": "{{name}} 企业标识",
     "logoUnavailable": "企业标识暂不可用",
-    "contactPermissionNote": "联系方式严格按接口返回内容展示；本页面不会绕过权限解锁受限信息。",
+    "contactPermissionNote": "解锁后即可查看联系方式",
     "sections": {
       "basic": "基本信息",
       "contact": "联系方式与地址",
@@ -940,6 +958,8 @@
     "eyebrow": "已校验产品档案",
     "profileEyebrow": "产品档案",
     "backToList": "返回重点产品",
+    "backToCompanyList": "返回企业码",
+    "backToCompanyDetail": "返回企业详情",
     "loading": "正在加载产品详情",
     "contactPermissionNote": "联系电话已在桌面端可信边界按 H5 规则脱敏；本页面不提供拨号或权限解锁。",
     "sections": {

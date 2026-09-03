@@ -8,6 +8,7 @@ import {
   loadDemandList,
   loadDemandTypes,
   parseDemandRouteParams,
+  parseSafeDemandImageUrls,
 } from '@/renderer/pages/enterprise/supplyDemand/supplyDemandData';
 import {
   allowsCustomPublishOption,
@@ -156,6 +157,21 @@ describe('supply-demand data boundary', () => {
       operation: 'demand.detail',
       payload: { typeId: 6, demandId: '-800000000000000001' },
     });
+  });
+
+  it('keeps unique trusted demand images and rejects untrusted image values', () => {
+    expect(
+      parseSafeDemandImageUrls([
+        {
+          key: 'images',
+          label: '产品图片',
+          value:
+            'http://www.lslnii.com/upload/NFSImgFile/appl/images/demand.jpg, https://evil.example/private.jpg, http://www.lslnii.com/upload/NFSImgFile/appl/images/demand.jpg',
+          valueType: 'image',
+        },
+        { key: 'parameters', label: '产品参数', value: '车削', valueType: 'TEXT' },
+      ])
+    ).toEqual(['https://www.lslnii.com/upload/NFSImgFile/appl/images/demand.jpg']);
   });
 
   it.each([

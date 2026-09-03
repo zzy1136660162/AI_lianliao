@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { CatalogAssistantResultCard } from './CatalogAssistantResultCard';
 import { useCatalogAssistant } from './CatalogAssistantProvider';
-import { getCatalogTrustedResultId } from './adapters/catalogAdapterRegistry';
+import { getCatalogTrustedResultId } from '@/common/enterprise/catalog-assistant/runtime';
 import styles from './catalog-ai-assistant.module.css';
 
 const runningStages = new Set(['PLANNING', 'SEARCHING', 'LINKING', 'RANKING']);

@@ -11,6 +11,7 @@ const {
   httpRequestMock,
   listServersMock,
   testMcpConnectionMock,
+  toggleServerMock,
   updateServerMock,
 } = vi.hoisted(() => ({
   batchImportServersMock: vi.fn(),
@@ -19,6 +20,7 @@ const {
   httpRequestMock: vi.fn(),
   listServersMock: vi.fn(),
   testMcpConnectionMock: vi.fn(),
+  toggleServerMock: vi.fn(),
   updateServerMock: vi.fn(),
 }));
 
@@ -31,6 +33,7 @@ vi.mock('@/common/adapter/ipcBridge', () => ({
     listServers: { invoke: listServersMock },
     batchImportServers: { invoke: batchImportServersMock },
     updateServer: { invoke: updateServerMock },
+    toggleServer: { invoke: toggleServerMock },
     testMcpConnection: { invoke: testMcpConnectionMock },
   },
 }));
@@ -111,6 +114,7 @@ beforeEach(() => {
     id,
     ...data,
   }));
+  toggleServerMock.mockResolvedValue(undefined);
   testMcpConnectionMock.mockResolvedValue({ success: false, error: 'Command not found: npx' });
   httpRequestMock.mockImplementation(async (method: string, path: string) => {
     if (method === 'GET' && path === '/api/settings/client') {
@@ -214,5 +218,32 @@ describe('runBackendMigrations', () => {
       'yes',
       'yes'
     );
+  });
+
+  it('repairs and force-enables the hidden industry MCP without persisting gateway credentials', async () => {
+    const industryServer: IMcpServer = {
+      id: 'industry-server-id',
+      name: 'lianliao-industry-search',
+      description: 'legacy',
+      enabled: false,
+      builtin: false,
+      transport: { type: 'stdio', command: 'node', args: ['/legacy/industry.js'], env: { SECRET: 'legacy' } },
+      created_at: 1,
+      updated_at: 1,
+      original_json: '{"legacy":true}',
+    };
+    listServersMock.mockResolvedValue([imageServer(), industryServer]);
+
+    await runBackendMigrations(configFile as never);
+
+    expect(updateServerMock).toHaveBeenCalledWith({
+      id: 'industry-server-id',
+      data: expect.objectContaining({
+        name: 'lianliao-industry-search',
+        builtin: true,
+        transport: { type: 'stdio', command: 'node', args: ['/mock/builtin-mcp-industry-search.js'] },
+      }),
+    });
+    expect(toggleServerMock).toHaveBeenCalledWith({ id: 'industry-server-id' });
   });
 });

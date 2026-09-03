@@ -20,14 +20,38 @@ export type ProductCatalogReturn = {
 export type CatalogReturn = CompanyCatalogReturn | ProductCatalogReturn;
 export type CatalogRouteState = { catalogReturn: CatalogReturn };
 
+export type AiConversationReturn = {
+  kind: 'ai-conversation';
+  path: `/conversation/${string}`;
+  conversationId: string;
+  targetMessageId: string;
+  scrollTop: number;
+};
+
 export type ProductDetailCompanyReturn = {
   kind: 'company-detail';
   companyId: string;
   catalogReturn?: CompanyCatalogReturn;
+  aiConversationReturn?: AiConversationReturn;
 };
 
 export type ProductDetailRouteState = {
   productDetailReturn: ProductDetailCompanyReturn;
+};
+
+export type ProductDetailOrigin =
+  | { kind: 'catalog'; catalogReturn: CatalogReturn }
+  | { kind: 'company-detail'; companyReturn: ProductDetailCompanyReturn }
+  | { kind: 'ai-conversation'; aiConversationReturn: AiConversationReturn };
+
+export type CompanyDetailProductReturn = {
+  kind: 'product-detail';
+  productId: string;
+  origin?: ProductDetailOrigin;
+};
+
+export type CompanyDetailRouteState = {
+  companyDetailReturn: CompanyDetailProductReturn;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -83,12 +107,26 @@ export const createCatalogReturnState = (catalogReturn: CatalogReturn): CatalogR
 /** Preserves the originating enterprise detail and its optional list state across a product drill-down. */
 export const createProductDetailCompanyReturnState = (
   companyId: string,
-  catalogReturn?: CompanyCatalogReturn | null
+  catalogReturn?: CompanyCatalogReturn | null,
+  aiConversationReturn?: AiConversationReturn | null
 ): ProductDetailRouteState => ({
   productDetailReturn: {
     kind: 'company-detail',
     companyId,
     ...(catalogReturn ? { catalogReturn } : {}),
+    ...(aiConversationReturn ? { aiConversationReturn } : {}),
+  },
+});
+
+/** Preserves a product detail and its validated origin while visiting the owning company. */
+export const createCompanyDetailProductReturnState = (
+  productId: string,
+  origin?: ProductDetailOrigin
+): CompanyDetailRouteState => ({
+  companyDetailReturn: {
+    kind: 'product-detail',
+    productId,
+    ...(origin ? { origin } : {}),
   },
 });
 
@@ -99,11 +137,100 @@ export const readProductDetailCompanyReturnState = (value: unknown): ProductDeta
   if (candidate.kind !== 'company-detail' || !isEnterpriseEntityId(candidate.companyId, 31)) return null;
 
   if (candidate.catalogReturn === undefined) {
-    return { kind: 'company-detail', companyId: candidate.companyId };
+    const aiConversationReturn = readAiConversationReturnState(candidate.aiConversationReturn);
+    return {
+      kind: 'company-detail',
+      companyId: candidate.companyId,
+      ...(aiConversationReturn ? { aiConversationReturn } : {}),
+    };
   }
   const catalogReturn = readCatalogReturnState({ catalogReturn: candidate.catalogReturn }, 'companies');
   if (!catalogReturn) return null;
-  return { kind: 'company-detail', companyId: candidate.companyId, catalogReturn };
+  const aiConversationReturn = readAiConversationReturnState(candidate.aiConversationReturn);
+  return {
+    kind: 'company-detail',
+    companyId: candidate.companyId,
+    catalogReturn,
+    ...(aiConversationReturn ? { aiConversationReturn } : {}),
+  };
+};
+
+const readProductDetailOrigin = (value: unknown): ProductDetailOrigin | null => {
+  if (!isRecord(value)) return null;
+  if (value.kind === 'catalog') {
+    const catalogReturn =
+      readCatalogReturnState({ catalogReturn: value.catalogReturn }, 'companies') ??
+      readCatalogReturnState({ catalogReturn: value.catalogReturn }, 'products');
+    return catalogReturn ? { kind: 'catalog', catalogReturn } : null;
+  }
+  if (value.kind === 'company-detail') {
+    const companyReturn = readProductDetailCompanyReturnState({ productDetailReturn: value.companyReturn });
+    return companyReturn ? { kind: 'company-detail', companyReturn } : null;
+  }
+  if (value.kind === 'ai-conversation') {
+    const aiConversationReturn = readAiConversationReturnState(value.aiConversationReturn);
+    return aiConversationReturn ? { kind: 'ai-conversation', aiConversationReturn } : null;
+  }
+  return null;
+};
+
+/** Accepts only a local product id and a fully validated product-detail origin. */
+export const readCompanyDetailProductReturnState = (value: unknown): CompanyDetailProductReturn | null => {
+  if (!isRecord(value) || !isRecord(value.companyDetailReturn)) return null;
+  const candidate = value.companyDetailReturn;
+  if (candidate.kind !== 'product-detail' || !isEnterpriseEntityId(candidate.productId, 31)) return null;
+  if (candidate.origin === undefined) return { kind: 'product-detail', productId: candidate.productId };
+  const origin = readProductDetailOrigin(candidate.origin);
+  return origin ? { kind: 'product-detail', productId: candidate.productId, origin } : null;
+};
+
+/** Rebuilds only the allowlisted route state needed by the returning product detail. */
+export const restoreProductDetailOriginState = (
+  value: CompanyDetailProductReturn
+): CatalogRouteState | ProductDetailRouteState | AiConversationReturn | undefined => {
+  switch (value.origin?.kind) {
+    case 'catalog':
+      return createCatalogReturnState(value.origin.catalogReturn);
+    case 'company-detail':
+      return { productDetailReturn: value.origin.companyReturn };
+    case 'ai-conversation':
+      return value.origin.aiConversationReturn;
+    default:
+      return undefined;
+  }
+};
+
+const SAFE_ROUTE_ID = /^[A-Za-z0-9_-]{1,100}$/u;
+
+/** Accepts only a local conversation path bound to the same validated ID. */
+export const readAiConversationReturnState = (value: unknown): AiConversationReturn | null => {
+  if (!isRecord(value)) return null;
+  const candidate = value.kind === 'ai-conversation' ? value : value.aiConversationReturn;
+  if (!isRecord(candidate)) return null;
+  const expectedPath =
+    typeof candidate.conversationId === 'string'
+      ? (`/conversation/${candidate.conversationId}` as `/conversation/${string}`)
+      : null;
+  if (
+    candidate.kind !== 'ai-conversation' ||
+    typeof candidate.conversationId !== 'string' ||
+    !SAFE_ROUTE_ID.test(candidate.conversationId) ||
+    typeof candidate.targetMessageId !== 'string' ||
+    !SAFE_ROUTE_ID.test(candidate.targetMessageId) ||
+    candidate.path !== expectedPath ||
+    typeof candidate.scrollTop !== 'number' ||
+    !Number.isFinite(candidate.scrollTop) ||
+    candidate.scrollTop < 0
+  ) {
+    return null;
+  }
+  return {
+    kind: 'ai-conversation',
+    path: expectedPath,
+    conversationId: candidate.conversationId,
+    targetMessageId: candidate.targetMessageId,
+    scrollTop: candidate.scrollTop,
+  };
 };
 
 export function readCatalogReturnState(value: unknown, expectedKind: 'companies'): CompanyCatalogReturn | null;

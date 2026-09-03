@@ -8,17 +8,17 @@ import type {
   CatalogAssistantTrustedResult,
   EnterpriseAssistantRoutePlan,
 } from '@/common/enterprise/catalog-assistant/contracts';
-import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
-import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
-import { useLocation } from 'react-router-dom';
-
 import {
   CatalogAssistantCancelledError,
   CatalogAssistantExecutionError,
-  type CatalogAssistantResumeState,
+  getCatalogScopeDigest,
+  getCatalogTrustedResultId,
   runCatalogAssistant,
-} from './catalogAssistantOrchestrator';
-import { getCatalogScopeDigest, getCatalogTrustedResultId } from './adapters/catalogAdapterRegistry';
+  type CatalogAssistantResumeState,
+} from '@/common/enterprise/catalog-assistant/runtime';
+import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
+import { useLocation } from 'react-router-dom';
 
 type CatalogAssistantSessionState = {
   message: string;

@@ -14,6 +14,27 @@ const enterprisePageStyles = [
   'packages/desktop/src/renderer/pages/enterprise/login/enterprise-login.css',
 ] as const;
 
+const readHexToken = (name: string): string => {
+  const value = themeCss.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1];
+  if (!value) throw new Error(`Missing color token: ${name}`);
+  return value;
+};
+
+const relativeLuminance = (hex: string): number => {
+  const channels = hex
+    .slice(1)
+    .match(/.{2}/g)
+    ?.map((channel) => Number.parseInt(channel, 16) / 255)
+    .map((channel) => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+  if (!channels || channels.length !== 3) throw new Error(`Invalid color: ${hex}`);
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+};
+
+const contrastRatio = (foreground: string, background: string): number => {
+  const values = [relativeLuminance(foreground), relativeLuminance(background)].toSorted((left, right) => right - left);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+};
+
 describe('enterprise visual theme contract', () => {
   it('loads the scoped enterprise theme after the shared color scheme', () => {
     const sharedThemeImport = rendererMain.indexOf("import './styles/themes/index.css';");
@@ -52,6 +73,29 @@ describe('enterprise visual theme contract', () => {
     expect(enterpriseScope).not.toMatch(/--color-(?:bg|text|fill|border|primary)/);
     expect(themeCss).toMatch(/\.enterprise-shell\s+:where\([^)]*\.ll-ant-btn[^)]*\.ll-ant-table[^)]*\)/s);
     expect(themeCss).toMatch(/\.enterprise-login\s+:where\([^)]*\.ll-ant-btn[^)]*\.ll-ant-alert[^)]*\)/s);
+  });
+
+  it('keeps IconPark glyphs legible on every enterprise primary button', () => {
+    expect(themeCss).toContain('--enterprise-on-primary: #ffffff;');
+    expect(themeCss).toContain('.enterprise-shell .ll-ant-btn-primary .i-icon,');
+    expect(themeCss).toContain('.enterprise-login .ll-ant-btn-primary .i-icon,');
+    expect(themeCss).toContain('.enterprise-shell .ll-ant-btn-primary .i-icon svg');
+    expect(themeCss).toContain('.enterprise-login .ll-ant-btn-primary .i-icon svg');
+    expect(themeCss).toContain('.enterprise-shell .ll-ant-btn-primary .i-icon svg [stroke]');
+    expect(themeCss).toContain('stroke: currentColor;');
+    expect(themeCss).toContain("[fill]:not([fill='none']):not([fill='transparent'])");
+    expect(themeCss).toContain('fill: currentColor;');
+  });
+
+  it('keeps the enterprise icon palette above the WCAG non-text contrast threshold', () => {
+    const surface = readHexToken('--enterprise-surface');
+    const primary = readHexToken('--enterprise-primary');
+    const onPrimary = readHexToken('--enterprise-on-primary');
+    const secondary = readHexToken('--enterprise-text-secondary');
+
+    expect(contrastRatio(onPrimary, primary)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(primary, surface)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(secondary, surface)).toBeGreaterThanOrEqual(3);
   });
 
   it.each(enterprisePageStyles)('uses the shared enterprise typeface in %s', (stylePath) => {

@@ -7,8 +7,17 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
+import {
+  DEV_USER_DATA_DIRECTORY,
+  LEGACY_DEV_USER_DATA_DIRECTORY,
+  LEGACY_MULTI_INSTANCE_DEV_USER_DATA_DIRECTORY,
+  LEGACY_PACKAGED_USER_DATA_DIRECTORY,
+  MULTI_INSTANCE_DEV_USER_DATA_DIRECTORY,
+  PACKAGED_USER_DATA_DIRECTORY,
+} from '@/common/platform/userDataPath';
 
 const LOG_SUFFIXES = ['.log', '.aioncore.log', '.aionrs.log'];
+const UNDATED_LOG_FILES = ['main.log'];
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}/;
 const DEFAULT_LOG_DAYS = 3;
 const MAX_LOG_TEXT_BYTES = 4 * 1024 * 1024;
@@ -17,6 +26,14 @@ export type FeedbackLogAttachment = {
   filename: string;
   data: Buffer;
   contentType: 'application/gzip';
+};
+
+export type FeedbackLogDirectoryOptions = {
+  appDataDir: string;
+  currentLogsDir: string;
+  isMultiInstance: boolean;
+  isPackaged: boolean;
+  productName: string;
 };
 
 function isFeedbackLogFile(file: string): boolean {
@@ -38,9 +55,32 @@ function normalizeLogDirs(logsDirs: string | string[]): string[] {
   return normalizedDirs;
 }
 
+/** Return current and historical log roots without mutating legacy data. */
+export function resolveFeedbackLogDirectories(options: FeedbackLogDirectoryOptions): string[] {
+  const stableDirectoryName = options.isPackaged
+    ? PACKAGED_USER_DATA_DIRECTORY
+    : options.isMultiInstance
+      ? MULTI_INSTANCE_DEV_USER_DATA_DIRECTORY
+      : DEV_USER_DATA_DIRECTORY;
+  const legacyDirectoryName = options.isPackaged
+    ? LEGACY_PACKAGED_USER_DATA_DIRECTORY
+    : options.isMultiInstance
+      ? LEGACY_MULTI_INSTANCE_DEV_USER_DATA_DIRECTORY
+      : LEGACY_DEV_USER_DATA_DIRECTORY;
+  const roots = [
+    options.currentLogsDir,
+    path.join(options.appDataDir, stableDirectoryName, 'logs'),
+    path.join(options.appDataDir, options.productName, 'logs'),
+    path.join(options.appDataDir, legacyDirectoryName, 'logs'),
+  ];
+
+  return normalizeLogDirs(roots.flatMap((root) => [root, path.join(root, 'logs')]));
+}
+
 export function getRecentFeedbackLogPathsFromDirs(logsDirs: string[], days = DEFAULT_LOG_DAYS): string[] {
   const filesByDir = new Map<string, Set<string>>();
   const dates = new Set<string>();
+  const undatedPaths: string[] = [];
 
   for (const logsDir of normalizeLogDirs(logsDirs)) {
     let files: string[];
@@ -52,6 +92,9 @@ export function getRecentFeedbackLogPathsFromDirs(logsDirs: string[], days = DEF
 
     const logFiles = new Set<string>();
     for (const file of files) {
+      if (UNDATED_LOG_FILES.includes(file)) {
+        undatedPaths.push(path.join(logsDir, file));
+      }
       if (!isFeedbackLogFile(file)) {
         continue;
       }
@@ -79,7 +122,7 @@ export function getRecentFeedbackLogPathsFromDirs(logsDirs: string[], days = DEF
     }
   }
 
-  return paths;
+  return [...undatedPaths, ...paths];
 }
 
 function getLogHeaderName(logPath: string, rootDir: string, showRelativePath: boolean): string {
@@ -113,7 +156,7 @@ export function getRecentFeedbackLogPaths(logsDir: string, days = DEFAULT_LOG_DA
   }
 
   const recentDates = [...dates].toSorted().toReversed().slice(0, days);
-  const paths: string[] = [];
+  const paths = UNDATED_LOG_FILES.filter((file) => files.includes(file)).map((file) => path.join(normalizedDir, file));
   for (const dateStr of recentDates) {
     for (const suffix of LOG_SUFFIXES) {
       const filePath = path.join(normalizedDir, `${dateStr}${suffix}`);

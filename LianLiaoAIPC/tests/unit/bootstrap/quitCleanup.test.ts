@@ -11,12 +11,6 @@ type BeforeQuitEvent = {
   preventDefault: () => void;
 };
 
-const flushMicrotasks = async () => {
-  for (let i = 0; i < 6; i += 1) {
-    await Promise.resolve();
-  }
-};
-
 describe('installQuitCleanup', () => {
   it('prevents the first quit until cleanup finishes, then requests quit again', async () => {
     const calls: string[] = [];
@@ -41,6 +35,9 @@ describe('installQuitCleanup', () => {
       markExplicitQuit: () => calls.push('mark-explicit-quit'),
       destroyTray: () => calls.push('destroy-tray'),
       disposeCronResumeListener: () => calls.push('dispose-cron'),
+      stopIndustrySearchGateway: async () => {
+        calls.push('stop-industry-gateway');
+      },
       stopBackend,
       logInfo: vi.fn(),
       logWarn: vi.fn(),
@@ -49,7 +46,7 @@ describe('installQuitCleanup', () => {
 
     const preventDefault = vi.fn();
     beforeQuitHandler?.({ preventDefault });
-    await flushMicrotasks();
+    await vi.waitFor(() => expect(stopBackend).toHaveBeenCalledTimes(1));
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(quitApp).not.toHaveBeenCalled();
@@ -58,11 +55,12 @@ describe('installQuitCleanup', () => {
       'mark-explicit-quit',
       'destroy-tray',
       'dispose-cron',
+      'stop-industry-gateway',
       'stop-backend-start',
     ]);
 
     resolveStopBackend?.();
-    await flushMicrotasks();
+    await vi.waitFor(() => expect(quitApp).toHaveBeenCalledTimes(1));
 
     expect(quitApp).toHaveBeenCalledTimes(1);
     expect(calls).toEqual([
@@ -70,6 +68,7 @@ describe('installQuitCleanup', () => {
       'mark-explicit-quit',
       'destroy-tray',
       'dispose-cron',
+      'stop-industry-gateway',
       'stop-backend-start',
       'quit-app',
     ]);
@@ -77,16 +76,18 @@ describe('installQuitCleanup', () => {
 
   it('allows the second before-quit after cleanup has completed', async () => {
     let beforeQuitHandler: ((event: BeforeQuitEvent) => void) | undefined;
+    const quitApp = vi.fn();
 
     installQuitCleanup({
       onBeforeQuit: (handler) => {
         beforeQuitHandler = handler;
       },
-      quitApp: vi.fn(),
+      quitApp,
       setIsQuitting: vi.fn(),
       markExplicitQuit: vi.fn(),
       destroyTray: vi.fn(),
       disposeCronResumeListener: vi.fn(),
+      stopIndustrySearchGateway: async () => {},
       stopBackend: async () => {},
       logInfo: vi.fn(),
       logWarn: vi.fn(),
@@ -94,7 +95,7 @@ describe('installQuitCleanup', () => {
     });
 
     beforeQuitHandler?.({ preventDefault: vi.fn() });
-    await flushMicrotasks();
+    await vi.waitFor(() => expect(quitApp).toHaveBeenCalledTimes(1));
 
     const preventDefault = vi.fn();
     beforeQuitHandler?.({ preventDefault });

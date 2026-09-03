@@ -233,4 +233,45 @@ export type CatalogAssistantRunResult = {
   results: CatalogAssistantTrustedResult[];
   navigationProposal?: EnterpriseAssistantRoutePlan;
   fallback: boolean;
+  broadenedFilters?: Array<{
+    field: 'district' | 'city' | 'keyword';
+    from?: string;
+    to?: string;
+  }>;
 };
+
+/**
+ * Contact-free business records that may cross the Core/MCP boundary.
+ * The desktop workbench can still hydrate protected contact fields after a
+ * user opens a detail page; the AI tool never receives those fields.
+ */
+export type IndustryPublicProduct = Omit<EnterpriseProductSummary, 'contactName' | 'phone'>;
+export type IndustryPublicCompany = Omit<
+  EnterpriseCompanyDetail,
+  'contactName' | 'contactTitle' | 'phone' | 'featuredProducts'
+> & {
+  featuredProducts?: IndustryPublicProduct[];
+};
+
+export type IndustryTrustedResult =
+  | {
+      entityType: 'COMPANY';
+      reason: string;
+      item: IndustryPublicCompany;
+      evidenceProducts?: CatalogProductEvidence[];
+    }
+  | {
+      entityType: 'PRODUCT';
+      reason: string;
+      item: IndustryPublicProduct;
+    }
+  | {
+      entityType: 'PROJECT';
+      reason: string;
+      item: EnterpriseProjectSummary;
+    }
+  | {
+      entityType: 'DEMAND';
+      reason: string;
+      item: EnterpriseDemandSummary;
+    };

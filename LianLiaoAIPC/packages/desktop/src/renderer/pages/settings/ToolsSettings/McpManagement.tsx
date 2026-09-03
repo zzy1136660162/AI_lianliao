@@ -2,7 +2,7 @@ import { Button, Collapse, Dropdown, Menu, Modal } from '@arco-design/web-react'
 import { Down, Plus } from '@icon-park/react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { BUILTIN_IMAGE_GEN_ID, BUILTIN_IMAGE_GEN_NAME, type IMcpServer } from '@/common/config/storage';
+import { isUserVisibleMcpServer, type IMcpServer } from '@/common/config/storage';
 import { useMcpConnection, useMcpModal, useMcpOAuth, useMcpServerCRUD, useMcpServers } from '@/renderer/hooks/mcp';
 import AddMcpServerModal from '../components/AddMcpServerModal';
 import McpServerItem from './McpServerItem';
@@ -11,16 +11,13 @@ interface McpManagementProps {
   message: ReturnType<typeof import('@arco-design/web-react').Message.useMessage>[0];
 }
 
-const isVisibleMcpServer = (server: IMcpServer) =>
-  !(server.builtin === true && (server.id === BUILTIN_IMAGE_GEN_ID || server.name === BUILTIN_IMAGE_GEN_NAME));
-
 const isOAuthCapableServer = (server: IMcpServer) =>
   server.transport.type === 'http' || server.transport.type === 'sse' || server.transport.type === 'streamable_http';
 
 const McpManagement: React.FC<McpManagementProps> = ({ message }) => {
   const { t } = useTranslation();
   const { mcpServers, extensionMcpServers, saveMcpServers, setMcpServers } = useMcpServers();
-  const visibleMcpServers = React.useMemo(() => mcpServers.filter(isVisibleMcpServer), [mcpServers]);
+  const visibleMcpServers = React.useMemo(() => mcpServers.filter(isUserVisibleMcpServer), [mcpServers]);
   const { oauthStatus, loggingIn, checkOAuthStatus, markLoginRequired, clearLoginRequired, login } = useMcpOAuth();
   const handleAuthRequired = React.useCallback(
     (server: IMcpServer) => {

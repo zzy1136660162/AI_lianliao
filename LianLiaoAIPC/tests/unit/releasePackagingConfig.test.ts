@@ -58,6 +58,19 @@ function readProjectFile(path: string): string {
   return readFileSync(resolve(projectRoot, path), 'utf8');
 }
 
+function runWindowsBuildScript(args: string[]) {
+  const scriptPath = resolve(projectRoot, '../tools/build/windows/build_lianliao_aipc_windows.ps1');
+  return spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, ...args],
+    {
+      cwd: resolve(projectRoot, '..'),
+      encoding: 'utf8',
+      timeout: releaseScriptTimeoutMs,
+    }
+  );
+}
+
 function yamlBlock(content: string, key: string): string {
   const startMatch = content.match(new RegExp(`^${key}:\\s*$`, 'm'));
   if (!startMatch || startMatch.index === undefined) return '';
@@ -170,6 +183,32 @@ describe('release packaging configuration', () => {
     expect(afterPackScript).toContain("process.env.LIANLIAO_AICORE_TRUST_PREPARED === '1'");
     expect(afterPackScript).toContain("process.env.LIANLIAO_RELEASE_BUILD !== '1'");
     expect(afterPackScript).toContain('bundled Core structure verification skipped');
+  });
+
+  it.skipIf(process.platform !== 'win32')(
+    'accepts a dry-run release build without requiring a local Core binary',
+    () => {
+      const result = runWindowsBuildScript(['-ReleaseBuild', '-NoProxy', '-WhatIf']);
+      const output = `${result.stdout}\n${result.stderr}`;
+
+      expect(result.status, output).toBe(0);
+      expect(output).toContain('正式发布构建');
+      expect(output).not.toContain('未找到 cargo');
+      expect(output).not.toContain('未找到本地 Core');
+    }
+  );
+
+  it.skipIf(process.platform !== 'win32')('rejects a local Core override in release build mode', () => {
+    const result = runWindowsBuildScript([
+      '-ReleaseBuild',
+      '-CorePath',
+      resolve(projectRoot, '../.release-cache/desktop-2.1.37/extracted/aioncore.exe'),
+      '-WhatIf',
+    ]);
+    const output = `${result.stdout}\n${result.stderr}`;
+
+    expect(result.status).not.toBe(0);
+    expect(output).toContain('正式发布模式不能使用 -CorePath');
   });
 
   it('uses stable ASCII desktop artifact names while retaining compatible updater references', () => {

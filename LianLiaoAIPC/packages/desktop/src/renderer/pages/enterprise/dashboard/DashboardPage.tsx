@@ -1,13 +1,4 @@
-import {
-  ArrowRight,
-  Box,
-  BuildingFour,
-  ChartHistogram,
-  EngineeringBrand,
-  ExchangeFour,
-  RadarChart,
-  User,
-} from '@icon-park/react';
+import { ArrowRight, Box, BuildingFour, EngineeringBrand, ExchangeFour, RadarChart, User } from '@icon-park/react';
 import { Card, Empty, Statistic } from 'antd';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,8 +7,9 @@ import { Link } from 'react-router-dom';
 import { useEnterpriseAuth } from '@/renderer/hooks/context/EnterpriseAuthContext';
 import EnterpriseChart from '@/renderer/pages/enterprise/charts/EnterpriseChart';
 import {
-  buildCategoryComparisonOption,
-  buildDistributionBarOption,
+  buildCategoryDotOption,
+  buildMaterialTreemapOption,
+  buildRegionHeatOption,
 } from '@/renderer/pages/enterprise/charts/projectChartOptions';
 import EnterprisePageState from '@/renderer/pages/enterprise/layout/EnterprisePageState';
 import CompanyMembershipBadge from '@/renderer/pages/enterprise/membership/CompanyMembershipBadge';
@@ -25,6 +17,7 @@ import { useProjectDashboard } from '@/renderer/pages/enterprise/projects/projec
 import type { EnterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 import { enterpriseClient } from '@/renderer/services/enterprise/enterpriseClient';
 
+import DashboardActivity from './DashboardActivity';
 import GlobalSearch from './GlobalSearch';
 import styles from './dashboard-workbench.module.css';
 
@@ -46,9 +39,9 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
   const radarCharts = useMemo(() => {
     if (!radar.data) return null;
     return {
-      region: buildDistributionBarOption(radar.data.dashboard.regionDistribution, reducedMotion),
-      material: buildDistributionBarOption(radar.data.dashboard.materialTop, reducedMotion),
-      category: buildCategoryComparisonOption(radar.data.drillItems, reducedMotion),
+      region: buildRegionHeatOption(radar.data.dashboard.regionDistribution, reducedMotion),
+      material: buildMaterialTreemapOption(radar.data.dashboard.materialTop, reducedMotion),
+      category: buildCategoryDotOption(radar.data.drillItems, reducedMotion),
     };
   }, [radar.data, reducedMotion]);
 
@@ -70,7 +63,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
     const { dashboard, drillItems } = radar.data;
     const emptyDistribution = t('enterprise.projects.dashboard.distributionEmpty');
     const emptyCategory = t('enterprise.projects.dashboard.categoryEmpty');
-    const distributions = [
+    const insights = [
       {
         key: 'regions',
         title: t('enterprise.projects.dashboard.regionTitle'),
@@ -82,6 +75,15 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
         title: t('enterprise.projects.dashboard.materialTitle'),
         items: dashboard.materialTop,
         option: radarCharts?.material ?? null,
+      },
+      {
+        key: 'categories',
+        title: t('enterprise.projects.dashboard.categoryTitle'),
+        items: drillItems.map((item) => ({
+          label: item.label,
+          value: `${item.projectCount} / ${item.materialNameCount ?? 0}`,
+        })),
+        option: radarCharts?.category ?? null,
       },
     ];
     return (
@@ -108,38 +110,28 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
             suffix={t('enterprise.projects.dashboard.units.materialName')}
           />
         </div>
-        <div className={styles.radarDistributions}>
-          {distributions.map(({ key, title, items, option }) => (
+        <div className={styles.radarVisuals}>
+          {insights.map(({ key, title, items, option }) => (
             <section key={key} aria-label={title}>
               <h3>{title}</h3>
               {option ? (
                 <div className={styles.chartFrame}>
-                  <EnterpriseChart ariaLabel={title} option={option} rows={items} fallback={emptyDistribution} />
+                  <EnterpriseChart
+                    ariaLabel={title}
+                    option={option}
+                    rows={items}
+                    fallback={key === 'categories' ? emptyCategory : emptyDistribution}
+                  />
                 </div>
               ) : (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyDistribution} />
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={key === 'categories' ? emptyCategory : emptyDistribution}
+                />
               )}
             </section>
           ))}
         </div>
-        <section className={styles.radarCategories} aria-label={t('enterprise.projects.dashboard.categoryTitle')}>
-          <h3>{t('enterprise.projects.dashboard.categoryTitle')}</h3>
-          {radarCharts?.category ? (
-            <div className={styles.categoryChartFrame}>
-              <EnterpriseChart
-                ariaLabel={t('enterprise.projects.dashboard.categoryTitle')}
-                option={radarCharts.category}
-                rows={drillItems.map((item) => ({
-                  label: item.label,
-                  value: `${item.projectCount} / ${item.materialNameCount ?? 0}`,
-                }))}
-                fallback={emptyCategory}
-              />
-            </div>
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyCategory} />
-          )}
-        </section>
       </div>
     );
   };
@@ -148,12 +140,7 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
     <section className={styles.page} aria-labelledby='enterprise-dashboard-title'>
       <header className={styles.hero}>
         <div>
-          <span>{t('enterprise.dashboard.eyebrow')}</span>
           <h1 id='enterprise-dashboard-title'>{t('enterprise.routes.dashboard.title')}</h1>
-          <p>{t('enterprise.routes.dashboard.description')}</p>
-        </div>
-        <div className={styles.heroIndex} aria-hidden='true'>
-          {t('enterprise.dashboard.heroIndex')}
         </div>
       </header>
 
@@ -162,13 +149,12 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
       <div className={styles.overviewGrid}>
         <Card className={styles.identityCard} variant='outlined'>
           <div className={styles.cardHeading}>
-            <span>{t('enterprise.dashboard.identity.index')}</span>
+            <h2>{t('enterprise.dashboard.identity.companyLabel')}</h2>
             <User aria-hidden='true' />
           </div>
           <div className={styles.identityCompany}>
             <BuildingFour aria-hidden='true' />
             <div>
-              <small>{t('enterprise.dashboard.identity.companyLabel')}</small>
               <h2>{user?.companyName || t('enterprise.shell.unknownCompany')}</h2>
             </div>
           </div>
@@ -190,37 +176,36 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ client = enterpriseClient
 
         <Card className={styles.quickCard} variant='outlined'>
           <div className={styles.cardHeading}>
-            <span>{t('enterprise.dashboard.quick.index')}</span>
-            <ChartHistogram aria-hidden='true' />
+            <h2>{t('enterprise.dashboard.quick.title')}</h2>
           </div>
-          <h2>{t('enterprise.dashboard.quick.title')}</h2>
           <p>{t('enterprise.dashboard.quick.description')}</p>
           <nav aria-label={t('enterprise.dashboard.quick.ariaLabel')}>
             {quickLinks.map(({ path, labelKey, Icon }) => (
               <Link key={path} to={path}>
                 <Icon aria-hidden='true' />
                 <span>{t(labelKey)}</span>
-                <ArrowRight aria-hidden='true' />
               </Link>
             ))}
           </nav>
         </Card>
       </div>
 
-      <section className={styles.radarSection} aria-labelledby='enterprise-dashboard-radar-title'>
-        <div className={styles.radarHeading}>
-          <div>
-            <span>{t('enterprise.dashboard.radar.eyebrow')}</span>
-            <h2 id='enterprise-dashboard-radar-title'>{t('enterprise.dashboard.radar.title')}</h2>
+      <div className={styles.bottomGrid}>
+        <section className={styles.radarSection} aria-labelledby='enterprise-dashboard-radar-title'>
+          <div className={styles.radarHeading}>
+            <div>
+              <h2 id='enterprise-dashboard-radar-title'>{t('enterprise.dashboard.radar.title')}</h2>
+            </div>
+            <Link to='/enterprise/projects' className={styles.radarLink}>
+              <RadarChart aria-hidden='true' />
+              <span>{t('enterprise.dashboard.radar.viewAll')}</span>
+              <ArrowRight aria-hidden='true' />
+            </Link>
           </div>
-          <Link to='/enterprise/projects' className={styles.radarLink}>
-            <RadarChart aria-hidden='true' />
-            <span>{t('enterprise.dashboard.radar.viewAll')}</span>
-            <ArrowRight aria-hidden='true' />
-          </Link>
-        </div>
-        {renderRadar()}
-      </section>
+          {renderRadar()}
+        </section>
+        <DashboardActivity client={client} />
+      </div>
     </section>
   );
 };

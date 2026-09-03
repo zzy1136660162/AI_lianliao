@@ -76,7 +76,6 @@ const VersionUpdatePage: React.FC<VersionUpdatePageProps> = ({ client = desktopV
     <section className={styles.page} aria-labelledby='desktop-version-update-title'>
       <header className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>{t('enterprise.versionUpdate.eyebrow')}</span>
           <h1 id='desktop-version-update-title'>{t('enterprise.versionUpdate.title')}</h1>
           <p>{t('enterprise.versionUpdate.description')}</p>
         </div>

@@ -1,5 +1,12 @@
 # AI_lianliao 仓库工具
 
+## Windows 桌面端版本发布
+
+Windows x64 本地发布使用按顺序编号的独立 PowerShell 脚本，覆盖安装包元数据、
+直接上传、远端核对、版本码生成、后台登记和客户端查询验证。完整参数和操作顺序见：
+
+- [`release/windows/README.md`](release/windows/README.md)
+
 ## Windows 桌面端本地构建
 
 仓库根目录提供两个 PowerShell 入口，用于把本地编译的 `aioncore.exe` 注入 AIPC 并生成 Windows x64 安装包。

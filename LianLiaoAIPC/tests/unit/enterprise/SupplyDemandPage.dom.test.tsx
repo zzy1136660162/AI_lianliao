@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
@@ -36,9 +36,9 @@ beforeAll(() => {
     value: scrollIntoViewMock,
   });
   window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
-    callback(0);
-    return 1;
+    return window.setTimeout(() => callback(0), 0);
   });
+  window.cancelAnimationFrame = vi.fn((handle: number) => window.clearTimeout(handle));
 });
 
 const listResponse: EnterpriseResponse = {
@@ -203,6 +203,62 @@ describe('supply-demand pages', () => {
     expect(document.querySelectorAll('.ll-ant-card')).toHaveLength(2);
   });
 
+  it('renders trusted demand image fields under the related-images label', async () => {
+    const trustedImage = 'http://www.lslnii.com/upload/NFSImgFile/appl/images/demand.jpg';
+    const client = createClient(async (request) => {
+      if (request.operation !== 'demand.detail') throw new Error('unexpected operation');
+      return {
+        ...detailResponse,
+        data: {
+          ...detailResponse.data,
+          fields: [
+            ...detailResponse.data.fields,
+            { key: 'images', label: '产品图片', value: trustedImage, valueType: 'IMAGE' },
+          ],
+        },
+      };
+    });
+    renderDetail('/enterprise/supply-demand/0/101', client);
+
+    const image = await screen.findByRole('img', {
+      name: 'enterprise.supplyDemand.detail.relatedImageAlt',
+    });
+    expect(image).toHaveAttribute('src', trustedImage.replace('http://', 'https://'));
+    expect(screen.getByText('enterprise.supplyDemand.detail.relatedImages')).toBeVisible();
+    expect(screen.queryByText('产品图片')).not.toBeInTheDocument();
+  });
+
+  it('hides unsafe or failed demand image URLs behind a safe unavailable state', async () => {
+    const client = createClient(async (request) => {
+      if (request.operation !== 'demand.detail') throw new Error('unexpected operation');
+      return {
+        ...detailResponse,
+        data: {
+          ...detailResponse.data,
+          fields: [
+            {
+              key: 'images',
+              label: '产品图片',
+              value: 'https://evil.example/private.jpg,https://www.lslnii.com/upload/demand.jpg',
+              valueType: 'IMAGE',
+            },
+          ],
+        },
+      };
+    });
+    renderDetail('/enterprise/supply-demand/0/101', client);
+
+    const image = await screen.findByRole('img', {
+      name: 'enterprise.supplyDemand.detail.relatedImageAlt',
+    });
+    fireEvent.error(image);
+
+    expect(
+      await screen.findByRole('img', { name: 'enterprise.supplyDemand.detail.relatedImageUnavailable' })
+    ).toBeVisible();
+    expect(screen.queryByText(/evil\.example|lslnii\.com/)).not.toBeInTheDocument();
+  });
+
   it('submits trimmed filters and resets to page one', async () => {
     const client = createClient();
     renderList(client);
@@ -286,7 +342,51 @@ describe('supply-demand pages', () => {
         payload: { pageNum: 2, pageSize: 20 },
       })
     );
-    expect(scrollIntoViewMock).toHaveBeenCalled();
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalled());
+  });
+
+  it('queries the first page once when the supply-demand type changes', async () => {
+    const client = createClient(async (request) => {
+      if (request.operation === 'demand.types') {
+        return {
+          operation: 'demand.types',
+          data: [
+            { typeId: 0, typeName: '机加外包' },
+            { typeId: 5, typeName: '设备采购' },
+          ],
+        };
+      }
+      if (request.operation === 'demand.list') {
+        return listResponseWith('精密零件加工', request.payload.pageNum, 21);
+      }
+      throw new Error('unexpected operation');
+    });
+    renderList(client);
+    await screen.findByText('精密零件加工');
+
+    await userEvent.click(screen.getByTitle('2'));
+    await waitFor(() =>
+      expect(client.request).toHaveBeenLastCalledWith({
+        operation: 'demand.list',
+        payload: { pageNum: 2, pageSize: 20 },
+      })
+    );
+    const listCallCountBeforeTypeChange = vi
+      .mocked(client.request)
+      .mock.calls.filter(([request]) => request.operation === 'demand.list').length;
+
+    fireEvent.mouseDown(screen.getByLabelText('enterprise.supplyDemand.filters.type'));
+    fireEvent.click(await screen.findByText('设备采购'));
+
+    await waitFor(() =>
+      expect(client.request).toHaveBeenLastCalledWith({
+        operation: 'demand.list',
+        payload: { typeId: 5, pageNum: 1, pageSize: 20 },
+      })
+    );
+    expect(
+      vi.mocked(client.request).mock.calls.filter(([request]) => request.operation === 'demand.list')
+    ).toHaveLength(listCallCountBeforeTypeChange + 1);
   });
 
   it('does not call IO for an invalid detail route', async () => {

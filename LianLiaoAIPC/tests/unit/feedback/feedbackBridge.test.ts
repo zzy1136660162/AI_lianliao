@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import * as path from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { app } from 'electron';
+import { DESKTOP_PRODUCT_NAME } from '@/common/platform/productIdentity';
 import { collectFeedbackLogAttachment } from '@/process/feedback/logs';
 
 // Table of handlers registered via ipcMain.handle during module import.
@@ -43,6 +44,8 @@ vi.mock('electron', () => ({
     on: vi.fn(),
   },
   app: {
+    isPackaged: true,
+    getName: vi.fn(() => 'Chain Liaoning Desktop'),
     getPath: vi.fn(() => '/tmp/aionui-test-logs-nonexistent'),
     getVersion: vi.fn(() => '0.0.0'),
   },
@@ -159,6 +162,39 @@ describe('feedbackBridge — capture-screenshot', () => {
 });
 
 describe('feedback logs', () => {
+  it('includes logs from the current product-name directory and the legacy AionUi directory', async () => {
+    const appDataDir = mkdtempSync(path.join(tmpdir(), 'lianliao-feedback-compat-'));
+    try {
+      const currentLogsDir = path.join(appDataDir, 'LianLiaoAIPC', 'logs');
+      const productLogsDir = path.join(appDataDir, DESKTOP_PRODUCT_NAME, 'logs');
+      const legacyLogsDir = path.join(appDataDir, 'AionUi', 'logs');
+      mkdirSync(currentLogsDir, { recursive: true });
+      mkdirSync(productLogsDir, { recursive: true });
+      mkdirSync(legacyLogsDir, { recursive: true });
+      writeFileSync(path.join(currentLogsDir, '2026-09-02.log'), 'stable current log\n');
+      writeFileSync(path.join(productLogsDir, 'main.log'), 'product-name compatibility log\n');
+      writeFileSync(path.join(legacyLogsDir, '2026-09-02.aioncore.log'), 'legacy compatibility log\n');
+
+      vi.mocked(app.getName).mockReturnValue(DESKTOP_PRODUCT_NAME);
+      vi.mocked(app.getPath).mockImplementation((name: string) => {
+        if (name === 'logs') return currentLogsDir;
+        if (name === 'appData') return appDataDir;
+        return path.join(appDataDir, 'LianLiaoAIPC');
+      });
+
+      const handler = handlers.get('feedback:collect-logs')!;
+      const result = (await handler({})) as { filename: string; data: number[] } | null;
+
+      expect(result).not.toBeNull();
+      const content = gunzipSync(Buffer.from(result!.data)).toString('utf8');
+      expect(content).toContain('stable current log');
+      expect(content).toContain('product-name compatibility log');
+      expect(content).toContain('legacy compatibility log');
+    } finally {
+      rmSync(appDataDir, { recursive: true, force: true });
+    }
+  });
+
   it('collects top-level frontend logs and nested backend logs through the IPC handler', async () => {
     const logsDir = mkdtempSync(path.join(tmpdir(), 'aionui-feedback-bridge-'));
     try {

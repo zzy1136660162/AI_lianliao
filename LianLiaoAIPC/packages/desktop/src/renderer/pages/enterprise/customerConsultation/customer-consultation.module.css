@@ -6,7 +6,7 @@
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
-  padding: 20px;
+  padding: var(--enterprise-layout-inset);
   overflow: hidden;
   box-sizing: border-box;
   color: var(--enterprise-text-primary);
@@ -38,15 +38,6 @@
   background: var(--primary);
   box-shadow: 0 10px 20px color-mix(in srgb, var(--primary) 24%, transparent);
   font-size: 22px;
-}
-
-.eyebrow {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--primary);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
 }
 
 .pageHeader h1,
